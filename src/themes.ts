@@ -2,7 +2,7 @@ import type { GlobalThemeOverrides } from 'naive-ui';
 
 export const lightThemeOverrides: GlobalThemeOverrides = {
   Menu: {
-    itemHeight: '32px',
+    itemHeight: '30px',
   },
 
   Layout: { color: '#f1f5f9' },

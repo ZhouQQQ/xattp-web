@@ -6,11 +6,12 @@ module.exports = {
   extends: ['@antfu', './.eslintrc-auto-import.json', '@unocss'],
 
   rules: {
-    'curly': ['error', 'all'],
-    '@typescript-eslint/semi': ['error', 'always'],
-    '@typescript-eslint/no-use-before-define': ['error', { allowNamedExports: true, functions: false }],
-    'vue/no-empty-component-block': ['error'],
-    'no-restricted-imports': ['error', {
+    'curly': ['warn', 'multi-line'],
+    '@typescript-eslint/semi': ['warn', 'never'],
+    '@typescript-eslint/no-use-before-define': ['off'],
+    'vue/no-empty-component-block': ['off'],
+    'no-restricted-imports': ['warn', {
+    'comma-spacing': 'off',
       paths: [{
         name: '@vueuse/core',
         importNames: ['useClipboard'],

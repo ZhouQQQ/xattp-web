@@ -10,7 +10,7 @@ import type { Tool } from '@/tools/tools.types';
 const route = useRoute();
 
 const head = computed<HeadObject>(() => ({
-  title: `${route.meta.name} - IT Tools`,
+  title: `${route.meta.name} - 小安测试工具平台`,
   meta: [
     {
       name: 'description',
@@ -38,9 +38,8 @@ const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.descrip
           <n-h1>
             {{ toolTitle }}
           </n-h1>
-
           <div>
-            <FavoriteButton :tool="{ name: route.meta.name } as Tool" />
+            <FavoriteButton :tool="{ name: route.meta.name, path: route.path } as Tool" />
           </div>
         </div>
 
@@ -68,22 +67,22 @@ const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.descrip
   gap: 16px;
 
   ::v-deep(& > *) {
-    flex: 0 1 600px;
+    flex: 0 1 80%;
   }
 }
 
 .tool-layout {
-  max-width: 600px;
+  max-width: 80%;
   margin: 0 auto;
   box-sizing: border-box;
 
   .tool-header {
-    padding: 40px 0;
+    padding: 18px 0;
     width: 100%;
 
     .n-h1 {
       opacity: 0.9;
-      font-size: 40px;
+      font-size: 32px;
       font-weight: 400;
       margin: 0;
       line-height: 1;
@@ -91,16 +90,14 @@ const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.descrip
 
     .separator {
       width: 200px;
-      height: 2px;
+      height: 1px;
       background: rgb(161, 161, 161);
       opacity: 0.2;
-
-      margin: 10px 0;
+      margin: 1px 0;
     }
 
     .description {
       margin: 0;
-
       opacity: 0.7;
     }
   }

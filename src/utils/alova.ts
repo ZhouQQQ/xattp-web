@@ -1,0 +1,57 @@
+import { createAlova } from 'alova';
+import adapterFetch from 'alova/fetch';
+import { useUserStore } from '@/stores/user.store';
+import { useRoute } from 'vue-router';
+
+// 定义不需要处理401的白名单路径
+const AUTH_WHITELIST = [
+    '/api/v1/auth/login',
+    // '/api/v1/auth/info'
+];
+
+export const AlovaInstance = createAlova({
+    requestAdapter: adapterFetch(),
+    cacheFor: 0,
+    beforeRequest(method) {
+        const token = localStorage.getItem('token');
+        // 添加 token 到请求头
+        if (!method.meta?.ignoreToken && token) {
+            method.config.headers['token'] = token;
+        }
+    },
+    responded: {
+        onSuccess: async (response, method) => {
+            // 判断当前请求URL是否在白名单中
+            const isAuthRequest = AUTH_WHITELIST.some(path => method.url.includes(path));
+            
+            if (response.status == 401 && !isAuthRequest) {
+                localStorage.removeItem("token");
+                // 跳转到登录页，但避免在登录页重复跳转
+                if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+            }
+            return response.json();
+        },
+        onError: async (error, method) => {
+            // // 判断401并处理
+            // if (error?.status === 401) {
+            //     const isAuthRequest = AUTH_WHITELIST.some(path => method.url.includes(path));
+            //     if (!isAuthRequest) {
+            //         const path = window.location.pathname;
+            //         localStorage.removeItem('token');
+            //         const query = window.location.search;
+            //         const hash = window.location.hash;
+            //         const result = path + query + hash;
+            //         toLogin(result);
+            //         return;
+            //     }
+            // }
+            console.error(error);
+        },
+    },
+});
+
+
+
+

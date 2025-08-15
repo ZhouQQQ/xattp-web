@@ -3,7 +3,7 @@ home:
     newestTools: '最新工具'
     favoriteTools: '我的收藏'
     allTools: '全部工具'
-  subtitle: '助力开发人员和 IT 工作者'
+  subtitle: '内部测试中...'
   toggleMenu: '切换菜单'
   home: '主页'
   uiLib: 'UI 库'
@@ -56,8 +56,11 @@ toolCard:
   new: '新'
 search:
   label: '搜索'
+  placeholder: "输入你想搜索的工具"
 tools:
   categories:
+    business: '业务工具'
+    useful: '通用实用工具'
     favorite-tools: '我的收藏'
     crypto: '加密'
     converter: '转换器'
@@ -69,6 +72,21 @@ tools:
     measurement: '测量'
     text: '文本'
     data: '数据'
+
+  rental-switch:
+    title: 短租切车
+    description: 用于短租业务切车,自动判断电柜、智能中控、共享中控，并切换到目标环境
+  muti-table-sql-gen:
+    title: 多表SQL生成
+    description: 共享经常只有单租户SQL,后期要用时维护到爆炸，本工具帮你快捷生成多租户SQL
+  
+  oversea-switch:
+    title: 海外切车
+    description: 用于海外共享业务切车,自动在dev,线上新加坡,线上法兰克福等环境寻找设备并切换到目标环境
+
+  ebike-switch:
+    title: 共享切车
+    description: 用于共享Saas切车,会自动在test2,uat,prod,prod2,dev,硬件生产环境寻找设备并切换到目标环境
 
   password-strength-analyser:
     title: 密码强度分析仪
@@ -387,3 +405,23 @@ tools:
   text-to-binary:
     title: 文本到 ASCII 二进制
     description: 将文本转换为其 ASCII 二进制表示形式，反之亦然。
+
+  text-to-speech:
+    title: 文本转语音
+    description: 将文本转换为语音，支持多种语言和语音设置，可试听和下载音频文件
+    text-placeholder: 请输入要转换的文本
+    select-voice: 选择语音
+    rate: 语速
+    pitch: 音调
+    volume: 音量
+    play: 播放
+    playing: 播放中...
+    download: 下载
+    download-mp3: 下载 MP3
+    download-wav: 下载 WAV
+    download-success: 下载成功
+    error:
+      no-text: 请输入要转换的文本
+      play-failed: 语音播放失败
+      download-failed: 音频生成失败
+      get-voices-failed: 获取语音引擎失败

@@ -1,19 +1,63 @@
 <script setup lang="ts">
 import { Heart } from '@vicons/tabler';
+import { onMounted, ref } from 'vue';
+import InputCopyable from '../components/InputCopyable.vue';
 import { useHead } from '@vueuse/head';
 import ColoredCard from '../components/ColoredCard.vue';
 import ToolCard from '../components/ToolCard.vue';
 import { useToolStore } from '@/tools/tools.store';
 import { config } from '@/config';
+import { useCopy } from '@/composable/copy';
+
 
 const toolStore = useToolStore();
 
-useHead({ title: 'IT Tools - Handy online tools for developers' });
+const showTokenDialog = ref(false);
+const tokenValue = ref('');
+const { copy } = useCopy({ source: tokenValue, text: '已复制' });
+
+async function copyAndClose() {
+  try {
+    await copy();
+    showTokenDialog.value = false;
+  } catch(err) {
+    console.error('复制失败:', err);
+  }
+}
+
+function getQueryParam(name: string) {
+  const url = window.location.href;
+  const match = url.match(new RegExp('[?&]' + name + '=([^&]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+onMounted(() => {
+  const showToken = getQueryParam('showToken');
+  if (showToken === '1') {
+    // 这里假设 token 通过 localStorage 或其它方式获取
+    tokenValue.value = localStorage.getItem('token') || '';
+    showTokenDialog.value = true;
+  }
+});
+
+useHead({ title: '小安测试工具平台' });
 const { t } = useI18n();
 </script>
 
 <template>
   <div class="pt-50px">
+    <n-modal v-model:show="showTokenDialog" preset="dialog" style="width: 480px">
+      <template #header>
+        <div>您的 Token</div>
+      </template>
+      <div style="padding: 16px 0;">
+        <InputCopyable :value="tokenValue" />
+      </div>
+      <template #action>
+        <n-button type="primary" size="large" @click="copyAndClose">复制并关闭</n-button>
+      </template>
+    </n-modal>
+
     <div class="grid-wrapper">
       <div class="grid grid-cols-1 gap-12px lg:grid-cols-3 md:grid-cols-3 sm:grid-cols-2 xl:grid-cols-4">
         <ColoredCard v-if="config.showBanner" :title="$t('home.follow.title')" :icon="Heart">

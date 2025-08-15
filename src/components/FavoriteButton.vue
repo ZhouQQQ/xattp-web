@@ -18,7 +18,6 @@ function toggleFavorite(event: MouseEvent) {
     toolStore.removeToolFromFavorites({ tool });
     return;
   }
-
   toolStore.addToolToFavorites({ tool });
 }
 </script>

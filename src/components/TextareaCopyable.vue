@@ -22,7 +22,7 @@ const props = withDefaults(
     followHeightOf: null,
     language: 'txt',
     copyPlacement: 'top-right',
-    copyMessage: 'Copy to clipboard',
+    copyMessage: '复制',
   },
 );
 hljs.registerLanguage('sql', sqlHljs);
