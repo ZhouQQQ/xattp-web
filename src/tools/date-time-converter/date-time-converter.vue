@@ -58,12 +58,12 @@ const formats: DateFormat[] = [
     toDate,
     formatMatcher: date => isRFC3339DateString(date),
   },
-  {
-    name: 'RFC 7231',
-    fromDate: formatRFC7231,
-    toDate,
-    formatMatcher: date => isRFC7231DateString(date),
-  },
+  // {
+  //   name: 'RFC 7231',
+  //   fromDate: formatRFC7231,
+  //   toDate,
+  //   formatMatcher: date => isRFC7231DateString(date),
+  // },
   {
     name: 'Unix timestamp',
     fromDate: date => String(getUnixTime(date)),
@@ -73,7 +73,7 @@ const formats: DateFormat[] = [
   {
     name: 'Timestamp',
     fromDate: date => String(getTime(date)),
-    toDate: ms => parseJSON(+ms),
+    toDate: ms => new Date(+ms),
     formatMatcher: date => isTimestamp(date),
   },
   {
@@ -82,18 +82,18 @@ const formats: DateFormat[] = [
     toDate,
     formatMatcher: date => isUTCDateString(date),
   },
-  {
-    name: 'Mongo ObjectID',
-    fromDate: date => `${Math.floor(date.getTime() / 1000).toString(16)}0000000000000000`,
-    toDate: objectId => new Date(Number.parseInt(objectId.substring(0, 8), 16) * 1000),
-    formatMatcher: date => isMongoObjectId(date),
-  },
-  {
-    name: 'Excel date/time',
-    fromDate: date => dateToExcelFormat(date),
-    toDate: excelFormatToDate,
-    formatMatcher: isExcelFormat,
-  },
+  // {
+  //   name: 'Mongo ObjectID',
+  //   fromDate: date => `${Math.floor(date.getTime() / 1000).toString(16)}0000000000000000`,
+  //   toDate: objectId => new Date(Number.parseInt(objectId.substring(0, 8), 16) * 1000),
+  //   formatMatcher: date => isMongoObjectId(date),
+  // },
+  // {
+  //   name: 'Excel date/time',
+  //   fromDate: date => dateToExcelFormat(date),
+  //   toDate: excelFormatToDate,
+  //   formatMatcher: isExcelFormat,
+  // },
 ];
 
 const formatIndex = ref(6);

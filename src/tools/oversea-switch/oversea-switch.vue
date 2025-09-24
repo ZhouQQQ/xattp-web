@@ -6,7 +6,8 @@ import { getJSONValueByPath } from '@/utils/json';
 import { getDeviceLogAPI, queryOverseaAPI, switchOverseaAPI } from '@/api/device';
 import { formatISO9075 } from 'date-fns';
 import { formatRelativeTime } from '@/utils/datetime';
-
+import overseaTenantData from '../../data/oversea_tenant_data.json';
+import { getOverseaTenant } from '@/utils/tenant';
 onMounted(() => {
   loadHistory();
 });
@@ -127,6 +128,13 @@ function historyClick(item) {
   deviceInfo.value = null;
 }
 
+function getTenantName(env, tenantId) {
+  const tenant = getOverseaTenant(env, tenantId);
+  debugger;
+  return tenant ? tenant.name : '';
+}
+
+
 function addToHistory() {
   if (imei.value && !history.value.includes(imei.value)) {
     history.value.unshift(imei.value);
@@ -166,11 +174,40 @@ watch(history, () => {
 const showModal = ref(false);
 const targetEnv = ref();
 const tenantID = ref();
+const selectedTenant = ref(null);
+
+// 处理租户数据，转换为下拉框选项格式
+const tenantOptions = computed(() => {
+  console.log('overseaTenantData:', overseaTenantData);
+  const options = overseaTenantData.map(tenant => ({
+    label: tenant.name,
+    value: tenant.name,
+    tenantId: tenant.tenantId,
+    env: tenant.env
+  }));
+  console.log('tenantOptions:', options);
+  return options;
+});
+
+function onTenantSelect(tenantName) {
+  if (!tenantName) return
+
+  const selectedTenantData = overseaTenantData.find(tenant => tenant.name === tenantName)
+  if (selectedTenantData) {
+    targetEnv.value = selectedTenantData.env
+    tenantID.value = parseInt(selectedTenantData.tenantId)
+  }
+}
+
 
 const envs = [
   {
     label: '海外dev',
     value: 'oversea-dev',
+  },
+  {
+    label: '海外test',
+    value: 'oversea-test',
   },
   {
     label: '海外线上新加坡',
@@ -188,13 +225,35 @@ const envs = [
 
 const switchLoading = ref(false);
 
+// 监听租户选择变化
+watch(selectedTenant, (val) => {
+  if (val) {
+    const tenant = overseaTenantData.find(t => t.tenantId === val);
+    if (tenant) {
+      targetEnv.value = tenant.env;
+      tenantID.value = tenant.tenantId;
+    }
+  }
+});
+
+// 监听环境变化
 watch(targetEnv, (val) => {
-  if (val === 'oversea-dev') tenantID.value = 1;
-  else tenantID.value = undefined;
+  if (val === 'oversea-dev') {
+    tenantID.value = 1;
+    selectedTenant.value = null;
+  } else {
+    // 如果选择了环境但没有选择租户，清空租户ID
+    if (!selectedTenant.value) {
+      tenantID.value = undefined;
+    }
+  }
 });
 
 function showSwitchDialog() {
   showModal.value = true;
+  selectedTenant.value = null;
+  targetEnv.value = undefined;
+  tenantID.value = undefined;
 }
 
 function swithDevice() {
@@ -219,7 +278,10 @@ function swithDevice() {
       message.error('未知错误:' + error);
     }).finally(() => {
       switchLoading.value = false;
-      deviceLogs.value = []
+      deviceLogs.value = [];
+      selectedTenant.value = null;
+      targetEnv.value = undefined;
+      tenantID.value = undefined;
     });
 }
 
@@ -249,7 +311,7 @@ function queryImei() {
     <c-card>
       <div flex gap-2>
         <c-input-text v-model:value.trim="imei" placeholder="请输入15位的IMEI设备号" raw-text
-          :validation-rules="urlValidationRules" clearable />
+          :validation-rules="urlValidationRules" clearable @keyup.enter="queryImei" />
         <n-button class="click-button" :loading="queryLoading" @click="queryImei"
           :disabled="!isFifteenDigitNumber(imei)">
           <template #icon>
@@ -269,8 +331,8 @@ function queryImei() {
         </n-button>
       </div>
       <div>
-        <n-tag @click="historyClick(item)" mt-4 mr-3 size="small" v-for="(item, index) in history" :key="index"
-          closable @close="handleClose(index)">
+        <n-tag @click="historyClick(item)" mt-4 mr-3 size="small" v-for="(item, index) in history" :key="index" closable
+          @close="handleClose(index)">
           {{ item }}
         </n-tag>
       </div>
@@ -297,12 +359,13 @@ function queryImei() {
       <c-card title="切换记录" v-if="deviceLogs.length > 0">
         <n-list>
           <n-list-item v-for="deviceLog in deviceLogs">
-            👤<span>{{ deviceLog.create_user_name }}</span> <span
-              :title="deviceLog.create_datetime">🕙{{ formatRelativeTime(deviceLog.create_datetime) }}</span> 切到
+            👤<span>{{ deviceLog.create_user_name }}</span> <span :title="deviceLog.create_datetime">🕙{{
+              formatRelativeTime(deviceLog.create_datetime) }}</span> 切到
             <n-tag size="small" type="warning"> {{ deviceLog.target_env_name }}</n-tag><span
               v-if="deviceLog.target_tenant_id">-</span><n-tag v-if="deviceLog.target_tenant_id" size="small"
               type="warning"> {{
-                deviceLog.target_tenant_id }}</n-tag>
+                deviceLog.target_tenant_id }}</n-tag><span class="ml-1">{{ getTenantName(deviceLog.target_env_name,
+                deviceLog.target_tenant_id) }} </span>
           </n-list-item>
         </n-list>
       </c-card>
@@ -314,9 +377,16 @@ function queryImei() {
           <div>快速切换设备环境</div>
         </template>
         <div>
-          <p>将设备号 {{ imei }} 切换到环境：</p>
-          <n-select placeholder="请选择环境" v-model:value="targetEnv" :options="envs" />
           <div>
+            <p mb-2>租户快速选择：</p>
+            <n-select placeholder="租户快速选择" v-model:value="selectedTenant" :options="tenantOptions" clearable
+              @update:value="onTenantSelect" />
+          </div>
+          <div mt-3>
+            <p>将设备号 {{ imei }} 切换到环境：</p>
+            <n-select placeholder="请选择环境" v-model:value="targetEnv" :options="envs" />
+          </div>
+          <div mt-3 v-if="targetEnv != 'shengchan'">
             租户ID :
             <n-input-number v-model:value.trim="tenantID" :show-button="false" placeholder="请输入租户ID" clearable />
           </div>

@@ -218,7 +218,7 @@ function queryImei() {
             <div flex gap-2>
                 <c-input-text trim v-model:value.trim="imei" placeholder="请输入15位的IMEI设备号" raw-text
                               :validation-rules="urlValidationRules"
-                              clearable />
+                              clearable @keyup.enter="queryImei" />
                 <n-button class="click-button" :loading="queryLoading" @click="queryImei"
                           :disabled="!isFifteenDigitNumber(imei)">
                     <template #icon>

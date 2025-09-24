@@ -57,23 +57,26 @@ const properties = [
       return data.device_raw?.data?.deviceType;
     },
   },
-  // {
-  //     label: '设备协议',
-  //     valueFn: (data) => {
-  //         if (data.current_env_name === 'shengchan') {
-  //             return '';
-  //         }
-  //         return data.device_raw?.data?.deviceProtocol;
-  //     },
-  // },
+  {
+      label: '设备协议',
+      valueFn: (data) => {
+          if (data.current_env_name === 'shengchan') {
+              return '';
+          }
+          return data.device_raw?.data?.deviceProtocol;
+      },
+  },
   {
     label: '上次在线时间',
     valueFn: (data) => {
       if (data.current_env_name === 'shengchan') {
         return '';
       }
-      const date = new Date(data.device_raw.data?.lastOnlineTime);
-      return formatISO9075(date);
+      try {
+        return formatISO9075(new Date(data.device_raw.data?.lastOnlineTime));
+      } catch (e) {
+        return '';
+      }   
     },
   },
   {
@@ -342,7 +345,7 @@ function openJsonModal(type: 'device' | 'c16' | 'c34') {
     <c-card>
       <div flex gap-2>
         <c-input-text v-model:value.trim="imei" placeholder="请输入15位的IMEI设备号" raw-text
-          :validation-rules="urlValidationRules" clearable />
+          :validation-rules="urlValidationRules" clearable @keyup.enter="queryImei" />
         <n-button class="click-button" :loading="queryLoading" @click="queryImei"
           :disabled="!isFifteenDigitNumber(imei)">
           <template #icon>
