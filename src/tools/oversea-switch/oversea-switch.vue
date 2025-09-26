@@ -379,12 +379,12 @@ function queryImei() {
         <div>
           <div>
             <p mb-2>租户快速选择：</p>
-            <n-select placeholder="租户快速选择" v-model:value="selectedTenant" :options="tenantOptions" clearable
+            <n-select filterable placeholder="租户快速选择" v-model:value="selectedTenant" :options="tenantOptions" clearable
               @update:value="onTenantSelect" />
           </div>
           <div mt-3>
             <p>将设备号 {{ imei }} 切换到环境：</p>
-            <n-select placeholder="请选择环境" v-model:value="targetEnv" :options="envs" />
+            <n-select filterable placeholder="请选择环境" v-model:value="targetEnv" :options="envs" />
           </div>
           <div mt-3 v-if="targetEnv != 'shengchan'">
             租户ID :
