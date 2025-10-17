@@ -28,17 +28,21 @@ const properties = [
         },
     },
     {
-        label: '设备网关',
-        valueFn: (data) => {
-            return data.gateway;
-        },
-    },
-    {
         label: '设备类型',
         valueFn: (data) => {
             return data.type_name;
         },
-    },
+    }, {
+        label: '设备网关',
+        valueFn: (data) => {
+            return data.gateway;
+        },
+    }, {
+        label: 'server',
+        valueFn: (data) => {
+            return data.server;
+        },
+    }
 ];
 
 const deviceInfo = ref(null);
@@ -119,8 +123,8 @@ const dType = ref(1);
 
 const DEVICE_TYPE_ARRAY = [
     { 'value': 1, name: '电柜' },
-    { 'value': 2, name: '智能中控' },
-    { 'value': 3, name: '共享中控' },
+    { 'value': 2, name: '智能协议中控' },
+    { 'value': 3, name: '共享协议中控(新网关)' },
 ];
 
 const envs = [
@@ -139,11 +143,7 @@ const envs = [
     {
         label: 'DEV',
         value: 'dev',
-    },
-    {
-        label: '城投',
-        value: 'chengtou',
-    },
+    }
 ];
 
 const switchLoading = ref(false);
@@ -178,9 +178,9 @@ function swithDevice() {
         .catch(error => {
             message.error('未知错误:' + error);// 处理错误
         }).finally(() => {
-        switchLoading.value = false;
-        deviceLogs.value = []
-    });
+            switchLoading.value = false;
+            deviceLogs.value = []
+        });
 }
 
 
@@ -191,7 +191,7 @@ function queryImei() {
     getDeviceLogAPI({ imei: imei.value, size: 5 }).then((res) => {
         deviceLogs.value = res.data;
     });
-    queryRentalAPI({ imei: imei.value ,type: dType.value})
+    queryRentalAPI({ imei: imei.value, type: dType.value })
         .then((response) => {
             if (response.code === 0) {
                 deviceInfo.value = response.data;
@@ -204,11 +204,11 @@ function queryImei() {
                 message.error(response.msg);
             }
         }).catch((error) => {
-        message.error(`未知错误:${error}`);// 处理错误
-    }).finally(() => {
-        queryLoading.value = false;
-        addToHistory();
-    });
+            message.error(`未知错误:${error}`);// 处理错误
+        }).finally(() => {
+            queryLoading.value = false;
+            addToHistory();
+        });
 }
 </script>
 
@@ -217,10 +217,9 @@ function queryImei() {
         <c-card>
             <div flex gap-2>
                 <c-input-text trim v-model:value.trim="imei" placeholder="请输入15位的IMEI设备号" raw-text
-                              :validation-rules="urlValidationRules"
-                              clearable @keyup.enter="queryImei" />
+                    :validation-rules="urlValidationRules" clearable @keyup.enter="queryImei" />
                 <n-button class="click-button" :loading="queryLoading" @click="queryImei"
-                          :disabled="!isFifteenDigitNumber(imei)">
+                    :disabled="!isFifteenDigitNumber(imei)">
                     <template #icon>
                         <n-icon>
                             <Search />
@@ -238,16 +237,13 @@ function queryImei() {
                 </n-button>
             </div>
             <n-radio-group style="margin-top:5px" v-model:value="dType" name="deviceType">
-                <n-radio v-for="type in DEVICE_TYPE_ARRAY"
-                         :value="type.value"
-                         :name="type.name"
-                >
+                <n-radio v-for="type in DEVICE_TYPE_ARRAY" :value="type.value" :name="type.name">
                     {{ type.name }}
                 </n-radio>
             </n-radio-group>
             <div>
-                <n-tag @click="historyClick(item)" mt-4 mr-3 size="small" v-for="(item, index ) in history" :key="index"
-                       closable @close="handleClose(index)">
+                <n-tag @click="historyClick(item)" mt-4 mr-3 size="small" v-for="(item, index) in history" :key="index"
+                    closable @close="handleClose(index)">
                     {{ item }}
                 </n-tag>
             </div>
@@ -259,26 +255,26 @@ function queryImei() {
 
                 <n-table>
                     <tbody>
-                    <tr v-for="{ label, valueFn } in properties" :key="label">
-                        <td font-bold >
-                            {{ label }}
-                        </td>
-                        <td>
-                            <span-copyable   v-if="valueFn(deviceInfo)" :value="`${valueFn(deviceInfo)}`" />
-                            <span v-else op-80>
-                -
-              </span>
-                        </td>
-                    </tr>
+                        <tr v-for="{ label, valueFn } in properties" :key="label">
+                            <td font-bold>
+                                {{ label }}
+                            </td>
+                            <td>
+                                <span-copyable v-if="valueFn(deviceInfo)" :value="`${valueFn(deviceInfo)}`" />
+                                <span v-else op-80>
+                                    -
+                                </span>
+                            </td>
+                        </tr>
                     </tbody>
                 </n-table>
 
             </c-card>
-            <c-card title="切车记录" v-if="deviceLogs.length>0">
+            <c-card title="切车记录" v-if="deviceLogs.length > 0">
                 <n-list>
                     <n-list-item v-for="deviceLog in deviceLogs">
-                        👤<span>{{ deviceLog.create_user_name }}</span> <span
-                        :title="deviceLog.create_datetime">🕙{{ formatRelativeTime(deviceLog.create_datetime) }}</span>
+                        👤<span>{{ deviceLog.create_user_name }}</span> <span :title="deviceLog.create_datetime">🕙{{
+                            formatRelativeTime(deviceLog.create_datetime) }}</span>
                         切到
                         <n-tag size="small" type="warning"> {{ deviceLog.target_env_name }}</n-tag>
 
