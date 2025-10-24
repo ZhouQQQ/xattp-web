@@ -33,7 +33,7 @@ const properties = [
             return data.type_name;
         },
     }, {
-        label: '设备网关',
+        label: '设备网关(透传)',
         valueFn: (data) => {
             return data.gateway;
         },
@@ -119,12 +119,12 @@ const showModal = ref(false);
 
 const targetEnv = ref();
 const tenantID = ref();
-const dType = ref(1);
+const dType = ref(3);
 
 const DEVICE_TYPE_ARRAY = [
-    { 'value': 1, name: '电柜' },
-    { 'value': 2, name: '智能协议中控' },
     { 'value': 3, name: '共享协议中控(新网关)' },
+    { 'value': 2, name: '智能协议中控' },
+    { 'value': 1, name: '电柜' },
 ];
 
 const envs = [

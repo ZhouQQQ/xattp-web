@@ -1,135 +1,149 @@
 [
-  {
-    "name": "AngoDEV",
-    "tenantId": "1",
-    "env": "oversea-dev",
-    "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/1.logo.png",
-    "platfromUrl": "https://ebike-star-dev.xiaoantech.net/frontend/admindev/index.html"
-  },
-  {
-    "name": "AngoTEST",
-    "tenantId": "1",
-    "env": "oversea-test",
-    "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/1.logo.png",
-    "platfromUrl": "https://ebike-star-test.xiaoantech.net/frontend/admin/index.htm"
-  },
-  {
-    "name": "Ango",
-    "tenantId": "1",
-    "env": "oversea-prod-sg",
-    "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/1.logo.png",
-    "platfromUrl": "https://ango.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "Welo",
-    "tenantId": "100",
-    "env": "oversea-prod-sg",
-    "logo": "https://ango.xiaoantek.com/frontend/res/100.logo.png",
-    "platfromUrl": "https://welo.welothai.com/frontend/admin/index.html"
-  },
-  {
-    "name": "GSR",
-    "tenantId": "101",
-    "env": "oversea-prod-fk",
-    "logo": "https://gsr.xiaoantek.com/frontend/res/101.logo.png",
-    "platfromUrl": "https://gsr.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "THUNDER GO",
-    "tenantId": "1907",
-    "env": "oversea-prod-fk",
-    "logo": "https://thunder.xiaoantek.com/frontend/res/1907.logo.png",
-    "platfromUrl": "https://thunder.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "T1 GO",
-    "tenantId": "609",
-    "env": "oversea-prod-fk",
-    "logo": "https://t1go.xiaoantek.com/frontend/res/609.logo.png",
-    "platfromUrl": "https://t1go.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "Tai GO",
-    "tenantId": "2163",
-    "env": "oversea-prod-sg",
-    "logo": "https://taigo.xiaoantek.com/frontend/res/2163.logo.png",
-    "platfromUrl": "https://taigo.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "QIFO",
-    "tenantId": "2162",
-    "env": "oversea-prod-fk",
-    "logo": "https://qifo.xiaoantek.com/frontend/res/2162.logo.png",
-    "platfromUrl": "https://qifo.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "Pleasant Ride",
-    "tenantId": "2258",
-    "env": "oversea-prod-sg",
-    "logo": "https://pleasant.xiaoantek.com/frontend/res/2258.logo.png",
-    "platfromUrl": "https://pleasant.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "LAOS-GO",
-    "tenantId": "2348",
-    "env": "oversea-prod-sg",
-    "logo": "https://laosgo.xiaoantek.com/frontend/res/2348.logo.png",
-    "platfromUrl": "https://laosgo.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "READY-GO",
-    "tenantId": "2339",
-    "env": "oversea-prod-sg",
-    "logo": "https://qifotl.xiaoantek.com/frontend/res/2339.logo.png",
-    "platfromUrl": "https://qifotl.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "QIFO E-BIKE",
-    "tenantId": "2388",
-    "env": "oversea-prod-sg",
-    "logo": "https://qifotl.xiaoantek.com/frontend/res/2388.logo.png",
-    "platfromUrl": "https://qifotl.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "拾时出行电单车",
-    "tenantId": "2385",
-    "env": "oversea-prod-sg",
-    "logo": "https://shishi.xiaoantek.com/frontend/res/2385.logo.png",
-    "platfromUrl": "https://shishi.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "EAGOO–Ebike sharing",
-    "tenantId": "2517",
-    "env": "oversea-prod-sg",
-    "logo": "https://eagoo.xiaoantek.com/frontend/res/2517.logo.png",
-    "platfromUrl": "https://eagoo.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "Mancool",
-    "tenantId": "2571",
-    "env": "oversea-prod-sg",
-    "logo": "https://mancool.xiaoantek.com/frontend/res/2571.logo.png",
-    "platfromUrl": "https://mancool.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "ETNGo",
-    "tenantId": "2965",
-    "env": "oversea-prod-sg",
-    "logo": "https://etngo.xiaoantek.com/frontend/res/2965.logo.png",
-    "platfromUrl": "https://etngo.xiaoantek.com/frontend/admin/index.html"
-  },
-  {
-    "name": "UB Bike",
-    "tenantId": "2967",
-    "env": "oversea-prod-sg",
-    "logo": "https://ubbike.xiaoantek.com/frontend/res/2967.logo.png",
-    "platfromUrl": "https://ubbike.xiaoantek.com/frontend/admin/index.html"
-  },
-   {
-    "name": "LPB-EBIKE",
-    "tenantId": "2976",
-    "env": "oversea-prod-sg",
-    "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/2976.logo.png",
-    "platfromUrl": "https://lpbebike.xiaoantek.com/frontend/admin/index.html"
-  }
+    {
+        "name": "AngoDEV",
+        "tenantId": "1",
+        "env": "oversea-dev",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/1.logo.png",
+        "platfromUrl": "https://ebike-star-dev.xiaoantech.net/frontend/admindev/index.html"
+    },
+    {
+        "name": "AngoTEST",
+        "tenantId": "1",
+        "env": "oversea-test",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/1.logo.png",
+        "platfromUrl": "https://ebike-star-test.xiaoantech.net/frontend/admin/index.htm"
+    },
+    {
+        "name": "Ango",
+        "tenantId": "1",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/1.logo.png",
+        "platfromUrl": "https://ango.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "Welo",
+        "tenantId": "100",
+        "env": "oversea-prod-sg",
+        "logo": "https://ango.xiaoantek.com/frontend/res/100.logo.png",
+        "platfromUrl": "https://welo.welothai.com/frontend/admin/index.html"
+    },
+    {
+        "name": "GSR",
+        "tenantId": "101",
+        "env": "oversea-prod-fk",
+        "logo": "https://gsr.xiaoantek.com/frontend/res/101.logo.png",
+        "platfromUrl": "https://gsr.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "THUNDER GO",
+        "tenantId": "1907",
+        "env": "oversea-prod-fk",
+        "logo": "https://thunder.xiaoantek.com/frontend/res/1907.logo.png",
+        "platfromUrl": "https://thunder.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "T1 GO",
+        "tenantId": "609",
+        "env": "oversea-prod-fk",
+        "logo": "https://t1go.xiaoantek.com/frontend/res/609.logo.png",
+        "platfromUrl": "https://t1go.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "Tai GO",
+        "tenantId": "2163",
+        "env": "oversea-prod-sg",
+        "logo": "https://taigo.xiaoantek.com/frontend/res/2163.logo.png",
+        "platfromUrl": "https://taigo.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "QIFO",
+        "tenantId": "2162",
+        "env": "oversea-prod-fk",
+        "logo": "https://qifo.xiaoantek.com/frontend/res/2162.logo.png",
+        "platfromUrl": "https://qifo.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "Pleasant Ride",
+        "tenantId": "2258",
+        "env": "oversea-prod-sg",
+        "logo": "https://pleasant.xiaoantek.com/frontend/res/2258.logo.png",
+        "platfromUrl": "https://pleasant.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "LAOS-GO",
+        "tenantId": "2348",
+        "env": "oversea-prod-sg",
+        "logo": "https://laosgo.xiaoantek.com/frontend/res/2348.logo.png",
+        "platfromUrl": "https://laosgo.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "READY-GO",
+        "tenantId": "2339",
+        "env": "oversea-prod-sg",
+        "logo": "https://qifotl.xiaoantek.com/frontend/res/2339.logo.png",
+        "platfromUrl": "https://qifotl.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "QIFO E-BIKE",
+        "tenantId": "2388",
+        "env": "oversea-prod-sg",
+        "logo": "https://qifotl.xiaoantek.com/frontend/res/2388.logo.png",
+        "platfromUrl": "https://qifotl.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "拾时出行电单车",
+        "tenantId": "2385",
+        "env": "oversea-prod-sg",
+        "logo": "https://shishi.xiaoantek.com/frontend/res/2385.logo.png",
+        "platfromUrl": "https://shishi.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "EAGOO–Ebike sharing",
+        "tenantId": "2517",
+        "env": "oversea-prod-sg",
+        "logo": "https://eagoo.xiaoantek.com/frontend/res/2517.logo.png",
+        "platfromUrl": "https://eagoo.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "Mancool",
+        "tenantId": "2571",
+        "env": "oversea-prod-sg",
+        "logo": "https://mancool.xiaoantek.com/frontend/res/2571.logo.png",
+        "platfromUrl": "https://mancool.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "ETNGo",
+        "tenantId": "2965",
+        "env": "oversea-prod-sg",
+        "logo": "https://etngo.xiaoantek.com/frontend/res/2965.logo.png",
+        "platfromUrl": "https://etngo.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "UB Bike",
+        "tenantId": "2967",
+        "env": "oversea-prod-sg",
+        "logo": "https://ubbike.xiaoantek.com/frontend/res/2967.logo.png",
+        "platfromUrl": "https://ubbike.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "LPB-EBIKE",
+        "tenantId": "2976",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/2976.logo.png",
+        "platfromUrl": "https://lpbebike.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "Ding-GO",
+        "tenantId": "2443",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/2443.logo.png",
+        "platfromUrl": "https://dinggo.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "MyGoAsia",
+        "tenantId": "2990",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/2990.logo.png",
+        "platfromUrl": "https://mygoasia.xiaoantek.com/frontend/admin/index.html"
+    }
 ]
