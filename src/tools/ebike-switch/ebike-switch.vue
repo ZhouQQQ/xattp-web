@@ -84,7 +84,7 @@ const properties = [
     // value: 'device_raw.data.updateAt',
     valueFn: (data) => {
       if (data.current_env_name === 'shengchan') {
-        return `${data.c34_raw.result.gps.lng},${data.c34_raw.result.gps.lat}`;
+        return `${data.c34_raw.result?.gps?.lng},${data.c34_raw.result?.gps?.lat}`;
       }
       return `${data.device_raw?.data?.lng},${data.device_raw?.data?.lat}`;
     },
@@ -94,7 +94,7 @@ const properties = [
     // value: 'device_raw.data.updateAt',
     valueFn: (data) => {
       if (data.current_env_name === 'shengchan') {
-        return `${data.c34_raw.result.acc}`;
+        return `${data.c34_raw.result?.acc}`;
       }
       return `${data.device_raw?.data?.acc}`;
     },
@@ -202,10 +202,10 @@ const envs = [
     label: 'PROD2',
     value: 'prod2',
   },
-  {
-    label: 'DIDI',
-    value: 'didi',
-  },
+  // {
+  //   label: 'DIDI',
+  //   value: 'didi',
+  // },
   {
     label: 'DEV',
     value: 'dev',

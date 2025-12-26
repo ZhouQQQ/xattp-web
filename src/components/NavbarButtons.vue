@@ -126,17 +126,17 @@ function handleXathClick() {
     </c-tooltip>
     <c-tooltip position="bottom">
         <c-button variant="text" @click="handleXathClick">
-            ⚙️小安测试助手
+            ⚙️小安测试助手（浏览器插件）
         </c-button>
     </c-tooltip>
     <c-tooltip position="bottom">
         <c-button variant="text" target="_blank" to="https://test-jenkins.xiaoantech.com">
-            共享自动化Jenkins
+            测试部Jenkins
         </c-button>
     </c-tooltip>
 
     <n-dropdown :options="userOptions" @select="handleSelect">
-        <c-button variant="text"> <span>🙂{{ userStore.userInfo.nick }}</span></c-button>
+        <c-button variant="text"> <span>😄{{ userStore.userInfo.nick }}</span></c-button>
     </n-dropdown>
 </template>
 

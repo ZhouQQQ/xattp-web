@@ -56,7 +56,7 @@
               <n-button type="default" size="small" @click="downloadSQL">
                 下载SQL文件
               </n-button>
-              <n-button type="success" size="small" @click="executeSQL">
+              <n-button type="success" size="small" @click="executeSQL" :loading="executingSQL">
                 执行SQL
               </n-button>
             </div>
@@ -91,6 +91,7 @@ const tenantIds = ref<string[]>([]);
 const totalCount = ref<string>('');
 const loadingTenants = ref(false);
 const includeComments = ref(false);
+const executingSQL = ref(false);
 
 // 环境配置
 const environments = [
@@ -301,6 +302,7 @@ function executeSQL() {
     return;
   }
 
+  executingSQL.value = true;
   // 这里可以添加实际执行SQL的逻辑
   sqlExecuteApi({ sql: allGeneratedSQL.value, env: selectedEnv.value }).then((res) => {
     if (res.code === 0) {
@@ -310,6 +312,8 @@ function executeSQL() {
     }
   }).catch((err) => {
     message.error('SQL执行失败: ' + err.message);
+  }).finally(() => {
+    executingSQL.value = false;
   });
 }
 

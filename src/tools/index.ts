@@ -1,6 +1,7 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as clearRealname } from './clear-realname';
 import { tool as releaseMergeCheck } from './release-merge-check';
 import { tool as mutiTableSqlGen } from './muti-table-sql-gen';
 import { tool as textToSpeech } from './text-to-speech';
@@ -96,15 +97,36 @@ import { tool as yamlViewer } from './yaml-viewer';
 
 export const toolsByCategory: ToolCategory[] = [
     {
-        name: 'Business',
+        name: 'Ebike-Business',
         components: [
             ebikeSwitch,
-            rentalSwitch,
-            overseaSwitch,
             mutiTableSqlGen,
-            // releaseMergeCheck,
+            clearRealname
         ],
     },
+    {
+        name: 'Rental-Business',
+        components: [
+            rentalSwitch,
+        ],
+    },
+    {
+        name: 'Oversea-Business',
+        components: [
+            overseaSwitch,
+        ],
+    },
+    // {
+    //     name: 'Business',
+    //     components: [
+    //         ebikeSwitch,
+    //         rentalSwitch,
+    //         overseaSwitch,
+    //         mutiTableSqlGen,
+    //         clearRealname,
+    //         // releaseMergeCheck,
+    //     ],
+    // },
     {
         name: 'Useful',
         components: [

@@ -60,6 +60,9 @@ search:
 tools:
   categories:
     business: '业务工具'
+    ebike-business: '共享业务工具'
+    rental-business: '短租业务工具'
+    oversea-business: '海外业务工具'
     useful: '通用实用工具'
     favorite-tools: '我的收藏'
     crypto: '加密'
@@ -83,6 +86,9 @@ tools:
   oversea-switch:
     title: 海外切车
     description: 用于海外共享业务切车,自动在dev,线上新加坡,线上法兰克福等环境寻找设备并切换到目标环境
+  clear-realname:
+    title: 共享清除实名
+    description: 用于共享业务清除实名,根据租户ID和手机号清除实名信息
 
   ebike-switch:
     title: 共享切车

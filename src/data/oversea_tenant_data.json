@@ -112,7 +112,7 @@
         "platfromUrl": "https://mancool.xiaoantek.com/frontend/admin/index.html"
     },
     {
-        "name": "ETNGo",
+        "name": "E-TNGo",
         "tenantId": "2965",
         "env": "oversea-prod-sg",
         "logo": "https://etngo.xiaoantek.com/frontend/res/2965.logo.png",
@@ -145,5 +145,19 @@
         "env": "oversea-prod-sg",
         "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/2990.logo.png",
         "platfromUrl": "https://mygoasia.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "DiDi Bike",
+        "tenantId": "3178",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/3178.logo.png",
+        "platfromUrl": "https://didibike.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "TNGo-HCM",
+        "tenantId": "3129",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/3129.logo.png",
+        "platfromUrl": "https://tngohcm.xiaoantek.com/frontend/admin/index.html"
     }
 ]
