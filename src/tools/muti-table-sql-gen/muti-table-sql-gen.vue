@@ -64,12 +64,13 @@
         </div>
         <div class="sql-results">
           <div class="sql-result-item">
-            <div class="sql-content">
-              <div v-if="!allGeneratedSQL" class="no-sql-placeholder">
-
-              </div>
-              <pre v-else><code>{{ allGeneratedSQL }}</code></pre>
-            </div>
+            <n-input
+              v-model:value="editableGeneratedSQL"
+              type="textarea"
+              :rows="20"
+              placeholder="生成的SQL将显示在这里，您可以编辑或删除部分内容..."
+              class="editable-sql-textarea"
+            />
           </div>
         </div>
       </div>
@@ -78,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useMessage } from 'naive-ui';
 import { sqlExecuteApi } from '@/api/db_tool';
 const message = useMessage();
@@ -92,6 +93,7 @@ const totalCount = ref<string>('');
 const loadingTenants = ref(false);
 const includeComments = ref(false);
 const executingSQL = ref(false);
+const editableGeneratedSQL = ref('');
 
 // 环境配置
 const environments = [
@@ -153,6 +155,11 @@ const allGeneratedSQL = computed(() => {
     const comment = includeComments.value ? `-- 租户ID: ${tenantId}\n` : '';
     return `${comment}${sqlInput.value.replace(/\{tenant_id\}/g, tenantIdNumber)}\n`;
   }).join('\n');
+});
+
+// 监听生成的SQL变化，同步到可编辑的SQL
+watch(allGeneratedSQL, (newSQL) => {
+  editableGeneratedSQL.value = newSQL;
 });
 
 
@@ -256,18 +263,18 @@ function insertPlaceholder() {
 
 // 复制所有SQL
 async function copyAllSQL() {
-  if (!allGeneratedSQL.value) {
+  if (!editableGeneratedSQL.value) {
     message.warning('没有可复制的SQL');
     return;
   }
 
   try {
-    await navigator.clipboard.writeText(allGeneratedSQL.value);
+    await navigator.clipboard.writeText(editableGeneratedSQL.value);
     message.success('所有SQL已复制到剪贴板');
   } catch (error) {
     // 降级方案
     const textArea = document.createElement('textarea');
-    textArea.value = allGeneratedSQL.value;
+    textArea.value = editableGeneratedSQL.value;
     document.body.appendChild(textArea);
     textArea.select();
     document.execCommand('copy');
@@ -278,12 +285,12 @@ async function copyAllSQL() {
 
 // 下载SQL文件
 function downloadSQL() {
-  if (!allGeneratedSQL.value) {
+  if (!editableGeneratedSQL.value) {
     message.warning('没有可下载的SQL');
     return;
   }
 
-  const blob = new Blob([allGeneratedSQL.value], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([editableGeneratedSQL.value], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -297,14 +304,14 @@ function downloadSQL() {
 
 
 function executeSQL() {
-  if (!allGeneratedSQL.value) {
+  if (!editableGeneratedSQL.value) {
     message.warning('没有可执行的SQL');
     return;
   }
 
   executingSQL.value = true;
   // 这里可以添加实际执行SQL的逻辑
-  sqlExecuteApi({ sql: allGeneratedSQL.value, env: selectedEnv.value }).then((res) => {
+  sqlExecuteApi({ sql: editableGeneratedSQL.value, env: selectedEnv.value }).then((res) => {
     if (res.code === 0) {
       message.success('SQL执行成功');
     } else {
@@ -474,43 +481,12 @@ onMounted(() => {
 
   .sql-results {
     .sql-result-item {
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      overflow: hidden;
-
-      .sql-content {
-        padding: 4px;
-        background: #f8f9fa;
-        min-height: 360px;
-        max-height: 1200px;
-        overflow-y: auto;
-
-        .no-sql-placeholder {
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          .placeholder-text {
-            text-align: center;
-
-            .n-tag {
-              font-size: 14px;
-            }
-          }
-        }
-
-        pre {
-          margin: 0;
+      .editable-sql-textarea {
+        :deep(textarea) {
           font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
           font-size: 12px;
-          line-height: 1.1;
-          color: #374151;
-          white-space: pre-wrap;
-          word-break: break-all;
+          line-height: 1.4;
         }
-
-
       }
     }
   }
