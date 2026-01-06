@@ -94,6 +94,10 @@ tools:
     title: 共享切车
     description: 用于共享Saas切车,会自动在test2,uat,prod,prod2,dev,硬件生产环境寻找设备并切换到目标环境
 
+  release-merge-check:
+    title: 发布计划MR检查
+    description: TAPD发布计划MR统计工具，用于检查发布计划中需求和缺陷的MR合并状态
+
   password-strength-analyser:
     title: 密码强度分析仪
     description: 使用此密码强度分析器和破解时间估计工具来发现密码的强度。

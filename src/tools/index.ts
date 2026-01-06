@@ -101,7 +101,8 @@ export const toolsByCategory: ToolCategory[] = [
         components: [
             ebikeSwitch,
             mutiTableSqlGen,
-            clearRealname
+            clearRealname,
+            releaseMergeCheck
         ],
     },
     {

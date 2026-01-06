@@ -43,6 +43,25 @@ const properties = [
             return data.server;
         },
     }
+    ,
+    // {
+    //     label: 'DB-当前环境',
+    //     valueFn: (data) => {
+    //         return data.tenant_info.db_env ? data.tenant_info.db_env : '-';
+    //     },
+    // },
+    {
+        label: 'DB-租户ID',
+        valueFn: (data) => {
+            return data.tenant_info.tenant_id ? data.tenant_info.tenant_id : '-';
+        },
+    },
+    {
+        label: 'DB-租户名称',
+        valueFn: (data) => {
+            return data.tenant_info.tenant_name ? data.tenant_info.tenant_name : '-';
+        }
+    }
 ];
 
 const deviceInfo = ref(null);

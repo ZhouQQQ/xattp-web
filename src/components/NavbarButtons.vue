@@ -30,7 +30,7 @@ onMounted(() => {
     setTimeout(() => {
         const token = localStorage.getItem('token');
         if (token) {
-            console.log('开始获取用户信息...');
+            // console.log('开始获取用户信息...');
             getUserInfo().then(res => {
                 // console.log('getUserInfo 响应:', res);
                 if (res && res.code === 0) {

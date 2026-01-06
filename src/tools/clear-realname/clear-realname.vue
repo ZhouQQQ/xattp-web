@@ -62,12 +62,13 @@ const formData = ref({
 const envOptions = [
   {
     label: "test2",
-    value: "test2"
+    value: "test2",
+    disabled: false
   },
   {
     label: "dev",
     value: "dev",
-    disabled: true
+    disabled: false
   },
   {
     label: "uat",
