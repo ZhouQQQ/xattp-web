@@ -8,5 +8,5 @@ export const tool = defineTool({
   keywords: ['release', 'merge', 'check', 'tapd', 'mr', '统计'],
   component: () => import('./release-merge-check.vue'),
   icon: ArrowsShuffle,
-  createdAt: new Date('2025-08-18'),
+  createdAt: new Date('2026-01-06'),
 });
