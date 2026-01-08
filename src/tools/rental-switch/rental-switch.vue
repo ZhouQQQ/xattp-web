@@ -133,6 +133,11 @@ watch(history, () => {
     saveHistory();
 }, { deep: true });
 
+// 监听输入框变化，清空切车记录
+watch(imei, () => {
+    deviceLogs.value = [];
+});
+
 
 const showModal = ref(false);
 
