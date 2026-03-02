@@ -216,10 +216,17 @@
 </template>
 
 <script setup>
-import { ref, computed, h } from 'vue';
+import { ref, computed, h, watch, nextTick } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { createDiscreteApi } from 'naive-ui';
 import { NTag } from 'naive-ui';
 import { getTapdReleaseInfo } from './release-merge-check.service.js';
+
+const route = useRoute();
+const router = useRouter();
+
+/** 地址栏参数名：分享用 TAPD 发布计划链接 */
+const TAPD_RELEASE_URL_PARAM = 'tapd_release_url';
 
 // 响应式数据
 const releaseUrl = ref('');
@@ -245,6 +252,7 @@ const { message } = createDiscreteApi(['message']);
 
 // 常量
 const HISTORY_STORAGE_KEY = 'tapdReleaseHistory';
+const FILTER_STORAGE_KEY = 'tapdReleaseFilterState';
 
 // 在组件初始化时立即加载历史记录
 if (typeof window !== 'undefined' && window.localStorage) {
@@ -260,10 +268,36 @@ if (typeof window !== 'undefined' && window.localStorage) {
         console.error('Failed to parse history on init:', e);
       }
     }
+    const filterData = localStorage.getItem(FILTER_STORAGE_KEY);
+    if (filterData) {
+      try {
+        const parsed = JSON.parse(filterData);
+        if (parsed.mrStatusFilter !== undefined) mrStatusFilter.value = parsed.mrStatusFilter;
+        if (parsed.typeFilter !== undefined) typeFilter.value = parsed.typeFilter;
+      } catch (e) {
+        console.error('Failed to parse filter state on init:', e);
+      }
+    }
   } catch (e) {
     console.error('Failed to load history on init:', e);
   }
 }
+
+/**
+ * 保存筛选状态到 localStorage
+ */
+const saveToLocalStorage = () => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
+        mrStatusFilter: mrStatusFilter.value,
+        typeFilter: typeFilter.value,
+      }));
+    }
+  } catch (e) {
+    console.error('Failed to save filter state:', e);
+  }
+};
 
 const mrStatusOptions = [
   { label: '全部', value: '' },
@@ -519,7 +553,7 @@ const columns = computed(() => [
   {
     title: '目标分支',
     key: 'target_branch',
-    width: 100,
+    width: 120,
     render: (row) => {
       if (!row.noMr) {
         return row.mr.target_branch || '-';
@@ -597,6 +631,15 @@ const fetchReport = async () => {
       saveToHistory();
     } catch (e) {
       console.error('Failed to save history in fetchReport:', e);
+    }
+    // 将 tapd_release_url 写入地址栏，便于分享链接
+    try {
+      await router.replace({
+        path: route.path,
+        query: { ...route.query, [TAPD_RELEASE_URL_PARAM]: releaseUrl.value },
+      });
+    } catch (e) {
+      console.error('Failed to update URL:', e);
     }
     message.success('统计完成');
   } catch (err) {
@@ -776,8 +819,47 @@ const clearData = () => {
   typeFilter.value = '';
   sortKey.value = '';
   sortOrder.value = 'asc';
+  // 移除地址栏中的分享参数
+  try {
+    const query = { ...route.query };
+    delete query[TAPD_RELEASE_URL_PARAM];
+    router.replace({ path: route.path, query });
+  } catch (e) {
+    console.error('Failed to clear URL param:', e);
+  }
   message.success('已清空数据');
 };
+
+/**
+ * 从地址栏 query 中取出 tapd_release_url（支持字符串或数组）
+ */
+function getTapdUrlFromQuery() {
+  const raw = route.query[TAPD_RELEASE_URL_PARAM];
+  if (raw == null) return '';
+  const str = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof str !== 'string') return '';
+  try {
+    return decodeURIComponent(str).trim();
+  } catch {
+    return str.trim();
+  }
+}
+
+// 打开带 tapd_release_url 的分享链接时，填充输入框并自动检查
+watch(
+  () => route.query[TAPD_RELEASE_URL_PARAM],
+  () => {
+    const url = getTapdUrlFromQuery();
+    if (!url) return;
+    // 避免与当前已加载的 URL 重复请求
+    if (releaseUrl.value === url && result.value) return;
+    releaseUrl.value = url;
+    nextTick(() => {
+      fetchReport();
+    });
+  },
+  { immediate: true }
+);
 
 </script>
 

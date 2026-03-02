@@ -7,8 +7,6 @@ import LoginPage from './pages/Login.page.vue';
 import { tools } from './tools';
 import { config } from './config';
 import { routes as demoRoutes } from './ui/demo/demo.routes';
-import { createRouterGuards } from './guards';
-
 const toolsRoutes = tools.map(({ path, name, component, ...config }) => ({
   path,
   name,
@@ -54,7 +52,5 @@ const router = createRouter({
     { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },
   ],
 });
-
-createRouterGuards(router);
 
 export default router;

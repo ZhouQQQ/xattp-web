@@ -159,5 +159,19 @@
         "env": "oversea-prod-sg",
         "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/3129.logo.png",
         "platfromUrl": "https://tngohcm.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "DiDi Bike mys",
+        "tenantId": "3330",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/3330.logo.png",
+        "platfromUrl": "https://didibike-mys.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "DiDi Bike tha",
+        "tenantId": "3329",
+        "env": "oversea-prod-sg",
+        "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/3329.logo.png",
+        "platfromUrl": "https://didibike-tha.xiaoantek.com/frontend/admin/index.html"
     }
 ]

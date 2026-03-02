@@ -96,7 +96,7 @@ const fillMyPhone = () => {
     
     if (phone) {
       formData.value.phone = phone;
-      message.success("已填充我的手机号");
+      message.success("已填充");
     } else {
       message.warning("token中未包含手机号信息");
     }

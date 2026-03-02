@@ -1,10 +1,15 @@
 import { defineStore } from 'pinia';
 import { login } from '@/api/auth';
 
+export interface UserInfo {
+  mobile?: string;
+  [key: string]: unknown;
+}
+
 export const useUserStore = defineStore('user', {
-    state: () => {
+    state: (): { userInfo: UserInfo } => {
         return {
-            userInfo:{}
+            userInfo: {},
         };
     },
     actions: {

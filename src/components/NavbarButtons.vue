@@ -131,7 +131,12 @@ function handleXathClick() {
     </c-tooltip>
     <c-tooltip position="bottom">
         <c-button variant="text" target="_blank" to="https://test-jenkins.xiaoantech.com">
-            测试部Jenkins
+            测试Jenkins
+        </c-button>
+    </c-tooltip>
+    <c-tooltip position="bottom">
+        <c-button variant="text" target="_blank" to="https://www.tapd.cn/51117884/prong/stories/add?workitem_type_id=1151117884001000289&category_id=1151117884001000868">
+            ❓需求反馈
         </c-button>
     </c-tooltip>
 

@@ -3,7 +3,7 @@ home:
     newestTools: '最新工具'
     favoriteTools: '我的收藏'
     allTools: '全部工具'
-  subtitle: '内部测试中...'
+  subtitle: 'by 软件中心-软件工程部'
   toggleMenu: '切换菜单'
   home: '主页'
   uiLib: 'UI 库'
@@ -97,6 +97,14 @@ tools:
   release-merge-check:
     title: 发布计划MR检查
     description: TAPD发布计划MR统计工具，用于检查发布计划中需求和缺陷的MR合并状态
+
+  merge-request-check:
+    title: MR合并检查
+    description: MR合并检查工具，用于检查MR合并状态，是否合并到指定分支
+
+  ecu-mock:
+    title: ECU模拟
+    description: ECU模拟工具，用于模拟ECU的通信
 
   password-strength-analyser:
     title: 密码强度分析仪

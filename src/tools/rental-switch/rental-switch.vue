@@ -53,13 +53,13 @@ const properties = [
     {
         label: 'DB-租户ID',
         valueFn: (data) => {
-            return data.tenant_info.tenant_id ? data.tenant_info.tenant_id : '-';
+            return data.tenant_info?.tenant_id ?? '-';
         },
     },
     {
         label: 'DB-租户名称',
         valueFn: (data) => {
-            return data.tenant_info.tenant_name ? data.tenant_info.tenant_name : '-';
+            return data.tenant_info?.tenant_name ?? '-';
         }
     }
 ];
@@ -94,6 +94,16 @@ function historyClick(item) {
     imei.value = item;
     deviceInfo.value = null;
     // queryImei()
+}
+
+/**
+ * 在新标签页打开租户 domain
+ */
+function openTenantDomain() {
+    const domain = deviceInfo.value?.tenant_info?.domain;
+    if (!domain) return;
+    const url = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+    window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function addToHistory() {
@@ -133,9 +143,10 @@ watch(history, () => {
     saveHistory();
 }, { deep: true });
 
-// 监听输入框变化，清空切车记录
+// 监听输入框变化，清空切车记录和基本信息
 watch(imei, () => {
     deviceLogs.value = [];
+    deviceInfo.value = null;
 });
 
 
@@ -288,6 +299,16 @@ function queryImei() {
                                 <span v-else op-80>
                                     -
                                 </span>
+                                <n-button
+                                    v-if="label === 'DB-租户名称' && deviceInfo?.tenant_info?.domain"
+                                    quaternary
+                                    size="small"
+                                    type="primary"
+                                    style="margin-left: 8px;"
+                                    @click="openTenantDomain"
+                                >
+                                    去后台
+                                </n-button>
                             </td>
                         </tr>
                     </tbody>

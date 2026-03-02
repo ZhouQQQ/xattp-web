@@ -11,6 +11,7 @@ import { naive } from './plugins/naive.plugin';
 
 import App from './App.vue';
 import router from './router';
+import { createRouterGuards } from './guards';
 import { i18nPlugin } from './plugins/i18n.plugin';
 
 // 自动注销所有 Service Worker，彻底避免被拦截
@@ -25,11 +26,13 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 }
 
 const app = createApp(App);
+const pinia = createPinia();
 
-app.use(createPinia());
+app.use(pinia);
 app.use(createHead());
 app.use(i18nPlugin);
 app.use(router);
+createRouterGuards(router, pinia);
 app.use(naive);
 app.use(plausible);
 app.use(shadow);

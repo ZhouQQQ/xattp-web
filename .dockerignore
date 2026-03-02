@@ -3,3 +3,14 @@ playwright-report
 coverage
 dist
 test-results
+.git
+.gitignore
+*.md
+.env
+.env.*
+.vscode
+.idea
+.DS_Store
+*.log
+cypress
+playwright

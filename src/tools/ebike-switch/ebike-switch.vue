@@ -58,13 +58,13 @@ const properties = [
     },
   },
   {
-      label: '设备协议',
-      valueFn: (data) => {
-          if (data.current_env_name === 'shengchan') {
-              return '';
-          }
-          return data.device_raw?.data?.deviceProtocol;
-      },
+    label: '设备协议',
+    valueFn: (data) => {
+      if (data.current_env_name === 'shengchan') {
+        return '';
+      }
+      return data.device_raw?.data?.deviceProtocol;
+    },
   },
   {
     label: '上次在线时间',
@@ -76,7 +76,7 @@ const properties = [
         return formatISO9075(new Date(data.device_raw.data?.lastOnlineTime));
       } catch (e) {
         return '';
-      }   
+      }
     },
   },
   {
@@ -219,6 +219,41 @@ const envs = [
     value: 'shengchan',
   },
   {
+    label: "独立部署-云江出行",
+    value: "yunjiang",
+    tenantID: 1955,
+  },
+  {
+    label: "独立部署-银川微公交",
+    value: "yinchuan",
+    tenantID: 1752,
+  },
+  {
+    label: "独立部署-城发悠出行",
+    value: "chengfayou",
+    tenantID: 2233,
+  },
+  {
+    label: "独立部署-圣庄出行",
+    value: "shengzhuang",
+    tenantID: 2654,
+  },
+  {
+    label: "独立部署-北斗千行",
+    value: "bdqx",
+    tenantID: 2719,
+  },
+  {
+    label: "独立部署-骑宜骑",
+    value: "qiyiqi",
+    tenantID: 250,
+  },
+  {
+    label: "独立部署-飞凡",
+    value: "feifan",
+    tenantID: 2001,
+  },
+  {
     label: '自定义Server',
     value: 'server',
   },
@@ -232,6 +267,13 @@ watch(targetEnv, (val) => {
   else if (val === 'prod2') tenantID.value = 1;
   else if (val === 'dev') tenantID.value = 1;
   else if (val === 'test2') tenantID.value = 1;
+  else if (val === 'yunjiang') tenantID.value = 1955;
+  else if (val === 'yinchuan') tenantID.value = 1752;
+  else if (val === 'chengfayou') tenantID.value = 2233;
+  else if (val === 'shengzhuang') tenantID.value = 2654;
+  else if (val === 'bdqx') tenantID.value = 2719;
+  else if (val === 'qiyiqi') tenantID.value = 250;
+  else if (val === 'feifan') tenantID.value = 2001;
   else tenantID.value = undefined;
 });
 
@@ -414,15 +456,15 @@ function openJsonModal(type: 'device' | 'c16' | 'c34') {
         </n-flex>
       </c-card>
 
-    <!-- 通用JSON弹窗 -->
-    <n-modal v-model:show="showJsonModal" preset="dialog">
-      <template #header>
-        <span>{{ jsonModalTitle }}</span>
-      </template>
-      <div style="max-width:600px;overflow:auto;">
-        <pre class="json-viewer">{{ JSON.stringify(jsonModalData, null, 2) }}</pre>
-      </div>
-    </n-modal>
+      <!-- 通用JSON弹窗 -->
+      <n-modal v-model:show="showJsonModal" preset="dialog">
+        <template #header>
+          <span>{{ jsonModalTitle }}</span>
+        </template>
+        <div style="max-width:600px;overflow:auto;">
+          <pre class="json-viewer">{{ JSON.stringify(jsonModalData, null, 2) }}</pre>
+        </div>
+      </n-modal>
     </div>
 
 
@@ -465,9 +507,11 @@ function openJsonModal(type: 'device' | 'c16' | 'c34') {
 .n-input-group-label {
   text-align: right;
 }
+
 .n-input-group {
   margin: 2px 0;
 }
+
 .click-button:hover {
   cursor: pointer;
 }
@@ -482,6 +526,7 @@ function openJsonModal(type: 'device' | 'c16' | 'c34') {
   width: 100%;
   min-height: 420px;
 }
+
 .ebike-card {
   display: flex;
   flex-direction: column;
@@ -492,16 +537,19 @@ function openJsonModal(type: 'device' | 'c16' | 'c34') {
   flex: 1 1 0;
   min-height: 100%;
 }
+
 .info-card {
   flex: 12 10 0;
   min-width: 240px;
   max-width: none;
 }
+
 .log-card {
   flex: 10 10 0;
   min-width: 200px;
   max-width: none;
 }
+
 .other-card {
   flex: 2 2 0;
   min-width: 120px;
@@ -518,21 +566,21 @@ function openJsonModal(type: 'device' | 'c16' | 'c34') {
 }
 </style>
 .json-viewer {
-  font-size: 10px;
-  background: #f7f7f7;
-  color: #333;
-  padding: 2px 10px;
-  margin: 2px 0 8px 0;
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 200px;
-  overflow: auto;
-  line-height: 0.9;
+font-size: 10px;
+background: #f7f7f7;
+color: #333;
+padding: 2px 10px;
+margin: 2px 0 8px 0;
+border-radius: 4px;
+white-space: pre-wrap;
+word-break: break-all;
+max-height: 200px;
+overflow: auto;
+line-height: 0.9;
 }
 .ebike-card-empty {
-  color: #aaa;
-  text-align: center;
-  padding: 48px 0;
-  font-size: 15px;
+color: #aaa;
+text-align: center;
+padding: 48px 0;
+font-size: 15px;
 }

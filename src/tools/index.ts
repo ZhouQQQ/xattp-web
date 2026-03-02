@@ -1,6 +1,10 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as rentalEcuMock } from './rental-ecu-mock';
+import { tool as xiaoanEcuMock } from './xiaoan-ecu-mock';
+import { tool as ecuMock } from './ecu-mock';
+import { tool as mergeRequestCheck } from './merge-request-check';
 import { tool as clearRealname } from './clear-realname';
 import { tool as releaseMergeCheck } from './release-merge-check';
 import { tool as mutiTableSqlGen } from './muti-table-sql-gen';
@@ -102,13 +106,16 @@ export const toolsByCategory: ToolCategory[] = [
             ebikeSwitch,
             mutiTableSqlGen,
             clearRealname,
-            releaseMergeCheck
+            releaseMergeCheck,
+            // ecuMock,
+            xiaoanEcuMock
         ],
     },
     {
         name: 'Rental-Business',
         components: [
             rentalSwitch,
+            rentalEcuMock,
         ],
     },
     {
@@ -131,6 +138,7 @@ export const toolsByCategory: ToolCategory[] = [
     {
         name: 'Useful',
         components: [
+            mergeRequestCheck,
             // hashText,
             dateTimeConverter,
             qrCodeGenerator,
