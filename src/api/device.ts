@@ -20,6 +20,18 @@ export function cmdEbikeAPI(data) {
     return AlovaInstance.Post(`${BASE_PATH}/ebike/device/cmd`,data);
 }
 
+/**
+ * 快捷设置语音位：根据文本生成语音并下发到设备指定索引
+ * @param data - imei/text/idx 必填
+ */
+export function setVoiceAPI(data: {
+  imei: string;
+  text: string;
+  idx: number;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ebike/device/set-voice`, data);
+}
+
 export function queryRentalAPI(params) {
     return AlovaInstance.Get(`${BASE_PATH}/rental/device/info`,{params});
 }

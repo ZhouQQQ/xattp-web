@@ -4,7 +4,7 @@ import { defineTool } from '../tool';
 export const tool = defineTool({
   name: '短租中控模拟（内测）',
   path: '/rental-ecu-mock',
-  description: '短租车辆中控模拟',
+  description: '短租中控模拟,用于测试和调试短租中控的通信,暂时只支持共享协议中控',
   keywords: ['rental', 'ecu', 'mock'],
   component: () => import('./rental-ecu-mock.vue'),
   icon: Devices,

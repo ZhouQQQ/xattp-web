@@ -101,6 +101,27 @@
                   </n-space>
                 </n-form-item>
               </n-gi>
+              <n-gi :span="2" class="helmet-row">
+                <n-space align="center" :size="24">
+                  <n-form-item label="模拟头盔" path="has_helmet" label-placement="left">
+                    <n-switch v-model:value="formData.has_helmet" size="small" @update:value="onHasHelmetChange" />
+                  </n-form-item>
+                  <n-form-item label="头盔在位" path="helmet_react" label-placement="left">
+                    <n-space :size="8" align="center">
+                      <span class="switch-label">否</span>
+                      <n-switch v-model:value="formData.helmet_react" size="small" :disabled="!formData.has_helmet" />
+                      <span class="switch-label">是</span>
+                    </n-space>
+                  </n-form-item>
+                  <n-form-item label="头盔上锁" path="helmet_lock" label-placement="left">
+                    <n-space :size="8" align="center">
+                      <span class="switch-label">否</span>
+                      <n-switch v-model:value="formData.helmet_lock" size="small" :disabled="!formData.has_helmet" />
+                      <span class="switch-label">是</span>
+                    </n-space>
+                  </n-form-item>
+                </n-space>
+              </n-gi>
             </n-grid>
             <n-form-item class="form-item-buttons">
               <template v-if="!connectId">
@@ -110,6 +131,12 @@
               </template>
               <template v-else>
                 <n-space :size="8">
+                  <n-button type="error" :loading="deleteLoading" @click="handleDisconnect">
+                    <template #icon>
+                      <n-icon :component="Trash" :size="18" />
+                    </template>
+                    停止模拟
+                  </n-button>
                   <n-button type="default" :loading="updateLoading" @click="handleUpdate">
                     更新数据
                   </n-button>
@@ -118,12 +145,6 @@
                       <n-icon :component="Gps" :size="18" />
                     </template>
                     模拟移动
-                  </n-button>
-                  <n-button type="error" :loading="deleteLoading" @click="handleDisconnect">
-                    <template #icon>
-                      <n-icon :component="Trash" :size="18" />
-                    </template>
-                    断开连接
                   </n-button>
                 </n-space>
               </template>
@@ -330,6 +351,9 @@ interface StoredForm {
   version?: string;
   seat_locked?: boolean;
   power_exists?: boolean;
+  has_helmet?: boolean;
+  helmet_react?: boolean;
+  helmet_lock?: boolean;
 }
 
 /** 默认表单值 */
@@ -343,6 +367,9 @@ const defaultFormData = {
   version: "1.2.3",
   seat_locked: true,
   power_exists: true,
+  has_helmet: false,
+  helmet_react: false,
+  helmet_lock: false,
 };
 
 /** 从 localStorage 读取并合并为初始表单（用于首屏回显，刷新/进入页面时执行一次） */
@@ -382,6 +409,12 @@ function getInitialFormData(): typeof defaultFormData {
         typeof data.seat_locked === "boolean" ? data.seat_locked : defaultFormData.seat_locked,
       power_exists:
         typeof data.power_exists === "boolean" ? data.power_exists : defaultFormData.power_exists,
+      has_helmet:
+        typeof data.has_helmet === "boolean" ? data.has_helmet : defaultFormData.has_helmet,
+      helmet_react:
+        typeof data.helmet_react === "boolean" ? data.helmet_react : defaultFormData.helmet_react,
+      helmet_lock:
+        typeof data.helmet_lock === "boolean" ? data.helmet_lock : defaultFormData.helmet_lock,
     };
   } catch (_e) {
     return { ...defaultFormData };
@@ -418,6 +451,9 @@ function saveFormToStorage() {
       version: formData.version,
       seat_locked: formData.seat_locked,
       power_exists: formData.power_exists,
+      has_helmet: formData.has_helmet,
+      helmet_react: formData.helmet_react,
+      helmet_lock: formData.helmet_lock,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (_e) {
@@ -483,6 +519,17 @@ function randomImei() {
   formData.imei = `86868686${tail}`;
 }
 
+/** 「模拟头盔」开关变化时：打开则下面两项默认打开，关闭则下面两项也关闭 */
+function onHasHelmetChange(val: boolean) {
+  if (val) {
+    formData.helmet_react = true;
+    formData.helmet_lock = true;
+  } else {
+    formData.helmet_react = false;
+    formData.helmet_lock = false;
+  }
+}
+
 /** 创建 mock 连接 */
 async function handleCreate() {
   if (!formData.env || !formData.imei?.trim()) {
@@ -504,6 +551,9 @@ async function handleCreate() {
     payload.seat_locked = formData.seat_locked;
     payload.power_exists = formData.power_exists;
     if (formData.ecu_type) payload.ecu_type = formData.ecu_type;
+    payload.has_helmet = formData.has_helmet;
+    payload.helmet_react = formData.helmet_react;
+    payload.helmet_lock = formData.helmet_lock;
 
     const res: any = await rentalEcuMockAddAPI(payload);
     if (!checkResCode(res)) return;
@@ -524,9 +574,8 @@ async function handleCreate() {
     await fetchCmdAll();
     saveFormToStorage();
     message.success(`模拟中控成功`);
-  } catch (e: any) {
-    createError.value = e?.message || String(e) || "创建失败";
-    message.error(createError.value);
+  } catch (e: any) {   
+    message.error("模拟中控请求失败");
   } finally {
     createLoading.value = false;
   }
@@ -548,6 +597,9 @@ async function handleUpdate() {
       payload.version = formData.version;
     payload.seat_locked = formData.seat_locked;
     payload.power_exists = formData.power_exists;
+    payload.has_helmet = formData.has_helmet;
+    payload.helmet_react = formData.helmet_react;
+    payload.helmet_lock = formData.helmet_lock;
     const res: any = await xiaoanEcuMockUpdateAPI(payload);
     if (!checkResCode(res)) return;
     saveFormToStorage();
@@ -566,12 +618,12 @@ async function handleDisconnect() {
   try {
     const res: any = await xiaoanEcuMockDeleteAPI({ connect_id: connectId.value });
     if (checkResCode(res)) {
-      message.success(`已断开连接`);
+      message.success(`已停止模拟`);
     } else {
-      message.error("断开请求失败");
+      message.error("停止模拟请求失败");
     }
   } catch (e: any) {
-    message.error(e?.message || String(e) || "断开失败");
+    // message.error("断开失败");
   } finally {
     connectId.value = "";
     cmdMap.value = {};

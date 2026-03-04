@@ -1,6 +1,7 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as ecuVoiceIdx } from './ecu-voice-idx';
 import { tool as rentalEcuMock } from './rental-ecu-mock';
 import { tool as xiaoanEcuMock } from './xiaoan-ecu-mock';
 import { tool as ecuMock } from './ecu-mock';
@@ -108,7 +109,8 @@ export const toolsByCategory: ToolCategory[] = [
             clearRealname,
             releaseMergeCheck,
             // ecuMock,
-            xiaoanEcuMock
+            xiaoanEcuMock,
+            ecuVoiceIdx
         ],
     },
     {
