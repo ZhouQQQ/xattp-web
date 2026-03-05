@@ -80,7 +80,7 @@ tools:
     title: 短租切车
     description: 用于短租业务切车,自动判断电柜、智能中控、共享中控，并切换到目标环境
   muti-table-sql-gen:
-    title: 多表SQL生成
+    title: 多租户SQL生成
     description: 共享经常只有单租户SQL,后期要用时维护到爆炸，本工具帮你快捷生成多租户SQL
   
   oversea-switch:
@@ -417,7 +417,7 @@ tools:
     description: 为多因素身份验证生成和验证基于时间的OTP（一次性密码）。
 
   url-encoder:
-    title: 编码/解码url格式的字符串
+    title: URL编解码
     description: 编码为url编码格式（也称为“百分比编码”）或从中解码。
 
   text-to-binary:
