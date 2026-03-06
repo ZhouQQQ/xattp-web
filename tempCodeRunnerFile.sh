@@ -1,1 +1,0 @@
-docker build -t registry.cn-shenzhen.aliyuncs.com/xiaoantest/xattp-web . && docker push registry.cn-shenzhen.aliyuncs.com/xiaoantest/xattp-web

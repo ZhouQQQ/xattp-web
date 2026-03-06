@@ -8,3 +8,6 @@ docker tag $IMAGE:$TAG $IMAGE:latest
 #推送镜像
 docker push $IMAGE:$TAG
 docker push $IMAGE:latest
+#删除本地镜像
+docker rmi $IMAGE:$TAG
+docker rmi $IMAGE:latest

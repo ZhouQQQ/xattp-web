@@ -129,7 +129,7 @@
                   </n-space>
                 </n-form-item>
               </n-gi>
-              <n-gi :span="2" class="helmet-row">
+              <n-gi :span="2" class="helmet-row" v-show="false">
                 <n-space align="center" :size="24">
                   <n-form-item label="模拟头盔" path="has_helmet" label-placement="left">
                     <n-switch v-model:value="formData.has_helmet" size="small" @update:value="onHasHelmetChange" />
@@ -149,6 +149,42 @@
                     </n-space>
                   </n-form-item>
                 </n-space>
+              </n-gi>
+              <n-gi :span="2">
+                <n-form-item path="tlv">
+                  <template #label>
+                    <span>TLV数据</span>
+                  </template>
+                  <div class="tlv-input-row">
+                    <n-input
+                      v-model:value="formData.tlv"
+                      type="textarea"
+                      placeholder='选填'
+                      :autosize="{ minRows: 4, maxRows: 10 }"
+                      clearable
+                      size="small"
+                      class="tlv-textarea"
+                    />
+                    <n-space :size="8" class="tlv-btns">
+                      <n-button
+                        type="default"
+                        size="small"
+                        class="tlv-ref-btn"
+                        @click="insertTlvExample"
+                      >
+                        示例
+                      </n-button>
+                      <n-button
+                        type="default"
+                        size="small"
+                        class="tlv-ref-btn"
+                        @click="openTlvProtocolDoc"
+                      >
+                        参考文档
+                      </n-button>
+                    </n-space>
+                  </div>
+                </n-form-item>
               </n-gi>
             </n-grid>
             <n-form-item class="form-item-buttons">
@@ -385,6 +421,7 @@ interface StoredForm {
   has_helmet?: boolean;
   helmet_react?: boolean;
   helmet_lock?: boolean;
+  tlv?: string;
 }
 
 /** 默认表单值 */
@@ -404,6 +441,7 @@ const defaultFormData = {
   has_helmet: false,
   helmet_react: false,
   helmet_lock: false,
+  tlv: "",
 };
 
 /** 从 localStorage 读取并合并为初始表单（用于首屏回显，刷新/进入页面时执行一次） */
@@ -455,6 +493,13 @@ function getInitialFormData(): typeof defaultFormData {
         typeof data.seat_locked === "boolean" ? data.seat_locked : defaultFormData.seat_locked,
       power_exists:
         typeof data.power_exists === "boolean" ? data.power_exists : defaultFormData.power_exists,
+      has_helmet:
+        typeof data.has_helmet === "boolean" ? data.has_helmet : defaultFormData.has_helmet,
+      helmet_react:
+        typeof data.helmet_react === "boolean" ? data.helmet_react : defaultFormData.helmet_react,
+      helmet_lock:
+        typeof data.helmet_lock === "boolean" ? data.helmet_lock : defaultFormData.helmet_lock,
+      tlv: typeof data.tlv === "string" ? data.tlv : defaultFormData.tlv,
     };
   } catch (_e) {
     return { ...defaultFormData };
@@ -540,6 +585,7 @@ function saveFormToStorage() {
       has_helmet: formData.has_helmet,
       helmet_react: formData.helmet_react,
       helmet_lock: formData.helmet_lock,
+      tlv: formData.tlv,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch (_e) {
@@ -596,6 +642,67 @@ function syncCmdEntries() {
   }
 }
 
+/** TLV 协议文档 URL（小安 CMD_GPS_V6 状态上报） */
+const TLV_PROTOCOL_DOC_URL =
+  "https://xc-res.oss-cn-shenzhen.aliyuncs.com/protocol/sharing_bak%40%23%40%24/%E5%B0%8F%E5%AE%89%E7%A7%91%E6%8A%80%E5%85%B1%E4%BA%AB%E8%BD%A6%E6%9C%BA%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE(BIN_ALL).html#_cmd_gps_v6%E7%8A%B6%E6%80%81%E4%B8%8A%E6%8A%A5_cmd_68";
+
+/** TLV 示例数据（插入到输入框） */
+const TLV_EXAMPLE_JSON = [
+  { type_hex: "0x0B", value_bin: "00001111" },
+  { type: 15, value: "03" },
+];
+
+/**
+ * 在新标签页打开 TLV 协议参考文档
+ */
+function openTlvProtocolDoc() {
+  window.open(TLV_PROTOCOL_DOC_URL, "_blank", "noopener,noreferrer");
+}
+
+/**
+ * 将 TLV 示例插入到表单输入框（格式化后的 JSON 字符串）
+ */
+function insertTlvExample() {
+  formData.tlv = JSON.stringify(TLV_EXAMPLE_JSON, null, 4);
+}
+
+/**
+ * 校验 TLV 表单字符串：非空时必须是合法的 JSON 数组。
+ * @param raw - 用户输入的 JSON 字符串
+ * @returns 校验通过返回 null，否则返回错误提示文案
+ */
+function validateTlvFormValue(raw: string): string | null {
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) {
+      return "TLV数据必须为 JSON 数组格式";
+    }
+    return null;
+  } catch {
+    return "TLV数据 JSON 格式错误，请检查括号、逗号与引号";
+  }
+}
+
+/**
+ * 解析 TLV 表单字符串为数组，供接口使用。非法或空则返回 []。
+ * @param raw - 用户输入的 JSON 字符串
+ * @returns TLV 项数组
+ */
+function parseTlvFormValue(raw: string): unknown[] {
+  if (!raw || typeof raw !== "string") return [];
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 /** 租户ID 仅允许数字，内部存为字符串 */
 function onTenantIdInput(v: string | null) {
   const next = String(v ?? "").replace(/\D/g, "");
@@ -628,6 +735,11 @@ async function handleCreate() {
     message.error("请填写 环境、租户ID、IMEI");
     return;
   }
+  const tlvError = validateTlvFormValue(formData.tlv);
+  if (tlvError) {
+    message.error(tlvError);
+    return;
+  }
   createLoading.value = true;
   createError.value = "";
   try {
@@ -650,6 +762,7 @@ async function handleCreate() {
     payload.has_helmet = formData.has_helmet;
     payload.helmet_react = formData.helmet_react;
     payload.helmet_lock = formData.helmet_lock;
+    payload.tlv = parseTlvFormValue(formData.tlv);
 
     const res: any = await xiaoanEcuMockCreateAPI(payload);
     if (!checkResCode(res)) return;
@@ -681,6 +794,11 @@ async function handleCreate() {
 /** 更新 mock 数据（经度、纬度、电压、版本、座舱锁、电源在位） */
 async function handleUpdate() {
   if (!connectId.value) return;
+  const tlvError = validateTlvFormValue(formData.tlv);
+  if (tlvError) {
+    message.error(tlvError);
+    return;
+  }
   updateLoading.value = true;
   try {
     const payload: Record<string, unknown> = {
@@ -697,6 +815,7 @@ async function handleUpdate() {
     payload.has_helmet = formData.has_helmet;
     payload.helmet_react = formData.helmet_react;
     payload.helmet_lock = formData.helmet_lock;
+    payload.tlv = parseTlvFormValue(formData.tlv);
     const res: any = await xiaoanEcuMockUpdateAPI(payload);
     if (!checkResCode(res)) return;
     saveFormToStorage();
@@ -1054,6 +1173,28 @@ async function handleCloseTab(name: string) {
   vertical-align: middle;
   cursor: help;
   color: #999;
+}
+
+.tlv-input-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.tlv-input-row .tlv-textarea {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.tlv-input-row .tlv-textarea :deep(.n-input__input-el),
+.tlv-input-row .tlv-textarea :deep(textarea) {
+  font-size: 11px;
+}
+
+.tlv-input-row .tlv-btns {
+  flex-shrink: 0;
 }
 
 .move-compass {
