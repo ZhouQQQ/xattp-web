@@ -138,13 +138,16 @@
                     停止模拟
                   </n-button>
                   <n-button type="default" :loading="updateLoading" @click="handleUpdate">
-                    更新数据
+                    立即更新数据
                   </n-button>
                   <n-button type="default" @click="openMoveModal">
                     <template #icon>
                       <n-icon :component="Gps" :size="18" />
                     </template>
-                    模拟移动
+                    手动移动
+                  </n-button>
+                  <n-button type="default" @click="openTrackModal">
+                    模拟轨迹
                   </n-button>
                 </n-space>
               </template>
@@ -204,8 +207,8 @@
       </n-card>
     </div>
 
-    <!-- 模拟移动弹窗 -->
-    <n-modal v-model:show="showMoveModal" preset="dialog" title="模拟移动（通过GPS上报）" :mask-closable="false">
+    <!-- 手动移动弹窗 -->
+    <n-modal v-model:show="showMoveModal" preset="dialog" title="手动移动（通过GPS上报）" :mask-closable="false">
       <template #action>
         <n-button type="primary" :loading="moveLoading" @click="handleMoveSubmit">
           移动
@@ -269,6 +272,32 @@
       </div>
     </n-modal>
 
+    <!-- 模拟轨迹弹窗 -->
+    <n-modal v-model:show="showTrackModal" preset="dialog" title="模拟轨迹" :mask-closable="false"
+      style="width: 600px">
+      <template #action>
+        <n-space :size="8">
+          <n-button type="default" :disabled="trackLoading" @click="generateSampleTrack">添加示例</n-button>
+          <n-button type="primary" :loading="trackLoading" @click="handleTrackStart">
+            提交轨迹
+          </n-button>
+        </n-space>
+      </template>
+      <n-form label-width="80px">
+        <n-form-item label="轨迹点">
+          <div class="track-input-wrap">
+            <n-input v-model:value="trackText" type="textarea" :rows="12" size="small"
+              placeholder="每行一个坐标，格式：经度,纬度&#10;为空时提交将清除轨迹"
+              :disabled="trackLoading" style="width: 100%" />
+            <n-button v-if="trackText.trim()" text size="small" class="track-clear-btn"
+              @click="trackText = ''">
+              清除
+            </n-button>
+          </div>
+        </n-form-item>
+      </n-form>
+    </n-modal>
+
     <!-- 新增 Cmd 弹窗 -->
     <n-modal v-model:show="showAddModal" preset="dialog" title="新增命令" positive-text="确定"
       @positive-click="confirmAddCmd">
@@ -299,6 +328,7 @@ import {
   xiaoanEcuMockDeleteAPI,
   xiaoanEcuMockUpdateAPI,
   xiaoanEcuMockMoveAPI,
+  xiaoanEcuMockTrajectoryAPI,
 } from "@/api/device";
 
 const { message } = createDiscreteApi(["message"]);
@@ -433,7 +463,7 @@ const envRadioOptions = [
 const controllerTypeOptions = [
   { label: "共享协议", value: 3 as EcuType, disabled: false },
   { label: "智能协议", value: 2 as EcuType, disabled: true },
-  { label: "电柜", value: 1 as EcuType, disabled: true },
+  // { label: "电柜", value: 1 as EcuType, disabled: true },
 ];
 
 const formData = reactive(getInitialFormData());
@@ -730,13 +760,13 @@ function getBearingArrow(bearing: number): string {
   return map[bearing] ?? "↗";
 }
 
-/** 打开模拟移动弹窗，默认选中北(0°) */
+/** 打开手动移动弹窗，默认选中北(0°) */
 function openMoveModal() {
   moveForm.bearing = 0;
   showMoveModal.value = true;
 }
 
-/** 模拟移动：调用接口后 toast 提示，不关闭弹窗 */
+/** 手动移动：调用接口后 toast 提示，不关闭弹窗 */
 async function handleMoveSubmit(): Promise<boolean> {
   if (!connectId.value) return false;
   moveLoading.value = true;
@@ -792,6 +822,95 @@ async function handleMoveSubmit(): Promise<boolean> {
     moveLoading.value = false;
   }
   return false;
+}
+
+/* ========== 模拟轨迹 ========== */
+const showTrackModal = ref(false);
+const trackText = ref("");
+const trackLoading = ref(false);
+
+/** 打开模拟轨迹弹窗 */
+function openTrackModal() {
+  showTrackModal.value = true;
+}
+
+/**
+ * 根据起点坐标、方位角、距离计算新坐标（GCJ02 近似）
+ * @param lng 起点经度
+ * @param lat 起点纬度
+ * @param bearing 方位角（度，0=北 90=东 180=南 270=西）
+ * @param distance 距离（米）
+ * @returns [新经度, 新纬度]
+ */
+function offsetCoord(lng: number, lat: number, bearing: number, distance: number): [number, number] {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const bearingRad = bearing * rad;
+  const latRad = lat * rad;
+  const dLat = (distance * Math.cos(bearingRad)) / R;
+  const dLng = (distance * Math.sin(bearingRad)) / (R * Math.cos(latRad));
+  return [
+    Math.round((lng + dLng / rad) * 1000000) / 1000000,
+    Math.round((lat + dLat / rad) * 1000000) / 1000000,
+  ];
+}
+
+/** 添加示例：模拟电动车骑行轨迹，大体沿一个方向前进，小幅度转弯 */
+function generateSampleTrack() {
+  let lng = formData.lng ?? 116.397428;
+  let lat = formData.lat ?? 39.90923;
+  const lines: string[] = [`${lng},${lat}`];
+  let bearing = Math.random() * 360;
+  for (let i = 1; i < 12; i++) {
+    const delta = (Math.random() - 0.5) * 30;
+    bearing = (bearing + delta + 360) % 360;
+    const dist = 30 + Math.random() * 20;
+    [lng, lat] = offsetCoord(lng, lat, bearing, dist);
+    lines.push(`${lng},${lat}`);
+  }
+  trackText.value = lines.join("\n");
+}
+
+/**
+ * 解析轨迹文本为坐标数组
+ * @returns 坐标数组 { lng, lat }[]
+ */
+function parseTrackPoints(): Array<{ lng: number; lat: number }> {
+  return trackText.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(",").map((s) => s.trim());
+      return { lng: Number.parseFloat(parts[0]), lat: Number.parseFloat(parts[1]) };
+    })
+    .filter((p) => !Number.isNaN(p.lng) && !Number.isNaN(p.lat));
+}
+
+/** 提交模拟轨迹：内容为空时清除轨迹，否则设置轨迹坐标列表 */
+async function handleTrackStart() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  const points = parseTrackPoints();
+  trackLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockTrajectoryAPI({
+      connect_id: connectId.value,
+      points,
+    });
+    if (!checkResCode(res)) return;
+    if (points.length === 0) {
+      message.success("轨迹已清除");
+    } else {
+      message.success(res?.data || `轨迹已设置，共 ${points.length} 个坐标点`);
+    }
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "轨迹设置失败");
+  } finally {
+    trackLoading.value = false;
+  }
 }
 
 function openAddCmd() {
@@ -1191,5 +1310,23 @@ async function handleCloseTab(name: string) {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+/* 轨迹输入框容器，右上角放清除按钮 */
+.track-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.track-clear-btn {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 1;
+  color: #9ca3af;
+}
+
+.track-clear-btn:hover {
+  color: #f56c6c;
 }
 </style>

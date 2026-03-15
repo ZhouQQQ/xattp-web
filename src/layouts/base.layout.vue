@@ -44,7 +44,6 @@ const tools = computed<ToolCategory[]>(() => [
                     <div class="title">
                         小安测试工具平台
                     </div>
-                    <div class="divider" />
                     <div class="subtitle">
                         {{ $t('home.subtitle') }}
                     </div>
@@ -182,10 +181,10 @@ const tools = computed<ToolCategory[]>(() => [
     left: 0;
     width: 100%;
     text-align: center;
-    top: 16px;
+    top: 14px;
 
     .title {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 550;
         color: v-bind('themeVars.primaryColor');
     }
@@ -199,7 +198,7 @@ const tools = computed<ToolCategory[]>(() => [
     }
 
     .subtitle {
-        font-size: 12px;
+        font-size: 10px;
         color: v-bind('themeVars.primaryColorPressed');
     }
 }

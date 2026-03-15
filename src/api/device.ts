@@ -149,3 +149,47 @@ export function xiaoanEcuMockMoveAPI(data: {
 }) {
   return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/move`, data);
 }
+
+/** 小安中控模拟：设置模拟运动轨迹，后端按 GPS 上报频率逐点推进 */
+export function xiaoanEcuMockTrajectoryAPI(data: {
+  connect_id: string;
+  points: Array<{ lng: number; lat: number }>;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/trajectory`, data);
+}
+
+// ---------- 电柜模拟 (cabinet mock) ----------
+
+/** 电柜模拟：创建 mock 连接，返回 connect_id 及连接信息；powermode 1=市电 2=电池 */
+export function cabinetMockCreateAPI(data: {
+  env: string;
+  imei: string;
+  door_num: number;
+  battery_num: number;
+  powermode?: number;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/cabinet/mock/create`, data);
+}
+
+/** 电柜模拟：根据 connect_id 获取连接信息 */
+export function cabinetMockGetAPI(params: { connect_id: string }) {
+  return AlovaInstance.Get(`${BASE_PATH}/cabinet/mock/get`, { params });
+}
+
+/** 电柜模拟：更新 mock 数据（如 powermode 等），仅传需更新字段 */
+export function cabinetMockUpdateAPI(data: { connect_id: string; [key: string]: unknown }) {
+  return AlovaInstance.Post(`${BASE_PATH}/cabinet/mock/update`, data);
+}
+
+/** 电柜模拟：更新单个仓门状态（door_no 放在 door_status 内） */
+export function cabinetMockDoorUpdateAPI(data: {
+  connect_id: string;
+  door_status: Record<string, unknown>;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/cabinet/mock/door/update`, data);
+}
+
+/** 电柜模拟：删除 mock 连接（connect_id 放在 body） */
+export function cabinetMockDeleteAPI(data: { connect_id: string }) {
+  return AlovaInstance.Delete(`${BASE_PATH}/cabinet/mock/delete`, data);
+}

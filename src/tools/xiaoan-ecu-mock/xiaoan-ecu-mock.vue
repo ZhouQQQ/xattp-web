@@ -3,40 +3,23 @@
     <div class="card-wrap" :class="{ 'card-wrap-reporting': connectId }">
       <n-card>
         <div class="form-section">
-          <n-form :model="formData" label-placement="left" label-width="140px">
-            <n-grid :cols="2" :x-gap="12" :y-gap="2">
-              <n-gi>
+          <n-form :model="formData" label-placement="left" label-width="100px">
+            <n-grid :cols="12" :x-gap="1" :y-gap="2">
+              <!-- 第一行：环境、租户ID、服务区（服务区宽一点） -->
+              <n-gi :span="4">
                 <n-form-item label="环境" path="env" required>
                   <n-select v-model:value="formData.env" :options="envOptions" placeholder="请选择环境" clearable
                     size="small" :disabled="!!connectId" style="width: 100%" />
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <n-gi :span="3">
                 <n-form-item label="租户ID" path="tenant_id" required>
                   <n-input :value="formData.tenant_id" placeholder="请输入租户 ID" clearable size="small"
                     :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" style="width: 100%"
                     @update:value="onTenantIdInput" />
                 </n-form-item>
               </n-gi>
-              <n-gi>
-                <n-form-item label="IMEI" path="imei" required>
-                  <div class="imei-row">
-                    <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
-                      :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
-                    <n-tooltip trigger="hover">
-                      <template #trigger>
-                        <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
-                          <template #icon>
-                            <n-icon :component="Dice" :size="18" />
-                          </template>
-                        </n-button>
-                      </template>
-                      随机
-                    </n-tooltip>
-                  </div>
-                </n-form-item>
-              </n-gi>
-              <n-gi>
+              <n-gi :span="5">
                 <n-form-item path="service_area">
                   <template #label>
                     <span>服务区</span>
@@ -78,25 +61,62 @@
                   </div>
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <!-- 第二行：IMEI、参考IMEI -->
+              <n-gi :span="6">
+                <n-form-item label="IMEI" path="imei" required>
+                  <div class="imei-row">
+                    <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
+                      :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
+                    <n-tooltip trigger="hover">
+                      <template #trigger>
+                        <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
+                          <template #icon>
+                            <n-icon :component="Dice" :size="18" />
+                          </template>
+                        </n-button>
+                      </template>
+                      随机生成
+                    </n-tooltip>
+                  </div>
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="6">
+                <n-form-item path="ref_imei">
+                  <template #label>
+                    <span>参考IMEI</span>
+                    <n-tooltip trigger="hover" style="margin-left: 4px;">
+                      <template #trigger>
+                        <n-icon :component="Help" :size="14" class="tip-icon" />
+                      </template>
+                      选填。请确保改IMEI真实存在并在线，如填入将参考此IMEI模拟透传返回
+                    </n-tooltip>
+                  </template>
+                  <n-input v-model:value="formData.ref_imei" placeholder="选填，15 位数字" clearable size="small"
+                    :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" style="width: 100%"
+                    :maxlength="15" show-count />
+                </n-form-item>
+              </n-gi>
+              <!-- 第三行：经度、纬度 -->
+              <n-gi :span="6">
                 <n-form-item label="经度(GCJ02)" path="lng">
                   <n-input-number v-model:value="formData.lng" placeholder="经度" size="small" clearable
                     :show-button="false" style="width: 100%" />
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <n-gi :span="6">
                 <n-form-item label="纬度(GCJ02)" path="lat">
                   <n-input-number v-model:value="formData.lat" placeholder="纬度" size="small" clearable
                     :show-button="false" style="width: 100%" />
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <!-- 剩余每行2个 -->
+              <n-gi :span="6">
                 <n-form-item label="电压（v）" path="voltage">
                   <n-input-number v-model:value="formData.voltage" placeholder="默认 55" size="small" :min="0"
                     style="width: 100%" />
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <n-gi :span="6">
                 <n-form-item path="version">
                   <template #label>
                     <span>版本号</span>
@@ -111,7 +131,7 @@
                     style="width: 100%" />
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <n-gi :span="6">
                 <n-form-item label="电源状态" path="power_exists">
                   <n-space :size="8" align="center">
                     <span class="switch-label">断开</span>
@@ -120,7 +140,7 @@
                   </n-space>
                 </n-form-item>
               </n-gi>
-              <n-gi>
+              <n-gi :span="6">
                 <n-form-item label="座舱锁状态" path="seat_locked">
                   <n-space :size="8" align="center">
                     <span class="switch-label">开启</span>
@@ -129,7 +149,7 @@
                   </n-space>
                 </n-form-item>
               </n-gi>
-              <n-gi :span="2" class="helmet-row" v-show="false">
+              <n-gi :span="12" class="helmet-row" v-show="false">
                 <n-space align="center" :size="24">
                   <n-form-item label="模拟头盔" path="has_helmet" label-placement="left">
                     <n-switch v-model:value="formData.has_helmet" size="small" @update:value="onHasHelmetChange" />
@@ -150,7 +170,8 @@
                   </n-form-item>
                 </n-space>
               </n-gi>
-              <n-gi :span="2">
+              <!-- TLV 独占一行 -->
+              <n-gi :span="12">
                 <n-form-item path="tlv">
                   <template #label>
                     <span>TLV数据</span>
@@ -202,13 +223,16 @@
                     停止模拟
                   </n-button>
                   <n-button type="default" :loading="updateLoading" @click="handleUpdate">
-                    更新数据
+                    立即更新数据
                   </n-button>
-                  <n-button type="default" @click="openMoveModal">
+                  <n-button type="default" @click="openMoveModal">                    
+                    手动移动
+                  </n-button>
+                  <n-button type="default" @click="openTrackModal">
                     <template #icon>
                       <n-icon :component="Gps" :size="18" />
                     </template>
-                    模拟移动
+                    模拟轨迹
                   </n-button>
                 </n-space>
               </template>
@@ -249,8 +273,14 @@
                 </span>
               </template>
               <div class="cmd-pane-content">
-                <n-input v-model:value="entry.editValue" v-fit-textarea-height type="textarea" placeholder="JSON 字符串"
-                  class="cmd-textarea cmd-json-display" :input-props="{ spellcheck: false, autocomplete: 'off' }" />
+                <div class="json-input-wrap">
+                  <n-input v-model:value="entry.editValue" v-fit-textarea-height type="textarea" placeholder="JSON 字符串"
+                    class="cmd-textarea cmd-json-display" :input-props="{ spellcheck: false, autocomplete: 'off' }" />
+                  <n-space :size="8" class="json-input-actions">
+                    <n-button type="default" size="small" @click="applyCmdEntryUnescape(entry)">去除转义</n-button>
+                    <n-button type="default" size="small" @click="applyCmdEntryFormat(entry)">格式化</n-button>
+                  </n-space>
+                </div>
                 <n-button type="primary" size="small" @click="saveCmd(entry)">
                   保存
                 </n-button>
@@ -268,8 +298,8 @@
       </n-card>
     </div>
 
-    <!-- 模拟移动弹窗 -->
-    <n-modal v-model:show="showMoveModal" preset="dialog" title="模拟移动（通过GPS上报）" :mask-closable="false">
+    <!-- 手动移动弹窗 -->
+    <n-modal v-model:show="showMoveModal" preset="dialog" title="手动移动（通过GPS上报）" :mask-closable="false">
       <template #action>
         <n-button type="primary" :loading="moveLoading" @click="handleMoveSubmit">
           移动
@@ -333,6 +363,32 @@
       </div>
     </n-modal>
 
+    <!-- 模拟轨迹弹窗 -->
+    <n-modal v-model:show="showTrackModal" preset="dialog" title="模拟轨迹" :mask-closable="false"
+      style="width: 600px">
+      <template #action>
+        <n-space :size="8">
+          <n-button type="default" :disabled="trackLoading" @click="generateSampleTrack">添加示例</n-button>
+          <n-button type="primary" :loading="trackLoading" @click="handleTrackStart">
+            提交轨迹
+          </n-button>
+        </n-space>
+      </template>
+      <n-form label-width="80px">
+        <n-form-item label="轨迹点，将按照下面经纬度列表依次上报数据">
+          <div class="track-input-wrap">
+            <n-input v-model:value="trackText" type="textarea" :rows="12" size="small"
+              placeholder="每行一个坐标，格式：经度,纬度&#10;为空时提交将清除已提交"
+              :disabled="trackLoading" style="width: 100%" />
+            <n-button v-if="trackText.trim()" text size="small" class="track-clear-btn"
+              @click="trackText = ''">
+              清除
+            </n-button>
+          </div>
+        </n-form-item>
+      </n-form>
+    </n-modal>
+
     <!-- 新增 Cmd 弹窗 -->
     <n-modal v-model:show="showAddModal" preset="dialog" title="新增命令" positive-text="确定"
       @positive-click="confirmAddCmd">
@@ -341,9 +397,15 @@
           <n-input v-model:value="addForm.cmd" placeholder="如 31、34" size="small" />
         </n-form-item>
         <n-form-item label="value" path="value">
-          <n-input v-model:value="addForm.value" v-fit-textarea-height type="textarea" :rows="6" size="small"
-            placeholder="JSON 字符串" class="cmd-textarea cmd-json-display"
-            :input-props="{ spellcheck: false, autocomplete: 'off' }" />
+          <div class="json-input-wrap">
+            <n-input v-model:value="addForm.value" v-fit-textarea-height type="textarea" :rows="6" size="small"
+              placeholder="JSON 字符串" class="cmd-textarea cmd-json-display"
+              :input-props="{ spellcheck: false, autocomplete: 'off' }" style="width: 100%" />
+            <n-space :size="8" class="json-input-actions">
+              <n-button type="default" size="small" @click="applyAddFormUnescape">去除转义</n-button>
+              <n-button type="default" size="small" @click="applyAddFormFormat">格式化</n-button>
+            </n-space>
+          </div>
         </n-form-item>
       </n-form>
     </n-modal>
@@ -363,6 +425,7 @@ import {
   xiaoanEcuMockDeleteAPI,
   xiaoanEcuMockUpdateAPI,
   xiaoanEcuMockMoveAPI,
+  xiaoanEcuMockTrajectoryAPI,
 } from "@/api/device";
 
 const { message } = createDiscreteApi(["message"]);
@@ -409,6 +472,7 @@ interface StoredForm {
   env?: string;
   tenant_id?: string;
   imei?: string;
+  ref_imei?: string;
   lng?: number | null;
   lat?: number | null;
   voltage?: number | null;
@@ -429,6 +493,7 @@ const defaultFormData = {
   env: "test2",
   tenant_id: "1",
   imei: "",
+  ref_imei: "",
   lng: 114.434888,
   lat: 30.500136,
   voltage: 55,
@@ -461,6 +526,8 @@ function getInitialFormData(): typeof defaultFormData {
           : defaultFormData.tenant_id,
       imei:
         typeof data.imei === "string" ? data.imei : defaultFormData.imei,
+      ref_imei:
+        typeof data.ref_imei === "string" ? data.ref_imei : defaultFormData.ref_imei,
       lng:
         typeof data.lng === "number" && !Number.isNaN(data.lng)
           ? data.lng
@@ -573,6 +640,7 @@ function saveFormToStorage() {
       env: formData.env,
       tenant_id: formData.tenant_id,
       imei: formData.imei,
+      ref_imei: formData.ref_imei,
       lng: formData.lng,
       lat: formData.lat,
       voltage: formData.voltage,
@@ -622,6 +690,51 @@ function formatJsonIfPossible(str: string): string {
   } catch {
     return str;
   }
+}
+
+/**
+ * 去除 JSON 字符串中的反斜杠转义（如 \" -> "，\\ -> \，\n -> 换行等）
+ * @param str - 可能包含转义字符的字符串
+ * @returns 去除转义后的字符串，若处理异常则返回原串
+ */
+function unescapeJsonString(str: string): string {
+  if (!str || typeof str !== "string") return str;
+  try {
+    return str.replace(/\\(.)/g, (_, c: string) => {
+      const map: Record<string, string> = {
+        '"': '"',
+        "\\": "\\",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+      };
+      return map[c] ?? c;
+    });
+  } catch {
+    return str;
+  }
+}
+
+/** Cmd Tab 当前条目的 editValue：去除转义后写回 */
+function applyCmdEntryUnescape(entry: CmdEntry) {
+  entry.editValue = unescapeJsonString(entry.editValue ?? "");
+}
+
+/** Cmd Tab 当前条目的 editValue：格式化后写回 */
+function applyCmdEntryFormat(entry: CmdEntry) {
+  entry.editValue = formatJsonIfPossible(entry.editValue ?? "");
+}
+
+/** 新增命令弹窗 value：去除转义后写回 */
+function applyAddFormUnescape() {
+  const raw = addForm.value ?? "";
+  addForm.value = unescapeJsonString(raw);
+}
+
+/** 新增命令弹窗 value：格式化后写回 */
+function applyAddFormFormat() {
+  const raw = addForm.value ?? "";
+  addForm.value = formatJsonIfPossible(raw);
 }
 
 /** 从 cmdMap 同步到 cmdEntries，便于 tab 展示与编辑；值为 JSON 时格式化显示 */
@@ -735,6 +848,12 @@ async function handleCreate() {
     message.error("请填写 环境、租户ID、IMEI");
     return;
   }
+  const imei = formData.imei.trim();
+  const refImei = formData.ref_imei?.trim();
+  if (refImei && refImei === imei) {
+    message.error("参考IMEI不能和 IMEI 填一样");
+    return;
+  }
   const tlvError = validateTlvFormValue(formData.tlv);
   if (tlvError) {
     message.error(tlvError);
@@ -746,10 +865,13 @@ async function handleCreate() {
     const payload: Record<string, unknown> = {
       env: formData.env,
       tenant_id: formData.tenant_id.trim(),
-      imei: formData.imei.trim(),
+      imei,
       voltage: formData.voltage ?? 55,
       version: formData.version || "1.2.3",
     };
+    if (refImei) {
+      payload.ref_imei = refImei;
+    }
     if (formData.lng != null) payload.lng = formData.lng;
     if (formData.lat != null) payload.lat = formData.lat;
     if (formData.serviceAreaInputMode === "name" && formData.service_area_name?.trim()) {
@@ -946,13 +1068,13 @@ function getBearingArrow(bearing: number): string {
   return map[bearing] ?? "↗";
 }
 
-/** 打开模拟移动弹窗，默认选中北(0°) */
+/** 打开手动移动弹窗，默认选中北(0°) */
 function openMoveModal() {
   moveForm.bearing = 0;
   showMoveModal.value = true;
 }
 
-/** 模拟移动：调用接口后 toast 提示，不关闭弹窗 */
+/** 手动移动：调用接口后 toast 提示，不关闭弹窗 */
 async function handleMoveSubmit(): Promise<boolean> {
   if (!connectId.value) return false;
   moveLoading.value = true;
@@ -1008,6 +1130,95 @@ async function handleMoveSubmit(): Promise<boolean> {
     moveLoading.value = false;
   }
   return false;
+}
+
+/* ========== 模拟轨迹 ========== */
+const showTrackModal = ref(false);
+const trackText = ref("");
+const trackLoading = ref(false);
+
+/** 打开模拟轨迹弹窗 */
+function openTrackModal() {
+  showTrackModal.value = true;
+}
+
+/**
+ * 根据起点坐标、方位角、距离计算新坐标（GCJ02 近似）
+ * @param lng 起点经度
+ * @param lat 起点纬度
+ * @param bearing 方位角（度，0=北 90=东 180=南 270=西）
+ * @param distance 距离（米）
+ * @returns [新经度, 新纬度]
+ */
+function offsetCoord(lng: number, lat: number, bearing: number, distance: number): [number, number] {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const bearingRad = bearing * rad;
+  const latRad = lat * rad;
+  const dLat = (distance * Math.cos(bearingRad)) / R;
+  const dLng = (distance * Math.sin(bearingRad)) / (R * Math.cos(latRad));
+  return [
+    Math.round((lng + dLng / rad) * 1000000) / 1000000,
+    Math.round((lat + dLat / rad) * 1000000) / 1000000,
+  ];
+}
+
+/** 添加示例：模拟电动车骑行轨迹，大体沿一个方向前进，小幅度转弯 */
+function generateSampleTrack() {
+  let lng = formData.lng ?? 114.397428;
+  let lat = formData.lat ?? 39.90923;
+  const lines: string[] = [`${lng},${lat}`];
+  let bearing = Math.random() * 360;
+  for (let i = 1; i < 12; i++) {
+    const delta = (Math.random() - 0.5) * 30;
+    bearing = (bearing + delta + 360) % 360;
+    const dist = 30 + Math.random() * 20;
+    [lng, lat] = offsetCoord(lng, lat, bearing, dist);
+    lines.push(`${lng},${lat}`);
+  }
+  trackText.value = lines.join("\n");
+}
+
+/**
+ * 解析轨迹文本为坐标数组
+ * @returns 坐标数组 { lng, lat }[]
+ */
+function parseTrackPoints(): Array<{ lng: number; lat: number }> {
+  return trackText.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(",").map((s) => s.trim());
+      return { lng: Number.parseFloat(parts[0]), lat: Number.parseFloat(parts[1]) };
+    })
+    .filter((p) => !Number.isNaN(p.lng) && !Number.isNaN(p.lat));
+}
+
+/** 提交模拟轨迹：内容为空时清除轨迹，否则设置轨迹坐标列表 */
+async function handleTrackStart() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  const points = parseTrackPoints();
+  trackLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockTrajectoryAPI({
+      connect_id: connectId.value,
+      points,
+    });
+    if (!checkResCode(res)) return;
+    if (points.length === 0) {
+      message.success("轨迹已清除");
+    } else {
+      message.success(res?.data || `轨迹已设置，共 ${points.length} 个坐标点`);
+    }
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "轨迹设置失败");
+  } finally {
+    trackLoading.value = false;
+  }
 }
 
 function openAddCmd() {
@@ -1161,7 +1372,7 @@ async function handleCloseTab(name: string) {
   width: 100%;
 }
 .service-area-row .service-area-type-select {
-  width: 80px;
+  width: 70px;
   flex-shrink: 0;
 }
 .service-area-row .service-area-input {
@@ -1398,6 +1609,24 @@ async function handleCloseTab(name: string) {
   padding: 12px 0;
 }
 
+/* JSON 输入框右上角操作按钮容器 */
+.json-input-wrap {
+  position: relative;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.json-input-wrap .json-input-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.json-input-wrap .cmd-textarea {
+  margin-bottom: 0;
+}
+
 .cmd-textarea {
   margin-bottom: 8px;
   font-family: "Consolas", "Monaco", "Menlo", "Ubuntu Mono", monospace;
@@ -1429,5 +1658,23 @@ async function handleCloseTab(name: string) {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+/* 轨迹输入框容器，右上角放清除按钮 */
+.track-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.track-clear-btn {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 1;
+  color: #9ca3af;
+}
+
+.track-clear-btn:hover {
+  color: #f56c6c;
 }
 </style>
