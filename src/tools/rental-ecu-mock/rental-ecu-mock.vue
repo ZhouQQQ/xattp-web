@@ -43,6 +43,7 @@
                           <template #icon>
                             <n-icon :component="Dice" :size="18" />
                           </template>
+                          随机
                         </n-button>
                       </template>
                       随机
@@ -81,6 +82,24 @@
                   </template>
                   <n-input v-model:value="formData.version" placeholder="默认 1.2.3" clearable size="small"
                     style="width: 100%" />
+                </n-form-item>
+              </n-gi>
+              <n-gi>
+                <n-form-item label="电池SN" path="battery_sn">
+                  <n-input v-model:value="formData.battery_sn" placeholder="选填，可清除" clearable size="small"
+                    style="width: 100%" />
+                </n-form-item>
+              </n-gi>
+              <n-gi>
+                <n-form-item label="电池SOC" path="battery_soc">
+                  <div class="battery-soc-row">
+                    <n-slider v-model:value="formData.battery_soc" :min="0" :max="100" :step="1" size="small"
+                      :disabled="!formData.battery_sn?.trim()"
+                      style="flex: 1; margin-right: 12px" />
+                    <n-input-number v-model:value="formData.battery_soc" :min="0" :max="100" :show-button="false"
+                      size="small" style="width: 72px" :disabled="!formData.battery_sn?.trim()" />
+                    <span class="soc-unit">%</span>
+                  </div>
                 </n-form-item>
               </n-gi>
               <n-gi>
@@ -342,13 +361,33 @@ function checkResCode(res: any): boolean {
   return true;
 }
 
-/** 使 n-input textarea 随内容增高，减少滚动 */
+/** 获取有滚动条的第一个祖先 */
+function getScrollParent(node: Element | null): Element | null {
+  let p = node?.parentElement ?? null;
+  while (p) {
+    const { overflowY } = getComputedStyle(p);
+    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return p;
+    p = p.parentElement;
+  }
+  return null;
+}
+
+/** 使 n-input textarea 随内容增高，减少滚动；调整时保持滚动位置，避免点击编辑时窗口跳动 */
 function fitTextareaHeight(el: HTMLElement) {
+  const textarea = el.tagName === "TEXTAREA" ? (el as HTMLTextAreaElement) : el.querySelector("textarea");
+  if (!textarea) return;
+  const winScrollY = window.scrollY ?? document.documentElement.scrollTop;
+  const textareaScrollTop = textarea.scrollTop;
+  const scrollParent = getScrollParent(textarea);
+  const parentScrollTop = scrollParent ? scrollParent.scrollTop : 0;
   nextTick(() => {
-    const textarea = el.tagName === "TEXTAREA" ? el : el.querySelector("textarea");
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 200)}px`;
+    const ta = el.tagName === "TEXTAREA" ? (el as HTMLTextAreaElement) : el.querySelector("textarea");
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.max(ta.scrollHeight, 200)}px`;
+    ta.scrollTop = textareaScrollTop;
+    if (scrollParent) scrollParent.scrollTop = parentScrollTop;
+    window.scrollTo({ top: winScrollY, behavior: "auto" });
   });
 }
 
@@ -378,6 +417,8 @@ interface StoredForm {
   lng?: number | null;
   lat?: number | null;
   voltage?: number | null;
+  battery_sn?: string;
+  battery_soc?: number | null;
   version?: string;
   seat_locked?: boolean;
   power_exists?: boolean;
@@ -394,6 +435,7 @@ const defaultFormData = {
   lng: 114.434888,
   lat: 30.500136,
   voltage: 55,
+  battery_sn: "",
   version: "1.2.3",
   seat_locked: true,
   power_exists: true,
@@ -431,6 +473,15 @@ function getInitialFormData(): typeof defaultFormData {
         typeof data.voltage === "number" && !Number.isNaN(data.voltage)
           ? data.voltage
           : defaultFormData.voltage,
+      battery_sn:
+        typeof data.battery_sn === "string" ? data.battery_sn : defaultFormData.battery_sn,
+      battery_soc:
+        typeof data.battery_soc === "number" &&
+        !Number.isNaN(data.battery_soc) &&
+        data.battery_soc >= 0 &&
+        data.battery_soc <= 100
+          ? data.battery_soc
+          : defaultFormData.battery_soc,
       version:
         typeof data.version === "string"
           ? data.version
@@ -478,6 +529,8 @@ function saveFormToStorage() {
       lng: formData.lng,
       lat: formData.lat,
       voltage: formData.voltage,
+      battery_sn: formData.battery_sn,
+      battery_soc: formData.battery_soc,
       version: formData.version,
       seat_locked: formData.seat_locked,
       power_exists: formData.power_exists,
@@ -578,6 +631,9 @@ async function handleCreate() {
     };
     if (formData.lng != null) payload.lng = formData.lng;
     if (formData.lat != null) payload.lat = formData.lat;
+    if (formData.battery_sn != null && formData.battery_sn !== "")
+      payload.battery_sn = formData.battery_sn.trim();
+    if (formData.battery_soc != null) payload.battery_soc = formData.battery_soc;
     payload.seat_locked = formData.seat_locked;
     payload.power_exists = formData.power_exists;
     if (formData.ecu_type) payload.ecu_type = formData.ecu_type;
@@ -623,6 +679,8 @@ async function handleUpdate() {
     if (formData.lng != null) payload.lng = formData.lng;
     if (formData.lat != null) payload.lat = formData.lat;
     if (formData.voltage != null) payload.voltage = formData.voltage;
+    if (formData.battery_sn != null) payload.battery_sn = formData.battery_sn;
+    if (formData.battery_soc != null) payload.battery_soc = formData.battery_soc;
     if (formData.version != null && formData.version !== "")
       payload.version = formData.version;
     payload.seat_locked = formData.seat_locked;
@@ -650,7 +708,7 @@ async function handleDisconnect() {
     if (checkResCode(res)) {
       message.success(`已停止模拟`);
     } else {
-      message.error("停止模拟请求失败");
+      // message.error("停止模拟请求失败");
     }
   } catch (e: any) {
     // message.error("断开失败");
@@ -1055,6 +1113,19 @@ async function handleCloseTab(name: string) {
 .imei-row .n-input {
   flex: 1;
   min-width: 0;
+}
+
+.battery-soc-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.soc-unit {
+  font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
 }
 
 .service-area-row {

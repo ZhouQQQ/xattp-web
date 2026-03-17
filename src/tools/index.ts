@@ -111,7 +111,7 @@ export const toolsByCategory: ToolCategory[] = [
             releaseMergeCheck,
             // ecuMock,
             xiaoanEcuMock,
-            ecuVoiceIdx
+            // ecuVoiceIdx
         ],
     },
     {

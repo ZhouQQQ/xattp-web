@@ -31,7 +31,7 @@
               </n-form-item>
             </n-gi>
             <!-- 第二行：IMEI、仓门数、初始电池 -->
-            <n-gi :span="4">
+            <n-gi :span="5">
               <n-form-item label="IMEI" path="imei" required>
                 <div class="imei-row">
                   <n-input v-model:value="formData.imei" placeholder="15 位数字" clearable size="small"
@@ -40,13 +40,14 @@
                     <template #icon>
                       <n-icon :component="Dice" :size="18" />
                     </template>
+                    随机
                   </n-button>
                 </div>
               </n-form-item>
             </n-gi>
             <n-gi :span="3">
               <n-form-item label="仓门数" path="doorCount">
-                <n-input-number v-model:value="formData.doorCount" :min="4" :max="16" :step="2" size="small"
+                <n-input-number v-model:value="formData.doorCount" :min="1" :max="16" :step="2" size="small"
                   :disabled="simulating" style="width: 100%" />
               </n-form-item>
             </n-gi>
@@ -76,23 +77,23 @@
               开始模拟
             </n-button>
             <template v-else>
-              <n-button type="default" @click="closeAllDoors">
-                仓门全关
-              </n-button>
-              <n-button type="default" @click="openAllDoors">
-                仓门全开
-              </n-button>
-              <n-button type="default" @click="copyAllBatterySn">
-                复制电池SN
-              </n-button>
-              <n-button type="default" @click="updateData">
-                更新数据
-              </n-button>
               <n-button type="error" @click="stopSimulation">
                 <template #icon>
                   <n-icon :component="Trash" :size="18" />
                 </template>
                 停止模拟
+              </n-button>
+              <n-button v-show="false" type="default" @click="closeAllDoors">
+                仓门全关
+              </n-button>
+              <n-button v-show="false" type="default" @click="openAllDoors">
+                仓门全开
+              </n-button>
+              <n-button type="default" @click="updateData">
+                更新数据
+              </n-button>
+              <n-button type="default" @click="copyAllBatterySn">
+                复制电池SN
               </n-button>
             </template>
           </n-space>
@@ -150,7 +151,7 @@
               </div>
               <!-- 是否充电中 -->
               <div class="battery-charging-row">
-                <span class="field-label">是否充电中</span>
+                <span class="field-label">是否充电</span>
                 <n-switch v-model:value="door.battery.charging" size="small"
                   @update:value="() => syncDoorToBackend(door, ['battery_charging'])">
                   <template #checked>充电中</template>
@@ -305,7 +306,7 @@ function loadCabinetMockFormFromStorage(): Partial<{
       typeof parsed.powerMode === "number" ? parsed.powerMode : undefined;
     const doorCount =
       typeof parsed.doorCount === "number" &&
-        parsed.doorCount >= 4 &&
+        parsed.doorCount >= 1 &&
         parsed.doorCount <= 16
         ? parsed.doorCount
         : undefined;
@@ -801,13 +802,14 @@ function removeBattery(door: CabinetDoor) {
   flex: 1;
 }
 
+/* 只读输入框：不写死浅色，避免深色模式下异常；交由 Naive 主题控制 */
 .input-readonly-gray {
-  background: #f3f4f6;
+  background: transparent;
 }
 
 .form-buttons {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin-top: 8px;
 }
 
@@ -1054,21 +1056,33 @@ function removeBattery(door: CabinetDoor) {
   font-weight: 600;
   color: #374151;
   white-space: nowrap;
-  min-width: 52px;
+  min-width: 50px;
   flex-shrink: 0;
 }
 
 .battery-sn-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
+/* 仓门卡片内输入框固定浅色样式，深色模式下在浅色卡片上可读 */
 .battery-sn-row :deep(.n-input) {
   flex: 1;
   min-width: 0;
   font-family: "Consolas", "Monaco", monospace;
   font-size: 11px;
+}
+.door-card :deep(.n-input .n-input__input-el),
+.door-card :deep(.n-input-number .n-input-number-input) {
+  background-color: #ffffff;
+  color: #1f2937;
+  border-color: #e5e7eb;
+}
+.door-card :deep(.n-input.n-input--focus .n-input__input-el),
+.door-card :deep(.n-input-number.n-input-number--focus .n-input-number-input) {
+  background-color: #ffffff;
+  border-color: #18a058;
 }
 
 /* SOC 进度条 */

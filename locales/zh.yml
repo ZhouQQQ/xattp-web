@@ -88,6 +88,9 @@ tools:
   rental-ecu-mock:
     title: 短租中控模拟（内测） 
     description: 短租中控模拟,用于测试和调试短租中控的通信,暂时只支持共享协议中控
+  quick-set-ecu-voice:
+    title: 快捷语音位设置
+    description: 使用文本快速快捷设置你的中控语音位
   muti-table-sql-gen:
     title: 多租户SQL生成
     description: 共享经常只有单租户SQL,后期要用时维护到爆炸，本工具帮你快捷生成多租户SQL

@@ -36,6 +36,7 @@
                       :options="serviceAreaInputModeOptions"
                       size="small"
                       :disabled="!!connectId"
+                      @update:value="onServiceAreaInputModeChange"
                       class="service-area-type-select"
                     />
                     <n-input
@@ -73,6 +74,7 @@
                           <template #icon>
                             <n-icon :component="Dice" :size="18" />
                           </template>
+                          随机
                         </n-button>
                       </template>
                       随机生成
@@ -439,13 +441,33 @@ function checkResCode(res: any): boolean {
   return true;
 }
 
-/** 使 n-input textarea 随内容增高，减少滚动 */
+/** 获取有滚动条的第一个祖先 */
+function getScrollParent(node: Element | null): Element | null {
+  let p = node?.parentElement ?? null;
+  while (p) {
+    const { overflowY } = getComputedStyle(p);
+    if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") return p;
+    p = p.parentElement;
+  }
+  return null;
+}
+
+/** 使 n-input textarea 随内容增高，减少滚动；调整时保持滚动位置，避免点击编辑时窗口跳动 */
 function fitTextareaHeight(el: HTMLElement) {
+  const textarea = el.tagName === "TEXTAREA" ? (el as HTMLTextAreaElement) : el.querySelector("textarea");
+  if (!textarea) return;
+  const winScrollY = window.scrollY ?? document.documentElement.scrollTop;
+  const textareaScrollTop = textarea.scrollTop;
+  const scrollParent = getScrollParent(textarea);
+  const parentScrollTop = scrollParent ? scrollParent.scrollTop : 0;
   nextTick(() => {
-    const textarea = el.tagName === "TEXTAREA" ? el : el.querySelector("textarea");
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 200)}px`;
+    const ta = el.tagName === "TEXTAREA" ? (el as HTMLTextAreaElement) : el.querySelector("textarea");
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.max(ta.scrollHeight, 200)}px`;
+    ta.scrollTop = textareaScrollTop;
+    if (scrollParent) scrollParent.scrollTop = parentScrollTop;
+    window.scrollTo({ top: winScrollY, behavior: "auto" });
   });
 }
 
@@ -632,6 +654,16 @@ const envOptions = [
 ];
 
 const formData = reactive(getInitialFormData());
+
+/**
+ * 切换服务区输入模式时，清除原输入框内容，避免把旧值带到新模式
+ * @param _nextMode 目标模式（name / id），由 v-model 自动更新
+ */
+function onServiceAreaInputModeChange(_nextMode: ServiceAreaInputMode) {
+  formData.service_area_id = "";
+  formData.service_area_name = "";
+  saveFormToStorage();
+}
 
 /** 将当前表单保存到 localStorage */
 function saveFormToStorage() {
@@ -1289,7 +1321,7 @@ async function handleCloseTab(name: string) {
   margin: 0;
 
   :deep(.n-card) {
-    padding: 16px;
+    padding: 10px;
   }
 }
 
@@ -1372,7 +1404,7 @@ async function handleCloseTab(name: string) {
   width: 100%;
 }
 .service-area-row .service-area-type-select {
-  width: 70px;
+  width: 80px;
   flex-shrink: 0;
 }
 .service-area-row .service-area-input {
