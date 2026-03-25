@@ -97,7 +97,7 @@
                       :disabled="!formData.battery_sn?.trim()"
                       style="flex: 1; margin-right: 12px" />
                     <n-input-number v-model:value="formData.battery_soc" :min="0" :max="100" :show-button="false"
-                      size="small" style="width: 72px" :disabled="!formData.battery_sn?.trim()" />
+                      size="small" style="width: 72px" placeholder="SOC" :disabled="!formData.battery_sn?.trim()" />
                     <span class="soc-unit">%</span>
                   </div>
                 </n-form-item>

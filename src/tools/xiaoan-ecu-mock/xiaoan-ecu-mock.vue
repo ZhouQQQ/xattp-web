@@ -3,6 +3,22 @@
     <div class="card-wrap" :class="{ 'card-wrap-reporting': connectId }">
       <n-card>
         <div class="form-section">
+          <div v-if="existingMockList.length > 0" class="existing-tabs-wrap">
+            <div class="existing-tabs-title">已有模拟连接</div>
+            <n-tabs
+              v-model:value="activeExistingMockImei"
+              type="line"
+              size="small"
+              @update:value="handleExistingMockTabChange"
+            >
+              <n-tab-pane
+                v-for="item in existingMockList"
+                :key="item.imei"
+                :name="item.imei"
+                :tab="item.imei"
+              />
+            </n-tabs>
+          </div>
           <n-form :model="formData" label-placement="left" label-width="100px">
             <n-grid :cols="12" :x-gap="1" :y-gap="2">
               <!-- 第一行：环境、租户ID、服务区（服务区宽一点） -->
@@ -90,7 +106,7 @@
                       <template #trigger>
                         <n-icon :component="Help" :size="14" class="tip-icon" />
                       </template>
-                      选填。请确保改IMEI真实存在并在线，如填入将参考此IMEI模拟透传返回
+                      选填。请确保该IMEI真实存在并且在线，如填入将参考此IMEI模拟其透传返回
                     </n-tooltip>
                   </template>
                   <n-input v-model:value="formData.ref_imei" placeholder="选填，15 位数字" clearable size="small"
@@ -423,6 +439,7 @@ import { Help, Gps, Trash, Dice } from "@vicons/tabler";
 import {
   xiaoanEcuMockCreateAPI,
   xiaoanEcuMockCmdAllAPI,
+  xiaoanEcuMockListAPI,
   xiaoanEcuMockCmdSetAPI,
   xiaoanEcuMockDeleteAPI,
   xiaoanEcuMockUpdateAPI,
@@ -431,6 +448,7 @@ import {
 } from "@/api/device";
 
 const { message } = createDiscreteApi(["message"]);
+const BASE_PATH = "/xattp-server";
 
 /** 校验接口返回 code，不为 0 时 toast 返回的 msg 并返回 false */
 function checkResCode(res: any): boolean {
@@ -654,6 +672,145 @@ const envOptions = [
 ];
 
 const formData = reactive(getInitialFormData());
+interface ExistingMockItem {
+  imei: string;
+  raw: Record<string, unknown>;
+}
+const existingMockList = ref<ExistingMockItem[]>([]);
+const activeExistingMockImei = ref("");
+
+/**
+ * 从对象中按候选 key 取字符串值
+ * @param source 原对象
+ * @param keys 候选 key 列表
+ * @returns 命中的字符串；未命中返回 undefined
+ */
+function pickString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 从对象中按候选 key 取数字值
+ * @param source 原对象
+ * @param keys 候选 key 列表
+ * @returns 命中的数字；未命中返回 undefined
+ */
+function pickNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && !Number.isNaN(value)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 从对象中按候选 key 取布尔值
+ * @param source 原对象
+ * @param keys 候选 key 列表
+ * @returns 命中的布尔值；未命中返回 undefined
+ */
+function pickBoolean(source: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 将 list 返回对象回显到表单
+ * @param item list 中单条对象
+ */
+function applyExistingMockToForm(item: Record<string, unknown>) {
+  const env = pickString(item, ["env"]);
+  const tenantId = pickString(item, ["tenant_id", "tenantId"]);
+  const imei = pickString(item, ["imei"]);
+  const refImei = pickString(item, ["ref_imei", "refImei"]);
+  const lng = pickNumber(item, ["lng", "longitude"]);
+  const lat = pickNumber(item, ["lat", "latitude"]);
+  const voltage = pickNumber(item, ["voltage"]);
+  const version = pickString(item, ["version"]);
+  const serviceAreaId = pickString(item, ["service_area_id", "serviceAreaId"]);
+  const serviceAreaName = pickString(item, ["service_area_name", "serviceAreaName"]);
+  const seatLocked = pickBoolean(item, ["seat_locked", "seatLocked"]);
+  const powerExists = pickBoolean(item, ["power_exists", "powerExists"]);
+  const hasHelmet = pickBoolean(item, ["has_helmet", "hasHelmet"]);
+  const helmetReact = pickBoolean(item, ["helmet_react", "helmetReact"]);
+  const helmetLock = pickBoolean(item, ["helmet_lock", "helmetLock"]);
+  const tlv = item.tlv;
+
+  if (typeof env === "string" && env.trim()) formData.env = env.trim();
+  if (typeof tenantId === "string") formData.tenant_id = tenantId.replace(/\D/g, "");
+  if (typeof imei === "string") formData.imei = imei;
+  if (typeof refImei === "string") formData.ref_imei = refImei;
+  if (typeof lng === "number") formData.lng = lng;
+  if (typeof lat === "number") formData.lat = lat;
+  if (typeof voltage === "number") formData.voltage = voltage;
+  if (typeof version === "string") formData.version = version;
+  formData.service_area_id = typeof serviceAreaId === "string" ? serviceAreaId : "";
+  formData.service_area_name = typeof serviceAreaName === "string" ? serviceAreaName : "";
+  formData.serviceAreaInputMode = formData.service_area_name?.trim() ? "name" : "id";
+  if (typeof seatLocked === "boolean") formData.seat_locked = seatLocked;
+  if (typeof powerExists === "boolean") formData.power_exists = powerExists;
+  if (typeof hasHelmet === "boolean") formData.has_helmet = hasHelmet;
+  if (typeof helmetReact === "boolean") formData.helmet_react = helmetReact;
+  if (typeof helmetLock === "boolean") formData.helmet_lock = helmetLock;
+  if (Array.isArray(tlv)) {
+    formData.tlv = JSON.stringify(tlv, null, 2);
+  } else if (typeof tlv === "string") {
+    formData.tlv = tlv;
+  } else {
+    formData.tlv = "";
+  }
+}
+
+/**
+ * 拉取当前用户已有 mock 连接，按 imei 作为 tab
+ */
+async function fetchExistingMockList() {
+  try {
+    const res: any = await xiaoanEcuMockListAPI();
+    if (!checkResCode(res)) return;
+    const data = Array.isArray(res?.data) ? res.data : [];
+    const list: ExistingMockItem[] = data
+      .map((raw: unknown) => {
+        const record = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+        if (!record) return null;
+        const imei = pickString(record, ["imei"]);
+        if (!imei) return null;
+        return { imei, raw: record };
+      })
+      .filter((item: ExistingMockItem | null): item is ExistingMockItem => item != null);
+    existingMockList.value = list;
+  } catch (_e) {
+    // 列表加载失败不阻塞页面使用
+  }
+}
+
+/**
+ * 切换已存在连接 tab：回显对象到表单并自动开始模拟
+ * @param imei tab 名称（即 imei）
+ */
+async function handleExistingMockTabChange(imei: string) {
+  if (!imei || createLoading.value) return;
+  const selected = existingMockList.value.find((item) => item.imei === imei);
+  if (!selected) return;
+  if (connectId.value) {
+    await handleDisconnect();
+  }
+  applyExistingMockToForm(selected.raw);
+  await handleCreate();
+}
 
 /**
  * 切换服务区输入模式时，清除原输入框内容，避免把旧值带到新模式
@@ -1361,6 +1518,16 @@ async function handleCloseTab(name: string) {
 
 .form-section {
   max-width: 960px;
+}
+
+.existing-tabs-wrap {
+  margin-bottom: 10px;
+}
+
+.existing-tabs-title {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
 }
 
 .form-section :deep(.n-form-item) {

@@ -87,11 +87,25 @@ const urlValidationRules = [
     },
 ];
 
-const STORAGE_KEY = 'RENTAL:IMEI:HISTORY';
-const history = ref([]);
+const STORAGE_KEY = 'RENTAL:DEVICE_HISTORY:v2';
 
-function historyClick(item) {
-    imei.value = item;
+interface RentalHistoryItem {
+    imei: string;
+    type: number;
+}
+
+const history = ref<RentalHistoryItem[]>([]);
+
+function getTypeShortLabel(type: number): string {
+    if (type === 3) return '共享';
+    if (type === 2) return '智能';
+    if (type === 1) return '电柜';
+    return '共享';
+}
+
+function historyClick(item: RentalHistoryItem) {
+    imei.value = item.imei;
+    dType.value = item.type;
     deviceInfo.value = null;
     // queryImei()
 }
@@ -106,12 +120,19 @@ function openTenantDomain() {
     window.open(url, "_blank", "noopener,noreferrer");
 }
 
-function addToHistory() {
-    if (imei.value && !history.value.includes(imei.value)) {
-        history.value.unshift(imei.value);
-        if (history.value.length > 24) {
-            history.value.pop();
-        }
+function addToHistory(item: RentalHistoryItem) {
+    const currentImei = item?.imei?.trim();
+    const currentType = Number(item?.type);
+    if (!currentImei) return;
+    if (![1, 2, 3].includes(currentType)) return;
+
+    const existedIndex = history.value.findIndex((h) => h.imei === currentImei);
+    if (existedIndex !== -1) {
+        history.value.splice(existedIndex, 1);
+    }
+    history.value.unshift({ imei: currentImei, type: currentType });
+    if (history.value.length > 24) {
+        history.value.pop();
     }
 }
 
@@ -119,7 +140,20 @@ function loadHistory() {
     try {
         const savedHistory = localStorage.getItem(STORAGE_KEY);
         if (savedHistory) {
-            history.value = JSON.parse(savedHistory);
+            const parsed = JSON.parse(savedHistory);
+            if (Array.isArray(parsed)) {
+                history.value = parsed
+                    .map((x: unknown) => {
+                        if (!x || typeof x !== 'object') return null;
+                        const raw = x as Record<string, unknown>;
+                        const nextImei = typeof raw.imei === 'string' ? raw.imei.trim() : '';
+                        const nextType = typeof raw.type === 'number' ? raw.type : Number(raw.type);
+                        if (!nextImei) return null;
+                        if (![1, 2, 3].includes(nextType)) return null;
+                        return { imei: nextImei, type: nextType } as RentalHistoryItem;
+                    })
+                    .filter((x: RentalHistoryItem | null): x is RentalHistoryItem => x != null);
+            }
         }
     } catch (e) {
         console.error('Failed to load history from localStorage:', e);
@@ -153,11 +187,13 @@ watch(imei, () => {
 const showModal = ref(false);
 
 const targetEnv = ref();
+const customServer = ref("");
 const tenantID = ref();
 const dType = ref(3);
+const CUSTOM_SERVER_ENV = "custom_server";
 
 const DEVICE_TYPE_ARRAY = [
-    { 'value': 3, name: '共享协议中控(新网关)' },
+    { 'value': 3, name: '共享协议中控' },
     { 'value': 2, name: '智能协议中控' },
     { 'value': 1, name: '电柜' },
 ];
@@ -167,6 +203,7 @@ const envs = [
         label: 'PROD (生产线上，新客户常用)',
         value: 'prod',
     },
+  
     {
         label: 'UAT ',
         value: 'uat',
@@ -178,6 +215,14 @@ const envs = [
     {
         label: 'DEV',
         value: 'dev',
+    },
+    {
+        label: '硬件生产',
+        value: 'shengchan',
+    },
+    {
+        label: '自定义server',
+        value: CUSTOM_SERVER_ENV,
     }
 ];
 
@@ -188,11 +233,16 @@ function showSwitchDialog() {
 }
 
 function swithDevice() {
+    if (targetEnv.value === CUSTOM_SERVER_ENV && !customServer.value.trim()) {
+        message.error("请选择自定义server后，请填写server");
+        return;
+    }
     switchLoading.value = true;
     // 要发送的数据对象
     const data = {
         imei: imei.value,
         target_env: targetEnv.value,
+        server: targetEnv.value === CUSTOM_SERVER_ENV ? customServer.value.trim() : "",
         type: dType.value,
         source: 'xattp',
     };
@@ -218,6 +268,12 @@ function swithDevice() {
         });
 }
 
+watch(targetEnv, (value) => {
+    if (value !== CUSTOM_SERVER_ENV) {
+        customServer.value = "";
+    }
+});
+
 
 function queryImei() {
     queryLoading.value = true;
@@ -234,6 +290,10 @@ function queryImei() {
                     message.warning(`该设备可能是一个 ${response.data.type_name}`);
                 }
                 dType.value = response.data.type;
+                addToHistory({
+                    imei: typeof response.data.imei === 'string' ? response.data.imei : imei.value,
+                    type: response.data.type,
+                });
 
             } else {
                 message.error(response.msg);
@@ -242,7 +302,6 @@ function queryImei() {
             message.error(`未知错误:${error}`);// 处理错误
         }).finally(() => {
             queryLoading.value = false;
-            addToHistory();
         });
 }
 </script>
@@ -277,9 +336,23 @@ function queryImei() {
                 </n-radio>
             </n-radio-group>
             <div>
-                <n-tag @click="historyClick(item)" mt-4 mr-3 size="small" v-for="(item, index) in history" :key="index"
-                    closable @close="handleClose(index)">
-                    {{ item }}
+                <n-tag
+                    class="history-tag"
+                    @click="historyClick(item)"
+                    mt-4
+                    mr-3
+                    size="small"
+                    v-for="(item, index) in history"
+                    :key="`${item.type}-${item.imei}`"
+                    closable
+                    @close="handleClose(index)"
+                >
+                    <div class="history-tag-content">
+                        <span class="history-tag-type" :class="`history-tag-type-${item.type}`">
+                            {{ getTypeShortLabel(item.type) }}
+                        </span>
+                        <span class="history-tag-imei">{{ item.imei }}</span>
+                    </div>
                 </n-tag>
             </div>
         </c-card>
@@ -338,6 +411,12 @@ function queryImei() {
                     <p>将设备号 {{ imei }} 切换到环境：</p>
 
                     <n-select placeholder="请选择环境" v-model:value="targetEnv" :options="envs" />
+                    <n-input
+                        v-if="targetEnv === CUSTOM_SERVER_ENV"
+                        v-model:value="customServer"
+                        style="margin-top: 8px"
+                        placeholder="请输入 server，例如：112.74.77.182:9880"
+                    />
                 </div>
                 <template #action>
                     <div>
@@ -364,5 +443,52 @@ function queryImei() {
 
 .click-button:hover {
     cursor: pointer;
+}
+
+:deep(.history-tag) {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 6px 0 2px !important;
+}
+
+.history-tag-content {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(27, 31, 36, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 18px;
+    margin-right: 4px;
+}
+
+.history-tag-type {
+    font-weight: 700;
+    padding: 2px 8px;
+    color: #ffffff;
+    background: var(--badge-type-bg);
+}
+
+.history-tag-imei {
+    font-weight: 600;
+    padding: 2px 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background: var(--badge-imei-bg);
+    color: #1f2937;
+}
+
+.history-tag-type-3 {
+    --badge-type-bg: #2da44e;
+    --badge-imei-bg: rgba(45, 164, 78, 0.12);
+}
+
+.history-tag-type-2 {
+    --badge-type-bg: #0969da;
+    --badge-imei-bg: rgba(9, 105, 218, 0.12);
+}
+
+.history-tag-type-1 {
+    --badge-type-bg: #b62324;
+    --badge-imei-bg: rgba(182, 35, 36, 0.12);
 }
 </style>

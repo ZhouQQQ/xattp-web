@@ -114,6 +114,14 @@ export function xiaoanEcuMockCmdAllAPI(params: { connect_id: string }) {
   return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/cmd/all`, { params });
 }
 
+/**
+ * 小安中控模拟：获取当前用户已有 mock 连接列表
+ * @returns mock 请求实例
+ */
+export function xiaoanEcuMockListAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/list`);
+}
+
 /** 小安中控模拟：设置单条 mock 命令 */
 export function xiaoanEcuMockCmdSetAPI(data: {
   connect_id: string;
