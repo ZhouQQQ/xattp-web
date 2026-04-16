@@ -5,18 +5,9 @@
         <div class="form-section">
           <div v-if="existingMockList.length > 0" class="existing-tabs-wrap">
             <div class="existing-tabs-title">已有模拟连接</div>
-            <n-tabs
-              v-model:value="activeExistingMockImei"
-              type="line"
-              size="small"
-              @update:value="handleExistingMockTabChange"
-            >
-              <n-tab-pane
-                v-for="item in existingMockList"
-                :key="item.imei"
-                :name="item.imei"
-                :tab="item.imei"
-              />
+            <n-tabs v-model:value="activeExistingMockImei" type="line" size="small"
+              @update:value="handleExistingMockTabChange">
+              <n-tab-pane v-for="item in existingMockList" :key="item.imei" :name="item.imei" :tab="item.imei" />
             </n-tabs>
           </div>
           <n-form :model="formData" label-placement="left" label-width="100px">
@@ -47,34 +38,15 @@
                     </n-tooltip>
                   </template>
                   <div class="service-area-row">
-                    <n-select
-                      v-model:value="formData.serviceAreaInputMode"
-                      :options="serviceAreaInputModeOptions"
-                      size="small"
-                      :disabled="!!connectId"
-                      @update:value="onServiceAreaInputModeChange"
-                      class="service-area-type-select"
-                    />
-                    <n-input
-                      v-if="formData.serviceAreaInputMode === 'name'"
-                      v-model:value="formData.service_area_name"
-                      placeholder="选填，服务区名称"
-                      clearable
-                      size="small"
-                      :readonly="!!connectId"
-                      :class="{ 'input-readonly-gray': connectId }"
-                      class="service-area-input"
-                    />
-                    <n-input
-                      v-else
-                      v-model:value="formData.service_area_id"
-                      placeholder="选填，服务区ID"
-                      clearable
-                      size="small"
-                      :readonly="!!connectId"
-                      :class="{ 'input-readonly-gray': connectId }"
-                      class="service-area-input"
-                    />
+                    <n-select v-model:value="formData.serviceAreaInputMode" :options="serviceAreaInputModeOptions"
+                      size="small" :disabled="!!connectId" @update:value="onServiceAreaInputModeChange"
+                      class="service-area-type-select" />
+                    <n-input v-if="formData.serviceAreaInputMode === 'name'" v-model:value="formData.service_area_name"
+                      placeholder="选填，服务区名称" clearable size="small" :readonly="!!connectId"
+                      :class="{ 'input-readonly-gray': connectId }" class="service-area-input" />
+                    <n-input v-else v-model:value="formData.service_area_id" placeholder="选填，服务区ID" clearable
+                      size="small" :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }"
+                      class="service-area-input" />
                   </div>
                 </n-form-item>
               </n-gi>
@@ -114,18 +86,37 @@
                     :maxlength="15" show-count />
                 </n-form-item>
               </n-gi>
-              <!-- 第三行：经度、纬度 -->
-              <n-gi :span="6">
-                <n-form-item label="经度(GCJ02)" path="lng">
-                  <n-input-number v-model:value="formData.lng" placeholder="经度" size="small" clearable
-                    :show-button="false" style="width: 100%" />
-                </n-form-item>
-              </n-gi>
-              <n-gi :span="6">
-                <n-form-item label="纬度(GCJ02)" path="lat">
-                  <n-input-number v-model:value="formData.lat" placeholder="纬度" size="small" clearable
-                    :show-button="false" style="width: 100%" />
-                </n-form-item>
+              <!-- 第三行：经度、纬度、重置（11:11:2） -->
+              <n-gi :span="12">
+                <n-grid :cols="24" :x-gap="8">
+                  <n-gi :span="11">
+                    <n-form-item path="lng">
+                      <template #label>
+                        <span>经度(GCJ02)</span>
+                      </template>
+                      <n-input-number v-model:value="formData.lng" placeholder="经度" size="small" clearable
+                        :show-button="false" style="width: 100%" />
+                    </n-form-item>
+                  </n-gi>
+                  <n-gi :span="11">
+                    <n-form-item path="lat">
+                      <template #label>
+                        <span>纬度(GCJ02)</span>
+                      </template>
+                      <n-input-number v-model:value="formData.lat" placeholder="纬度" size="small" clearable
+                        :show-button="false" style="width: 100%" />
+                    </n-form-item>
+                  </n-gi>
+                  <n-gi :span="2">
+                    <n-form-item label="" :label-width="0" class="coord-reset-item">
+                      <div class="coord-reset-row">
+                        <n-button size="small" type="default" title="重置经纬度到武汉留学生创业园" @click="resetDefaultCoords">
+                          重置经纬度
+                        </n-button>
+                      </div>
+                    </n-form-item>
+                  </n-gi>
+                </n-grid>
               </n-gi>
               <!-- 剩余每行2个 -->
               <n-gi :span="6">
@@ -195,30 +186,13 @@
                     <span>TLV数据</span>
                   </template>
                   <div class="tlv-input-row">
-                    <n-input
-                      v-model:value="formData.tlv"
-                      type="textarea"
-                      placeholder='选填'
-                      :autosize="{ minRows: 4, maxRows: 10 }"
-                      clearable
-                      size="small"
-                      class="tlv-textarea"
-                    />
+                    <n-input v-model:value="formData.tlv" type="textarea" placeholder='选填'
+                      :autosize="{ minRows: 4, maxRows: 10 }" clearable size="small" class="tlv-textarea" />
                     <n-space :size="8" class="tlv-btns">
-                      <n-button
-                        type="default"
-                        size="small"
-                        class="tlv-ref-btn"
-                        @click="insertTlvExample"
-                      >
+                      <n-button type="default" size="small" class="tlv-ref-btn" @click="insertTlvExample">
                         示例
                       </n-button>
-                      <n-button
-                        type="default"
-                        size="small"
-                        class="tlv-ref-btn"
-                        @click="openTlvProtocolDoc"
-                      >
+                      <n-button type="default" size="small" class="tlv-ref-btn" @click="openTlvProtocolDoc">
                         参考文档
                       </n-button>
                     </n-space>
@@ -243,7 +217,7 @@
                   <n-button type="default" :loading="updateLoading" @click="handleUpdate">
                     立即更新数据
                   </n-button>
-                  <n-button type="default" @click="openMoveModal">                    
+                  <n-button type="default" @click="openMoveModal">
                     手动移动
                   </n-button>
                   <n-button type="default" @click="openTrackModal">
@@ -382,8 +356,7 @@
     </n-modal>
 
     <!-- 模拟轨迹弹窗 -->
-    <n-modal v-model:show="showTrackModal" preset="dialog" title="模拟轨迹" :mask-closable="false"
-      style="width: 600px">
+    <n-modal v-model:show="showTrackModal" preset="dialog" title="模拟轨迹" :mask-closable="false" style="width: 600px">
       <template #action>
         <n-space :size="8">
           <n-button type="default" :disabled="trackLoading" @click="generateSampleTrack">添加示例</n-button>
@@ -396,10 +369,8 @@
         <n-form-item label="轨迹点，将按照下面经纬度列表依次上报数据">
           <div class="track-input-wrap">
             <n-input v-model:value="trackText" type="textarea" :rows="12" size="small"
-              placeholder="每行一个坐标，格式：经度,纬度&#10;为空时提交将清除已提交"
-              :disabled="trackLoading" style="width: 100%" />
-            <n-button v-if="trackText.trim()" text size="small" class="track-clear-btn"
-              @click="trackText = ''">
+              placeholder="每行一个坐标，格式：经度,纬度&#10;为空时提交将清除已提交" :disabled="trackLoading" style="width: 100%" />
+            <n-button v-if="trackText.trim()" text size="small" class="track-clear-btn" @click="trackText = ''">
               清除
             </n-button>
           </div>
@@ -449,6 +420,8 @@ import {
 
 const { message } = createDiscreteApi(["message"]);
 const BASE_PATH = "/xattp-server";
+const DEFAULT_COORD_LNG = 114.434888;
+const DEFAULT_COORD_LAT = 30.500136;
 
 /** 校验接口返回 code，不为 0 时 toast 返回的 msg 并返回 false */
 function checkResCode(res: any): boolean {
@@ -639,11 +612,11 @@ const envOptions = [
     value: "yunjiang",
     tenantID: 1955,
   },
-  {
-    label: "独立部署-银川微公交",
-    value: "yinchuan",
-    tenantID: 1752,
-  },
+  // {
+  //   label: "独立部署-银川微公交",
+  //   value: "yinchuan",
+  //   tenantID: 1752,
+  // },
   {
     label: "独立部署-城发悠出行",
     value: "chengfayou",
@@ -1018,6 +991,12 @@ function randomImei() {
     tail += Math.floor(Math.random() * 10);
   }
   formData.imei = `86868686${tail}`;
+}
+
+function resetDefaultCoords() {
+  formData.lng = DEFAULT_COORD_LNG;
+  formData.lat = DEFAULT_COORD_LAT;
+  saveFormToStorage();
 }
 
 /** 「模拟头盔」开关变化时：打开则下面两项默认打开，关闭则下面两项也关闭 */
@@ -1570,10 +1549,12 @@ async function handleCloseTab(name: string) {
   gap: 8px;
   width: 100%;
 }
+
 .service-area-row .service-area-type-select {
   width: 80px;
   flex-shrink: 0;
 }
+
 .service-area-row .service-area-input {
   flex: 1;
   min-width: 0;
@@ -1583,6 +1564,14 @@ async function handleCloseTab(name: string) {
   vertical-align: middle;
   cursor: help;
   color: #999;
+}
+
+.coord-reset-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
 }
 
 .tlv-input-row {

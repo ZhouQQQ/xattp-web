@@ -101,6 +101,9 @@ tools:
   clear-realname:
     title: 共享清除实名
     description: 用于共享业务清除实名,根据租户ID和手机号清除实名信息
+  add-tester:
+    title: 添加体验权限
+    description: 适用于给共享业务小程序，添加体验成员权限，方便测试
 
   ebike-switch:
     title: 共享切车

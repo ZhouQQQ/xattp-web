@@ -173,8 +173,10 @@ watch(history, () => {
 
 const showModal = ref(false);
 const targetEnv = ref();
+const customServer = ref("");
 const tenantID = ref();
 const selectedTenant = ref(null);
+const CUSTOM_SERVER_ENV = "custom_server";
 
 // 处理租户数据，转换为下拉框选项格式
 const tenantOptions = computed(() => {
@@ -220,6 +222,10 @@ const envs = [
   {
     label: '硬件生产',
     value: 'shengchan',
+  },
+  {
+    label: '自定义server',
+    value: CUSTOM_SERVER_ENV,
   }
 ];
 
@@ -238,6 +244,9 @@ watch(selectedTenant, (val) => {
 
 // 监听环境变化
 watch(targetEnv, (val) => {
+  if (val !== CUSTOM_SERVER_ENV) {
+    customServer.value = "";
+  }
   if (val === 'oversea-dev') {
     tenantID.value = 1;
     selectedTenant.value = null;
@@ -254,14 +263,20 @@ function showSwitchDialog() {
   selectedTenant.value = null;
   targetEnv.value = undefined;
   tenantID.value = undefined;
+  customServer.value = "";
 }
 
 function swithDevice() {
+  if (targetEnv.value === CUSTOM_SERVER_ENV && !customServer.value.trim()) {
+    message.error("选择自定义server后，请填写server");
+    return;
+  }
   switchLoading.value = true;
   const data = {
     imei: imei.value,
     target_env: targetEnv.value,
-    tenant_id: tenantID.value.toString(),
+    tenant_id: targetEnv.value === CUSTOM_SERVER_ENV ? "" : String(tenantID.value ?? ""),
+    server: targetEnv.value === CUSTOM_SERVER_ENV ? customServer.value.trim() : "",
     source: 'xattp',
   };
   switchOverseaAPI(data)
@@ -282,6 +297,7 @@ function swithDevice() {
       selectedTenant.value = null;
       targetEnv.value = undefined;
       tenantID.value = undefined;
+      customServer.value = "";
     });
 }
 
@@ -385,8 +401,14 @@ function queryImei() {
           <div mt-3>
             <p>将设备号 {{ imei }} 切换到环境：</p>
             <n-select filterable placeholder="请选择环境" v-model:value="targetEnv" :options="envs" />
+            <n-input
+              v-if="targetEnv === CUSTOM_SERVER_ENV"
+              v-model:value="customServer"
+              mt-2
+              placeholder="请输入 server，例如：112.74.77.182:9880"
+            />
           </div>
-          <div mt-3 v-if="targetEnv != 'shengchan'">
+          <div mt-3 v-if="targetEnv != 'shengchan' && targetEnv !== CUSTOM_SERVER_ENV">
             租户ID :
             <n-input-number v-model:value.trim="tenantID" :show-button="false" placeholder="请输入租户ID" clearable />
           </div>

@@ -223,11 +223,11 @@ const envs = [
     value: "yunjiang",
     tenantID: 1955,
   },
-  {
-    label: "独立部署-银川微公交",
-    value: "yinchuan",
-    tenantID: 1752,
-  },
+  // {
+  //   label: "独立部署-银川微公交",
+  //   value: "yinchuan",
+  //   tenantID: 1752,
+  // },
   {
     label: "独立部署-城发悠出行",
     value: "chengfayou",

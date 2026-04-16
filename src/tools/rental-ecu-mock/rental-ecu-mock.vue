@@ -51,17 +51,41 @@
                   </div>
                 </n-form-item>
               </n-gi>
-              <n-gi>
-                <n-form-item label="经度(GCJ02)" path="lng">
-                  <n-input-number v-model:value="formData.lng" placeholder="经度" size="small" clearable
-                    :show-button="false" style="width: 100%" />
-                </n-form-item>
-              </n-gi>
-              <n-gi>
-                <n-form-item label="纬度(GCJ02)" path="lat">
-                  <n-input-number v-model:value="formData.lat" placeholder="纬度" size="small" clearable
-                    :show-button="false" style="width: 100%" />
-                </n-form-item>
+              <n-gi :span="2">
+                <n-grid :cols="24" :x-gap="8">
+                  <n-gi :span="11">
+                    <n-form-item path="lng">
+                      <template #label>
+                        <span>经度(GCJ02)</span>
+                      </template>
+                      <n-input-number v-model:value="formData.lng" placeholder="经度" size="small" clearable
+                        :show-button="false" style="width: 100%" />
+                    </n-form-item>
+                  </n-gi>
+                  <n-gi :span="11">
+                    <n-form-item path="lat">
+                      <template #label>
+                        <span>纬度(GCJ02)</span>
+                      </template>
+                      <n-input-number v-model:value="formData.lat" placeholder="纬度" size="small" clearable
+                        :show-button="false" style="width: 100%" />
+                    </n-form-item>
+                  </n-gi>
+                  <n-gi :span="2">
+                    <n-form-item label="" :label-width="0" class="coord-reset-item">
+                      <div class="coord-reset-row">
+                        <n-button
+                          size="small"
+                          type="default"
+                          title="重置经纬度到武汉留学生创业园"
+                          @click="resetDefaultCoords"
+                        >
+                          重置经纬度
+                        </n-button>
+                      </div>
+                    </n-form-item>
+                  </n-gi>
+                </n-grid>
               </n-gi>
               <n-gi>
                 <n-form-item label="电压（v）" path="voltage">
@@ -351,6 +375,8 @@ import {
 } from "@/api/device";
 
 const { message } = createDiscreteApi(["message"]);
+const DEFAULT_COORD_LNG = 114.434888;
+const DEFAULT_COORD_LAT = 30.500136;
 
 /** 校验接口返回 code，不为 0 时 toast 返回的 msg 并返回 false */
 function checkResCode(res: any): boolean {
@@ -600,6 +626,12 @@ function randomImei() {
     tail += Math.floor(Math.random() * 10);
   }
   formData.imei = `86868686${tail}`;
+}
+
+function resetDefaultCoords() {
+  formData.lng = DEFAULT_COORD_LNG;
+  formData.lat = DEFAULT_COORD_LAT;
+  saveFormToStorage();
 }
 
 /** 「模拟头盔」开关变化时：打开则下面两项默认打开，关闭则下面两项也关闭 */
@@ -1147,6 +1179,14 @@ async function handleCloseTab(name: string) {
   vertical-align: middle;
   cursor: help;
   color: #999;
+}
+
+.coord-reset-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
 }
 
 .move-compass {

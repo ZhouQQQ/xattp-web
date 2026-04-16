@@ -173,5 +173,12 @@
         "env": "oversea-prod-sg",
         "logo": "https://xiaoansida-saas.oss-ap-southeast-1.aliyuncs.com/frontend/res/3329.logo.png",
         "platfromUrl": "https://didibike-tha.xiaoantek.com/frontend/admin/index.html"
+    },
+    {
+        "name": "QBA RIDE",
+        "tenantId": "3554",
+        "env": "oversea-prod-fk",
+        "logo": "https://xiaoansida-saas-eu.oss-eu-central-1.aliyuncs.com/frontend/res/3554.logo.png",
+        "platfromUrl": "https://qbago.xiaoantek.com/frontend/admin/index.html"
     }
 ]

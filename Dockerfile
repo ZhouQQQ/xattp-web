@@ -4,6 +4,16 @@ ENV NODE_OPTIONS="--max_old_space_size=8098"
 
 WORKDIR /app
 
+# Build-time metadata exposed to the Vue app via import.meta.env.VITE_*
+ARG VITE_BUILD_BRANCH=""
+ENV VITE_BUILD_BRANCH=${VITE_BUILD_BRANCH}
+
+ARG VITE_VERCEL_GIT_COMMIT_SHA=""
+ENV VITE_VERCEL_GIT_COMMIT_SHA=${VITE_VERCEL_GIT_COMMIT_SHA}
+
+ARG VITE_BUILD_TIME=""
+ENV VITE_BUILD_TIME=${VITE_BUILD_TIME}
+
 # 仅复制依赖描述，先安装依赖（未改 package 时该层可复用，节省约 72s）
 COPY package.json ./
 
