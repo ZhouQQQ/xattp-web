@@ -1,6 +1,7 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as xiaoanEcuMockBatch } from './xiaoan-ecu-mock-batch';
 import { tool as addTester } from './add-tester';
 import { tool as rentalCabinetMock } from './rental-cabinet-mock';
 import { tool as ecuVoiceIdx } from './ecu-voice-idx';
@@ -112,6 +113,7 @@ export const toolsByCategory: ToolCategory[] = [
             releaseMergeCheck,
             // ecuMock,
             xiaoanEcuMock,
+            ,
             ecuVoiceIdx,
             addTester,
         ],
@@ -144,6 +146,7 @@ export const toolsByCategory: ToolCategory[] = [
     {
         name: 'Useful',
         components: [
+            xiaoanEcuMockBatch,
             mergeRequestCheck,
             // hashText,
             dateTimeConverter,

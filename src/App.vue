@@ -27,7 +27,7 @@ syncRef(
       <NNotificationProvider placement="bottom-right">
         <component :is="layout">
           <RouterView v-slot="{ Component }">
-            <KeepAlive :include="['XiaoanEcuMock', 'RentalEcuMock', 'RentalCabinetMock']">
+            <KeepAlive :include="['XiaoanEcuMock', 'RentalEcuMock', 'RentalCabinetMock', 'XiaoanEcuMockBatch']">
               <component :is="Component" />
             </KeepAlive>
           </RouterView>

@@ -54,6 +54,21 @@ export function switchOverseaAPI(data) {
     return AlovaInstance.Post(`${BASE_PATH}/oversea/device/switch`,data);
 }
 
+/** 环境配置：获取共享环境列表 */
+export function getEbikeEnvListAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/env/ebike/all`);
+}
+
+/** 环境配置：获取短租环境列表 */
+export function getRentalEnvListAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/env/rental/all`);
+}
+
+/** 环境配置：获取海外环境列表 */
+export function getOverseaEnvListAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/env/oversea/all`);
+}
+
 /**
  * ECU 模拟接口（baseURL 随环境：dev → mock.xiaoantech.com/mock/7093/ecu，prod → mock-test.xiaoantech.com/ecu）
  * @param data - { host: 切车地址host, port: 切车地址port, imei: 设备IMEI号, type: 类型 1自动挡 2手动挡 默认1 }
@@ -89,6 +104,43 @@ export function xiaoanEcuMockCreateAPI(data: {
   service_area_id?: string;
 }) {
   return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/create`, data);
+}
+
+/** 小安中控批量模拟：按 mode 批量创建并启动 mock */
+export function xiaoanEcuMockBatchCreateAPI(data: {
+  env: string;
+  tenant_id?: string;
+  server?: string;
+  voltage_min?: number;
+  voltage_max?: number;
+  lat?: number;
+  lng?: number;
+  radius_m?: number;
+  mode: 1 | 2 | 3;
+  num?: number;
+  start_imei?: string;
+  imeis?: string[];
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/batch_add`, data);
+}
+
+/** 小安中控批量模拟：批量删除 mock（与 batch_add 对应，mode 1/2/3） */
+export function xiaoanEcuMockBatchDeleteAPI(data: {
+  mode: 1 | 2 | 3;
+  server: string;
+  num?: number;
+  start_imei?: string;
+  imei?: string;
+  imeis?: string[];
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/batch_delete`, data);
+}
+
+/** 小安中控批量模拟：获取当前用户批量创建记录 */
+export function xiaoanEcuMockBatchRecordAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/get_batch_record`, {
+    params: { _ts: Date.now() },
+  });
 }
 
 /** 租车中控模拟：添加 mock 连接（接口 /ecu/mock/add，无租户ID/服务区） */

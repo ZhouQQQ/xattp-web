@@ -1,0 +1,1493 @@
+<template>
+  <div class="xiaoan-ecu-mock-batch">
+    <n-card>
+      <n-spin :show="batchRecordLoading">
+        <div class="form-section">
+        <n-form :model="formData" :disabled="batchMockSessionActive || batchRecordLoading" label-placement="left" label-width="110px">
+          <n-grid :cols="12" :x-gap="12" :y-gap="4">
+            <n-gi :span="12">
+              <n-form-item label="设备网关" required>
+                <div class="gateway-row">
+                  <n-input
+                    v-model:value="formData.server"
+                    placeholder="请输入设备网关，或点击右侧「共享 / 短租 / 海外」在弹窗中选择环境并自动填充"
+                    clearable
+                    size="small"
+                    class="gateway-input"
+                  />
+                  <n-space :size="8" class="gateway-buttons">
+                    <n-button
+                      size="small"
+                      :loading="envPickerLoading && envPickerSource === 'ebike'"
+                      @click="openEnvPickerModal('ebike')"
+                    >
+                      共享
+                    </n-button>
+                    <n-button
+                      size="small"
+                      :loading="envPickerLoading && envPickerSource === 'rental'"
+                      @click="openEnvPickerModal('rental')"
+                    >
+                      短租
+                    </n-button>
+                    <n-button
+                      size="small"
+                      :loading="envPickerLoading && envPickerSource === 'oversea'"
+                      @click="openEnvPickerModal('oversea')"
+                    >
+                      海外
+                    </n-button>
+                  </n-space>
+                </div>
+              </n-form-item>
+            </n-gi>
+
+            <n-gi :span="12">
+              <n-form-item label="IMEI规则" required>
+                <div class="mode-section">
+                  <n-radio-group v-model:value="formData.mode" name="batch-mode">
+                    <n-space>
+                      <n-radio :value="1">随机模式</n-radio>
+                      <n-radio :value="2">顺序模式</n-radio>
+                      <n-radio :value="3">指定模式</n-radio>
+                    </n-space>
+                  </n-radio-group>
+                  <div class="mode-tip">
+                    {{ modeTipText }}
+                  </div>
+                </div>
+              </n-form-item>
+            </n-gi>
+
+            <n-gi :span="12" v-if="formData.mode === 1">
+              <n-form-item label="创建数量" required>
+                <div class="num-field">
+                  <n-input
+                    :value="numInputStr"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="10000"
+                    maxlength="5"
+                    placeholder="请输入随机创建数量"
+                    clearable
+                    size="small"
+                    class="num-input"
+                    @update:value="onNumInputStrUpdate"
+                    @wheel.prevent="onNumInputWheel"
+                  />
+                  <div class="num-tip">测试期间最大数量只支持 10000</div>
+                </div>
+              </n-form-item>
+            </n-gi>
+
+            <template v-if="formData.mode === 2">
+              <n-gi :span="6">
+                <n-form-item label="起始IMEI" required>
+                  <div class="start-imei-row">
+                    <n-input
+                      v-model:value="formData.start_imei"
+                      class="start-imei-input"
+                      placeholder="15 位数字"
+                      clearable
+                      size="small"
+                      maxlength="15"
+                    />
+                    <n-button size="small" class="start-imei-random-btn" @click="fillRandomStartImei">
+                      随机
+                    </n-button>
+                  </div>
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="6">
+                <n-form-item label="创建数量" required>
+                  <div class="num-field">
+                    <n-input
+                      :value="numInputStr"
+                      type="number"
+                      inputmode="numeric"
+                      min="1"
+                      max="10000"
+                      maxlength="5"
+                      placeholder="请输入顺序创建数量"
+                      clearable
+                      size="small"
+                      class="num-input"
+                      @update:value="onNumInputStrUpdate"
+                      @wheel.prevent="onNumInputWheel"
+                    />
+                    <div class="num-tip">测试期间最大数量只支持 10000</div>
+                  </div>
+                </n-form-item>
+              </n-gi>
+            </template>
+
+            <n-gi :span="12" v-if="formData.mode === 3">
+              <n-form-item label="IMEI 列表" required>
+                <div class="imeis-textarea-wrap">
+                  <n-input v-model:value="formData.imeis_text" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }"
+                    placeholder="请输入 IMEI 列表，支持按换行、空格、逗号分隔" clearable size="small" />
+                  <div class="imeis-preview">
+                    已识别 {{ validImeis.length }} 个有效 IMEI（15 位数字）
+                  </div>
+                </div>
+              </n-form-item>
+            </n-gi>
+
+            <n-gi :span="3">
+              <n-form-item label="经度(GCJ02)">
+                <n-input-number v-model:value="formData.lng" :show-button="false" size="small" style="width: 100%" />
+              </n-form-item>
+            </n-gi>
+            <n-gi :span="3">
+              <n-form-item label="纬度(GCJ02)">
+                <n-input-number v-model:value="formData.lat" :show-button="false" size="small" style="width: 100%" />
+              </n-form-item>
+            </n-gi>
+            <n-gi :span="4">
+              <n-form-item label="随机半径(m)">
+                <template #label>
+                  <span>随机半径(m)</span>
+                  <n-tooltip trigger="hover" style="margin-left: 8px;">
+                    <template #trigger>
+                      <span class="tip-text">?</span>
+                    </template>
+                    会以当前经纬度为中心，在该半径范围内随机生成坐标
+                  </n-tooltip>
+                </template>
+                <n-input-number placeholder="请输入,为0时表示不随机" v-model:value="formData.radius_m" :min="0" :show-button="false" size="small"
+                  style="width: 100%" />
+              </n-form-item>
+            </n-gi>
+            <n-gi :span="2">
+              <n-form-item :label-width="0">
+                <n-button type="default" size="small" @click="resetDefaultCoords">
+                  重置经纬度
+                </n-button>
+              </n-form-item>
+            </n-gi>
+
+            <n-gi :span="12">
+              <n-form-item label="电压范围（V）">
+                <div class="voltage-range">
+                  <n-slider
+                    v-model:value="voltageSlider"
+                    range
+                    :min="VOLTAGE_MIN"
+                    :max="VOLTAGE_MAX"
+                    :step="1"
+                    @update:value="onVoltageSliderUpdate"
+                  />
+                  <div class="voltage-inputs">
+                    <n-input-number
+                      v-model:value="formData.voltage_min"
+                      :min="VOLTAGE_MIN"
+                      :max="VOLTAGE_MAX"
+                      :show-button="false"
+                      size="small"
+                      placeholder="最小"
+                      @update:value="onVoltageNumberUpdate"
+                    />
+                    <span class="voltage-sep">~</span>
+                    <n-input-number
+                      v-model:value="formData.voltage_max"
+                      :min="VOLTAGE_MIN"
+                      :max="VOLTAGE_MAX"
+                      :show-button="false"
+                      size="small"
+                      placeholder="最大"
+                      @update:value="onVoltageNumberUpdate"
+                    />
+                  </div>
+                </div>
+              </n-form-item>
+            </n-gi>
+
+            <n-gi :span="12">
+              <n-form-item class="form-actions">
+                <n-space>
+                  <n-button
+                    v-if="!batchMockSessionActive"
+                    type="primary"
+                    :loading="createLoading"
+                    :disabled="batchRecordLoading"
+                    @click="handleCreate"
+                  >
+                    批量创建
+                  </n-button>
+                  <n-button
+                    v-else
+                    type="warning"
+                    :loading="stopMockLoading"
+                    :disabled="batchRecordLoading || checkedRowKeys.length === 0"
+                    @click="handleStopMock"
+                  >
+                    停止模拟（{{ checkedRowKeys.length }}）
+                  </n-button>
+                  <n-button
+                    v-if="batchMockSessionActive"
+                    type="default"
+                    :disabled="batchRecordLoading || checkedImeis.length === 0"
+                    @click="handleCopyCheckedImeis"
+                  >
+                    复制IMEI{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                  </n-button>
+                  <n-button type="default" :disabled="batchRecordLoading || batchMockSessionActive" @click="handleReset">
+                    重置
+                  </n-button>
+                </n-space>
+              </n-form-item>
+            </n-gi>
+          </n-grid>
+        </n-form>
+
+        <n-alert v-if="requestError" class="result-block" type="error" :title="requestError" />
+
+        <n-alert v-if="successSummary" class="result-block" type="success" :title="successSummary" />
+
+        <div v-if="batchMockListRows.length > 0" class="result-block batch-mock-result-table">
+          <div class="table-actions">
+            <n-space :size="8" align="center" class="table-actions-left">
+              <n-button size="small" quaternary type="primary" :disabled="batchRecordLoading" @click="handleSelectAllRows">全选</n-button>
+              <n-button size="small" quaternary :disabled="batchRecordLoading" @click="handleInvertSelectedRows">反选</n-button>
+            </n-space>
+            <n-space :size="8" align="center" class="table-filters-right">
+              <n-select
+                v-model:value="tableSuccessFilter"
+                size="small"
+                :options="tableSuccessFilterOptions"
+                :disabled="batchRecordLoading"
+                class="table-filter-select"
+              />
+              <n-input
+                v-model:value="tableImeiKeyword"
+                size="small"
+                clearable
+                :disabled="batchRecordLoading"
+                placeholder="输入IMEI模糊搜索"
+                class="table-imei-search"
+              />
+            </n-space>
+          </div>
+          <n-data-table
+            v-model:checked-row-keys="checkedRowKeys"
+            :columns="batchMockTableColumns"
+            :data="filteredBatchMockListRows"
+            :row-key="batchMockRowKey"
+            size="small"
+            :pagination="{ pageSize: 100 }"
+            :max-height="520"
+            striped
+            bordered
+          />
+        </div>
+        </div>
+      </n-spin>
+    </n-card>
+
+    <n-modal
+      v-model:show="envPickerShow"
+      preset="card"
+      :title="envPickerTitle"
+      :mask-closable="true"
+      class="env-picker-modal"
+      style="width: 600px"
+      @after-leave="onEnvPickerAfterLeave"
+    >
+      <div class="env-picker-body">
+        <p class="env-picker-hint">
+          点击任意一行即可写入「设备网关」与环境标识并关闭窗口。环境较多时可用顶部搜索缩小范围，列表按页展示、无需在框内滚动。
+        </p>
+        <n-spin :show="envPickerLoading">
+          <div v-if="!envPickerLoading && envPickerOptions.length === 0" class="env-picker-empty-wrap">
+            <n-empty description="暂无可选环境" size="medium">
+              <template #extra>
+                <p class="env-picker-empty-tip">
+                  需配置 order，且网关字段有效（共享/海外：<code>ebike_target_addr</code>；短租：字段 <code>3</code>）
+                </p>
+              </template>
+            </n-empty>
+          </div>
+          <div v-else-if="!envPickerLoading && envPickerNoMatch" class="env-picker-empty-wrap">
+            <n-empty description="没有匹配的环境" size="medium">
+              <template #extra>
+                <p class="env-picker-empty-tip">可缩短关键字，或清空搜索框查看全部列表</p>
+              </template>
+            </n-empty>
+          </div>
+          <div v-else-if="!envPickerLoading" class="env-picker-list-panel">
+            <div class="env-picker-toolbar">
+              <n-input
+                v-model:value="envPickerSearch"
+                clearable
+                size="small"
+                placeholder="筛选：名称、环境 key、网关地址"
+                class="env-picker-search-input"
+              />
+              <span class="env-picker-count">{{ envPickerFilteredTotal }} / {{ envPickerOptions.length }}</span>
+            </div>
+            <ul class="env-picker-list">
+              <li
+                v-for="item in envPickerPageItems"
+                :key="item.value"
+                class="env-picker-item"
+                role="button"
+                tabindex="0"
+                @click="applyEnvFromPicker(item)"
+                @keydown.enter.prevent="applyEnvFromPicker(item)"
+              >
+                <div class="env-picker-item-top">
+                  <span class="env-picker-name" :title="envPickerItemName(item)">{{ envPickerItemName(item) }}</span>
+                  <n-tag size="small" :bordered="false" type="info" class="env-picker-key-tag">
+                    {{ item.value }}
+                  </n-tag>
+                </div>
+                <div class="env-picker-addr" :title="envPickerItemGateway(item)">{{ envPickerItemGateway(item) }}</div>
+              </li>
+            </ul>
+            <div v-if="envPickerFilteredTotal > ENV_PICKER_PAGE_SIZE" class="env-picker-pagination-wrap">
+              <n-pagination
+                v-model:page="envPickerPage"
+                :page-size="ENV_PICKER_PAGE_SIZE"
+                :item-count="envPickerFilteredTotal"
+                size="small"
+                show-quick-jumper
+              />
+            </div>
+          </div>
+        </n-spin>
+      </div>
+    </n-modal>
+  </div>
+</template>
+
+<script setup lang="ts">
+defineOptions({ name: "XiaoanEcuMockBatch" });
+
+import { computed, h, onMounted, reactive, ref, watch } from "vue";
+import { createDiscreteApi, NTag, type DataTableColumns, type DataTableRowKey } from "naive-ui";
+import {
+  getEbikeEnvListAPI,
+  getOverseaEnvListAPI,
+  getRentalEnvListAPI,
+  xiaoanEcuMockBatchCreateAPI,
+  xiaoanEcuMockBatchDeleteAPI,
+  xiaoanEcuMockBatchRecordAPI,
+} from "@/api/device";
+import {
+  buildBatchPayload,
+  isFifteenDigitImei,
+  parseImeisText,
+  validateBatchForm,
+  type BatchFormData,
+} from "./xiaoan-ecu-mock-batch.service";
+
+const { message } = createDiscreteApi(["message"]);
+
+const DEFAULT_COORD_LNG = 114.434888;
+const DEFAULT_COORD_LAT = 30.500136;
+const STORAGE_KEY = "XATTP_ECU_MOCK_BATCH_FORM";
+const VOLTAGE_MIN = 0;
+const VOLTAGE_MAX = 72;
+type EnvSource = "ebike" | "rental" | "oversea";
+type EnvRecord = Record<string, unknown>;
+
+/** 批量创建接口 data.list 单行 */
+interface BatchMockListRow {
+  connect_id: string;
+  imei: string;
+  lat: number | null;
+  lng: number | null;
+  success: boolean;
+  voltage: number | null;
+}
+
+function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
+  const r = res as { data?: { list?: unknown } } | null;
+  const raw = r?.data?.list;
+  if (!Array.isArray(raw)) return [];
+  const out: BatchMockListRow[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const connect_id = typeof row.connect_id === "string" ? row.connect_id.trim() : "";
+    if (!connect_id) continue;
+    const imei = typeof row.imei === "string" ? row.imei : "";
+    out.push({
+      connect_id,
+      imei,
+      lat: typeof row.lat === "number" && Number.isFinite(row.lat) ? row.lat : null,
+      lng: typeof row.lng === "number" && Number.isFinite(row.lng) ? row.lng : null,
+      success: Boolean(row.success),
+      voltage: typeof row.voltage === "number" && Number.isFinite(row.voltage) ? row.voltage : null,
+    });
+  }
+  return out.sort((a, b) => a.imei.localeCompare(b.imei, "en", { numeric: true }));
+}
+
+/** 历史兼容：旧接口返回 data 为 list[] 或 [{ list: [] }] */
+function parseBatchMockListFromLegacyRecordResponse(res: unknown): BatchMockListRow[] {
+  const root = res as { data?: unknown } | null;
+  const data = root?.data;
+  if (!Array.isArray(data)) return [];
+  const rows: BatchMockListRow[] = [];
+  for (const item of data) {
+    if (!item) continue;
+    if (Array.isArray(item)) {
+      rows.push(...parseBatchMockListFromResponse({ data: { list: item } }));
+      continue;
+    }
+    if (typeof item === "object") {
+      const obj = item as Record<string, unknown>;
+      if (Array.isArray(obj.list)) {
+        rows.push(...parseBatchMockListFromResponse({ data: { list: obj.list } }));
+      } else if (obj.connect_id) {
+        rows.push(...parseBatchMockListFromResponse({ data: { list: [obj] } }));
+      }
+    }
+  }
+  const dedup = new Map<string, BatchMockListRow>();
+  rows.forEach((r) => dedup.set(r.connect_id, r));
+  return Array.from(dedup.values()).sort((a, b) => a.imei.localeCompare(b.imei, "en", { numeric: true }));
+}
+
+interface EnvOption {
+  label: string;
+  value: string;
+  order: number;
+  record: EnvRecord;
+}
+const ENV_GROUP_LABEL: Record<EnvSource, string> = {
+  ebike: "共享",
+  rental: "短租",
+  oversea: "海外",
+};
+
+const defaultFormData: BatchFormData = {
+  env: "test2",
+  server: "",
+  voltage_min: 50,
+  voltage_max: 54,
+  lat: DEFAULT_COORD_LAT,
+  lng: DEFAULT_COORD_LNG,
+  radius_m: 10000,
+  mode: 1,
+  num: 10,
+  start_imei: "",
+  imeis_text: "",
+};
+
+function getInitialFormData(): BatchFormData {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...defaultFormData };
+    const parsed = JSON.parse(raw) as Partial<BatchFormData> & { voltage?: number };
+    const merged: BatchFormData = {
+      ...defaultFormData,
+      ...parsed,
+    };
+    if (
+      (merged.voltage_min == null || merged.voltage_max == null) &&
+      typeof parsed.voltage === "number" &&
+      !Number.isNaN(parsed.voltage)
+    ) {
+      merged.voltage_min = Math.trunc(parsed.voltage);
+      merged.voltage_max = Math.trunc(parsed.voltage);
+    }
+    // 缓存里缺省或非法电压时，使用表单初始默认 50–54（避免 null 被规范成 0–0）
+    if (
+      merged.voltage_min == null ||
+      merged.voltage_max == null ||
+      !Number.isFinite(Number(merged.voltage_min)) ||
+      !Number.isFinite(Number(merged.voltage_max))
+    ) {
+      merged.voltage_min = defaultFormData.voltage_min;
+      merged.voltage_max = defaultFormData.voltage_max;
+    }
+    const clamped = normalizeVoltagePair(merged.voltage_min, merged.voltage_max);
+    merged.voltage_min = clamped[0];
+    merged.voltage_max = clamped[1];
+    // 随机半径默认 10000（m）；缓存缺省或非法时回退，0 表示不随机仍保留
+    if (merged.radius_m == null || !Number.isFinite(Number(merged.radius_m)) || Number(merged.radius_m) < 0) {
+      merged.radius_m = defaultFormData.radius_m;
+    }
+    return merged;
+  } catch {
+    return { ...defaultFormData };
+  }
+}
+
+const formData = reactive<BatchFormData>(getInitialFormData());
+const numInputStr = ref(
+  formData.num != null && Number.isFinite(Number(formData.num)) ? String(Math.trunc(Number(formData.num))) : "",
+);
+const voltageSlider = ref<[number, number]>([
+  Math.min(Number(formData.voltage_min ?? 0), Number(formData.voltage_max ?? 0)),
+  Math.max(Number(formData.voltage_min ?? 0), Number(formData.voltage_max ?? 0)),
+]);
+const createLoading = ref(false);
+const stopMockLoading = ref(false);
+const requestError = ref("");
+const successSummary = ref("");
+const batchMockListRows = ref<BatchMockListRow[]>([]);
+const checkedRowKeys = ref<DataTableRowKey[]>([]);
+const checkedImeis = computed(() =>
+  batchMockListRows.value
+    .filter((row) => checkedRowKeys.value.includes(row.connect_id))
+    .map((row) => row.imei)
+    .filter((imei) => /^\d{15}$/.test(imei)),
+);
+const tableSuccessFilter = ref<"all" | "success" | "fail">("all");
+const tableSuccessFilterOptions = [
+  { label: "全部", value: "all" },
+  { label: "仅成功", value: "success" },
+  { label: "仅失败", value: "fail" },
+] as const;
+const tableImeiKeyword = ref("");
+const filteredBatchMockListRows = computed(() => {
+  const kw = tableImeiKeyword.value.trim();
+  let rows = batchMockListRows.value;
+  if (tableSuccessFilter.value === "success") {
+    rows = rows.filter((row) => row.success);
+  } else if (tableSuccessFilter.value === "fail") {
+    rows = rows.filter((row) => !row.success);
+  }
+  if (kw) {
+    rows = rows.filter((row) => row.imei.includes(kw));
+  }
+  return rows;
+});
+
+const batchMockSessionActive = computed(() => batchMockListRows.value.length > 0);
+
+function batchMockRowKey(row: BatchMockListRow) {
+  return row.connect_id;
+}
+
+const batchMockTableColumns: DataTableColumns<BatchMockListRow> = [
+  { type: "selection", width: 42 },
+  {
+    title: "IMEI",
+    key: "imei",
+    width: 168,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: "经度",
+    key: "lng",
+    width: 108,
+    render(row) {
+      return row.lng != null ? String(row.lng) : "—";
+    },
+  },
+  {
+    title: "纬度",
+    key: "lat",
+    width: 108,
+    render(row) {
+      return row.lat != null ? String(row.lat) : "—";
+    },
+  },
+  {
+    title: "电压(V)",
+    key: "voltage",
+    width: 88,
+    render(row) {
+      return row.voltage != null ? String(row.voltage) : "—";
+    },
+  },
+  {
+    title: "成功",
+    key: "success",
+    width: 72,
+    render(row) {
+      return h(
+        NTag,
+        { type: row.success ? "success" : "error", size: "small", bordered: false },
+        { default: () => (row.success ? "是" : "否") },
+      );
+    },
+  },
+];
+
+function handleSelectAllRows() {
+  checkedRowKeys.value = filteredBatchMockListRows.value.map((row) => row.connect_id);
+}
+
+function handleInvertSelectedRows() {
+  const selected = new Set(checkedRowKeys.value.map((k) => String(k)));
+  checkedRowKeys.value = filteredBatchMockListRows.value
+    .map((row) => row.connect_id)
+    .filter((key) => !selected.has(String(key)));
+}
+
+const envPickerShow = ref(false);
+const envPickerSource = ref<EnvSource | null>(null);
+const envPickerOptions = ref<EnvOption[]>([]);
+const envPickerLoading = ref(false);
+const envPickerSearch = ref("");
+const envPickerPage = ref(1);
+/** 每页条数固定，列表区不滚动，靠搜索 + 分页浏览 */
+const ENV_PICKER_PAGE_SIZE = 5;
+let envPickerRequestId = 0;
+const batchRecordLoading = ref(false);
+let batchRecordLoaded = false;
+
+const envPickerTitle = computed(() => {
+  const s = envPickerSource.value;
+  if (s === "ebike") return `选择环境 — ${ENV_GROUP_LABEL.ebike}`;
+  if (s === "rental") return `选择环境 — ${ENV_GROUP_LABEL.rental}`;
+  if (s === "oversea") return `选择环境 — ${ENV_GROUP_LABEL.oversea}`;
+  return "选择环境";
+});
+
+const envPickerFiltered = computed(() => {
+  const q = envPickerSearch.value.trim().toLowerCase();
+  const list = envPickerOptions.value;
+  if (!q) return list;
+  return list.filter((item) => {
+    const name = envPickerItemName(item).toLowerCase();
+    const val = item.value.toLowerCase();
+    const gw = envPickerItemGateway(item).toLowerCase();
+    return name.includes(q) || val.includes(q) || gw.includes(q);
+  });
+});
+
+const envPickerFilteredTotal = computed(() => envPickerFiltered.value.length);
+
+const envPickerNoMatch = computed(
+  () =>
+    envPickerOptions.value.length > 0 &&
+    envPickerSearch.value.trim() !== "" &&
+    envPickerFiltered.value.length === 0,
+);
+
+const envPickerPageItems = computed(() => {
+  const all = envPickerFiltered.value;
+  const start = (envPickerPage.value - 1) * ENV_PICKER_PAGE_SIZE;
+  return all.slice(start, start + ENV_PICKER_PAGE_SIZE);
+});
+
+watch(envPickerSearch, () => {
+  envPickerPage.value = 1;
+});
+
+watch(envPickerFilteredTotal, (n) => {
+  const maxPage = Math.max(1, Math.ceil(n / ENV_PICKER_PAGE_SIZE));
+  if (envPickerPage.value > maxPage) envPickerPage.value = maxPage;
+});
+
+const parsedImeis = computed(() => parseImeisText(formData.imeis_text));
+const validImeis = computed(() => parsedImeis.value.filter((item) => isFifteenDigitImei(item)));
+const modeTipText = computed(() => {
+  if (formData.mode === 1) {
+    return "随机模式：只需要填写数量，后端会自动生成对应数量的随机 15 位 IMEI。测试期间最多 10000 台。";
+  }
+  if (formData.mode === 2) {
+    return "顺序模式：填写起始 IMEI 和数量，后端会按起始值依次递增生成 IMEI。测试期间最多 10000 台。";
+  }
+  return "指定模式：手动输入 IMEI 列表，支持换行、空格、逗号分隔，后端按输入内容创建。测试期间最多 10000 条合法 IMEI（15 位数字）。";
+});
+
+function saveFormToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...formData }));
+}
+
+watch(
+  () => formData.num,
+  () => {
+    if (formData.mode !== 1 && formData.mode !== 2) return;
+    numInputStr.value =
+      formData.num != null && Number.isFinite(Number(formData.num))
+        ? String(Math.trunc(Number(formData.num)))
+        : "";
+  },
+);
+
+watch(
+  () => formData.mode,
+  () => {
+    if (formData.mode !== 1 && formData.mode !== 2) return;
+    numInputStr.value =
+      formData.num != null && Number.isFinite(Number(formData.num))
+        ? String(Math.trunc(Number(formData.num)))
+        : "";
+  },
+);
+
+function onNumInputWheel() {
+  // 避免 number 输入框聚焦时滚轮改变值
+}
+
+/** 顺序模式：86 + 8 位随机数字 + 00000，共 15 位 */
+function fillRandomStartImei() {
+  const n = Math.floor(Math.random() * 1e8);
+  const mid = String(n).padStart(8, "0");
+  formData.start_imei = `86${mid}00000`;
+  saveFormToStorage();
+}
+
+function onNumInputStrUpdate(value: string | null) {
+  const raw = String(value ?? "");
+  const digits = raw.replace(/\D/g, "").slice(0, 5);
+  numInputStr.value = digits;
+  if (!digits) {
+    formData.num = null;
+    saveFormToStorage();
+    return;
+  }
+  const n = Math.trunc(Number(digits));
+  if (!Number.isFinite(n)) {
+    formData.num = null;
+    saveFormToStorage();
+    return;
+  }
+  const clamped = Math.min(10000, Math.max(1, n));
+  formData.num = clamped;
+  numInputStr.value = String(clamped);
+  saveFormToStorage();
+}
+
+function normalizeVoltagePair(a: number | null, b: number | null): [number, number] {
+  const clamp = (n: number) => Math.min(VOLTAGE_MAX, Math.max(VOLTAGE_MIN, n));
+  const x = clamp(Math.trunc(Number(a ?? 0)));
+  const y = clamp(Math.trunc(Number(b ?? 0)));
+  return [Math.min(x, y), Math.max(x, y)];
+}
+
+function syncVoltageSliderFromForm() {
+  voltageSlider.value = normalizeVoltagePair(formData.voltage_min, formData.voltage_max);
+}
+
+function onVoltageSliderUpdate(val: [number, number]) {
+  const [min, max] = normalizeVoltagePair(val?.[0] ?? 0, val?.[1] ?? 0);
+  voltageSlider.value = [min, max];
+  formData.voltage_min = min;
+  formData.voltage_max = max;
+  saveFormToStorage();
+}
+
+function onVoltageNumberUpdate() {
+  const [min, max] = normalizeVoltagePair(formData.voltage_min, formData.voltage_max);
+  formData.voltage_min = min;
+  formData.voltage_max = max;
+  voltageSlider.value = [min, max];
+  saveFormToStorage();
+}
+
+function normalizeEnvOptions(
+  data: Record<string, unknown>,
+  source: EnvSource,
+): {
+  options: EnvOption[];
+  envMap: Record<string, EnvRecord>;
+} {
+  const envMap: Record<string, EnvRecord> = {};
+  const options = Object.entries(data)
+    .map(([key, value]) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+      const record = value as EnvRecord;
+      const order = Number(record.order);
+      if (!Number.isFinite(order)) return null;
+      const gateway = pickGatewayBySource(source, record);
+      if (!gateway) return null;
+      envMap[key] = record;
+      const name = typeof record.name === "string" && record.name.trim() ? record.name : key;
+      return {
+        label: `${name} (${gateway})`,
+        value: key,
+        order,
+        record,
+      };
+    })
+    .filter((item): item is EnvOption => item != null)
+    .sort((a, b) => a.order - b.order);
+
+  return { options, envMap };
+}
+
+function pickGatewayBySource(source: EnvSource, record: EnvRecord): string {
+  if (source === "rental") {
+    const value = record["3"];
+    return typeof value === "string" ? value : "";
+  }
+  const value = record.ebike_target_addr;
+  return typeof value === "string" ? value : "";
+}
+
+async function fetchEnvListRaw(source: EnvSource): Promise<any> {
+  if (source === "ebike") return getEbikeEnvListAPI();
+  if (source === "rental") return getRentalEnvListAPI();
+  return getOverseaEnvListAPI();
+}
+
+async function fetchEnvListForSource(
+  source: EnvSource,
+): Promise<{ options: EnvOption[]; envMap: Record<string, EnvRecord>; error?: string }> {
+  try {
+    const res: any = await fetchEnvListRaw(source);
+    if (res != null && Number(res.code) !== 0) {
+      return { options: [], envMap: {}, error: res?.msg || "获取环境列表失败" };
+    }
+    const data = res?.data && typeof res.data === "object" ? res.data : {};
+    return normalizeEnvOptions(data as Record<string, unknown>, source);
+  } catch (error: any) {
+    return { options: [], envMap: {}, error: error?.message || String(error) || "获取环境列表失败" };
+  }
+}
+
+async function openEnvPickerModal(source: EnvSource) {
+  envPickerSource.value = source;
+  envPickerShow.value = true;
+  envPickerSearch.value = "";
+  envPickerPage.value = 1;
+  envPickerOptions.value = [];
+  const reqId = ++envPickerRequestId;
+  envPickerLoading.value = true;
+  requestError.value = "";
+  try {
+    const { options, error } = await fetchEnvListForSource(source);
+    if (reqId !== envPickerRequestId) return;
+    if (error) {
+      requestError.value = error;
+      message.error(error);
+      return;
+    }
+    envPickerOptions.value = options;
+    if (options.length === 0) {
+      message.warning("没有可展示的环境（需配置 order 且网关地址不为空）");
+    }
+  } finally {
+    if (reqId === envPickerRequestId) envPickerLoading.value = false;
+  }
+}
+
+function envPickerItemName(item: EnvOption): string {
+  const n = item.record.name;
+  return typeof n === "string" && n.trim() ? n.trim() : item.value;
+}
+
+function envPickerItemGateway(item: EnvOption): string {
+  const src = envPickerSource.value;
+  if (!src) return "—";
+  const g = pickGatewayBySource(src, item.record);
+  return g || "—";
+}
+
+function applyEnvFromPicker(item: EnvOption) {
+  const src = envPickerSource.value;
+  if (!src) return;
+  applyEnvSelection(src, item.value, item.record);
+  envPickerShow.value = false;
+}
+
+function onEnvPickerAfterLeave() {
+  envPickerSource.value = null;
+  envPickerOptions.value = [];
+  envPickerSearch.value = "";
+  envPickerPage.value = 1;
+}
+
+function applyEnvSelection(source: EnvSource, envKey: string, record: EnvRecord) {
+  formData.env = envKey;
+  if (!envKey) return;
+  const gateway = pickGatewayBySource(source, record);
+  if (gateway) {
+    formData.server = gateway;
+  }
+  saveFormToStorage();
+}
+
+function resetDefaultCoords() {
+  formData.lng = DEFAULT_COORD_LNG;
+  formData.lat = DEFAULT_COORD_LAT;
+  saveFormToStorage();
+}
+
+function handleReset() {
+  Object.assign(formData, { ...defaultFormData });
+  numInputStr.value =
+    formData.num != null && Number.isFinite(Number(formData.num))
+      ? String(Math.trunc(Number(formData.num)))
+      : "";
+  syncVoltageSliderFromForm();
+  envPickerShow.value = false;
+  envPickerSource.value = null;
+  envPickerOptions.value = [];
+  batchMockListRows.value = [];
+  checkedRowKeys.value = [];
+  requestError.value = "";
+  successSummary.value = "";
+  saveFormToStorage();
+}
+
+function getCreatedCount(): number {
+  if (formData.mode === 3) return validImeis.value.length;
+  return Number(formData.num) || 0;
+}
+
+/** get_batch_record 回显到表单（按 batch_add 的 data 结构） */
+function applyBatchRecordDataToForm(res: unknown) {
+  const data = (res as { data?: unknown } | null)?.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  const record = data as Record<string, unknown>;
+
+  const env = typeof record.env === "string" ? record.env.trim() : "";
+  if (env) {
+    formData.env = env;
+  }
+
+  const modeNum = Number(record.mode);
+  if (modeNum === 1 || modeNum === 2 || modeNum === 3) {
+    formData.mode = modeNum;
+  }
+
+  const server = typeof record.server === "string" ? record.server.trim() : "";
+  if (server) formData.server = server;
+
+  const num = Number(record.num);
+  if (Number.isInteger(num) && num > 0) {
+    const clamped = Math.min(10000, Math.max(1, Math.trunc(num)));
+    formData.num = clamped;
+    numInputStr.value = String(clamped);
+  } else {
+    formData.num = null;
+    numInputStr.value = "";
+  }
+
+  const imeis = Array.isArray(record.imeis)
+    ? record.imeis.map((v) => String(v ?? "").trim()).filter((v) => /^\d{15}$/.test(v))
+    : [];
+
+  const startImeiRaw =
+    typeof record.start_imei === "string"
+      ? record.start_imei.trim()
+      : typeof record.imei === "string"
+        ? record.imei.trim()
+        : "";
+
+  if (formData.mode === 2) {
+    formData.start_imei = /^\d{15}$/.test(startImeiRaw) ? startImeiRaw : imeis[0] || "";
+    formData.imeis_text = "";
+  } else if (formData.mode === 3) {
+    formData.imeis_text = imeis.join("\n");
+    formData.start_imei = "";
+  } else {
+    formData.start_imei = "";
+    formData.imeis_text = "";
+  }
+
+  const list = Array.isArray(record.list) ? (record.list as Array<Record<string, unknown>>) : [];
+
+  const recVmin = Number(record.voltage_min);
+  const recVmax = Number(record.voltage_max);
+  if (Number.isFinite(recVmin) && Number.isFinite(recVmax)) {
+    const [vmin, vmax] = normalizeVoltagePair(recVmin, recVmax);
+    formData.voltage_min = vmin;
+    formData.voltage_max = vmax;
+  } else {
+    const voltages = list.map((item) => Number(item?.voltage)).filter((v) => Number.isFinite(v));
+    if (voltages.length > 0) {
+      const [vmin, vmax] = normalizeVoltagePair(Math.min(...voltages), Math.max(...voltages));
+      formData.voltage_min = vmin;
+      formData.voltage_max = vmax;
+    }
+  }
+  syncVoltageSliderFromForm();
+
+  const radius = Number(record.radius_m);
+  if (Number.isFinite(radius) && radius >= 0) {
+    formData.radius_m = radius;
+  }
+
+  const recLng = Number(record.lng);
+  const recLat = Number(record.lat);
+  if (Number.isFinite(recLng) && Number.isFinite(recLat)) {
+    formData.lng = recLng;
+    formData.lat = recLat;
+    return;
+  }
+
+  const firstPos = list.find((item) => Number.isFinite(Number(item?.lng)) && Number.isFinite(Number(item?.lat)));
+  if (firstPos) {
+    formData.lng = Number(firstPos.lng);
+    formData.lat = Number(firstPos.lat);
+  }
+}
+
+async function handleCopyCheckedImeis() {
+  const imeis = Array.from(new Set(checkedImeis.value));
+  if (imeis.length === 0) {
+    message.warning("请先勾选要复制的 IMEI");
+    return;
+  }
+  const text = imeis.join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制 ${imeis.length} 条 IMEI`);
+    return;
+  } catch {
+    // fallback below
+  }
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    if (!ok) throw new Error("copy failed");
+    message.success(`已复制 ${imeis.length} 条 IMEI`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
+async function loadBatchMockRecords() {
+  if (batchRecordLoaded) return;
+  batchRecordLoaded = true;
+  batchRecordLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockBatchRecordAPI();
+    if (res != null && Number(res.code) !== 0) return;
+    applyBatchRecordDataToForm(res);
+    const rows = parseBatchMockListFromResponse(res);
+    const mergedRows = rows.length > 0 ? rows : parseBatchMockListFromLegacyRecordResponse(res);
+    batchMockListRows.value = mergedRows;
+    checkedRowKeys.value = mergedRows.map((row) => row.connect_id);
+    saveFormToStorage();
+  } catch {
+    // 历史记录加载失败不阻塞页面主流程
+  } finally {
+    batchRecordLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  loadBatchMockRecords();
+});
+
+// setup 阶段也触发一次，确保页面初始渲染链路就发请求（便于在 Network 观察）
+void loadBatchMockRecords();
+
+async function handleStopMock() {
+  const keys = checkedRowKeys.value.map((k) => String(k)).filter(Boolean);
+  if (keys.length === 0) {
+    message.warning("请先勾选要停止模拟的连接");
+    return;
+  }
+  const server = formData.server?.trim();
+  if (!server) {
+    message.error("设备网关为空，无法批量停止。请填写与创建时一致的网关（server）。");
+    return;
+  }
+  const imeis = Array.from(
+    new Set(
+      batchMockListRows.value
+        .filter((r) => keys.includes(r.connect_id))
+        .map((r) => String(r.imei ?? "").trim())
+        .filter((im) => /^\d{15}$/.test(im)),
+    ),
+  );
+  if (imeis.length === 0) {
+    message.warning("无法从勾选行解析有效 IMEI，请重新勾选");
+    return;
+  }
+  stopMockLoading.value = true;
+  requestError.value = "";
+  successSummary.value = "";
+  try {
+    const res: any = await xiaoanEcuMockBatchDeleteAPI({
+      mode: 3,
+      server,
+      imeis,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      const msg = res?.msg || "批量停止失败";
+      requestError.value = msg;
+      message.error(msg);
+      return;
+    }
+    const data = res?.data;
+    const list = Array.isArray(data?.list) ? data.list : [];
+    const failedImeis = new Set(
+      list.filter((item: any) => item && item.success === false && item.imei).map((item: any) => String(item.imei)),
+    );
+    // 后端 skipped 不在 list 中，仅有 skipped_count；因此这里保留失败项，其余（成功 + 跳过）都从列表清除
+    const removedImeis = new Set(imeis.filter((imei) => !failedImeis.has(imei)));
+    batchMockListRows.value = batchMockListRows.value.filter((r) => !removedImeis.has(r.imei));
+    checkedRowKeys.value = [];
+    const sc = typeof data?.success_count === "number" ? data.success_count : removedImeis.size;
+    const fc = typeof data?.fail_count === "number" ? data.fail_count : 0;
+    const sk = typeof data?.skipped_count === "number" ? data.skipped_count : 0;
+    const tail = [fc > 0 ? `失败 ${fc}` : "", sk > 0 ? `跳过 ${sk}` : ""].filter(Boolean).join("，");
+    message.success(tail ? `批量停止完成：成功 ${sc} 台，${tail}` : `批量停止完成：成功 ${sc} 台`);
+    saveFormToStorage();
+  } catch (e: any) {
+    const msg = e?.message || String(e) || "批量停止失败";
+    requestError.value = msg;
+    message.error(msg);
+  } finally {
+    stopMockLoading.value = false;
+  }
+}
+
+async function handleCreate() {
+  const error = validateBatchForm(formData);
+  if (error) {
+    message.error(error);
+    requestError.value = error;
+    return;
+  }
+
+  createLoading.value = true;
+  requestError.value = "";
+  successSummary.value = "";
+  const startAt = performance.now();
+
+  try {
+    const payload = buildBatchPayload(formData);
+    const res: any = await xiaoanEcuMockBatchCreateAPI(payload);
+    const elapsedSec = ((performance.now() - startAt) / 1000).toFixed(2);
+    if (res != null && Number(res.code) !== 0) {
+      const msg = res?.msg || "批量创建失败";
+      requestError.value = msg;
+      message.error(msg);
+      batchMockListRows.value = [];
+      checkedRowKeys.value = [];
+      return;
+    }
+
+    const list = parseBatchMockListFromResponse(res);
+    batchMockListRows.value = list;
+    if (list.length > 0) {
+      checkedRowKeys.value = list.map((row) => row.connect_id);
+      successSummary.value = `批量创建成功，耗时 ${elapsedSec} 秒`;
+      message.success(`批量创建成功（耗时 ${elapsedSec} 秒）`);
+    } else {
+      checkedRowKeys.value = [];
+      const count = getCreatedCount();
+      successSummary.value = `批量创建请求成功，已提交 ${count} 台设备（耗时 ${elapsedSec} 秒）`;
+      message.success(successSummary.value);
+    }
+    saveFormToStorage();
+  } catch (error: any) {
+    const msg = error?.message || String(error) || "批量创建失败";
+    requestError.value = msg;
+    message.error(msg);
+    batchMockListRows.value = [];
+    checkedRowKeys.value = [];
+  } finally {
+    createLoading.value = false;
+  }
+}
+</script>
+
+<style lang="less" scoped>
+.xiaoan-ecu-mock-batch {
+  width: 100px;
+}
+
+.form-section {
+  max-width: 100%;
+}
+
+.form-actions {
+  margin-top: 8px;
+}
+
+.mode-section {
+  width: 100%;
+}
+
+.mode-tip {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.num-field {
+  width: 100%;
+}
+
+.num-input {
+  width: 100%;
+}
+
+.num-tip {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.gateway-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.gateway-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.gateway-buttons {
+  flex-shrink: 0;
+}
+
+.env-picker-body {
+  margin-top: -2px;
+}
+
+.env-picker-hint {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.env-picker-list-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.env-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 8px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.env-picker-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.env-picker-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.env-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+}
+
+.env-picker-item {
+  padding: 12px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.env-picker-item:hover {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  box-shadow: 0 2px 8px rgb(14 165 233 / 0.12);
+}
+
+.env-picker-item:focus-visible {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgb(56 189 248 / 0.35);
+}
+
+.env-picker-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.env-picker-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-picker-key-tag {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.env-picker-addr {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-picker-pagination-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 10px 10px;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+
+.env-picker-empty-wrap {
+  padding: 28px 12px 36px;
+}
+
+.env-picker-empty-tip {
+  margin: 12px auto 0;
+  max-width: 420px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.env-picker-empty-tip code {
+  padding: 0 4px;
+  font-size: 11px;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.start-imei-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.start-imei-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.start-imei-random-btn {
+  flex-shrink: 0;
+}
+
+.voltage-range {
+  width: 100%;
+  max-width: 420px;
+}
+
+.voltage-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.voltage-inputs .n-input-number {
+  flex: 1;
+  min-width: 0;
+}
+
+.voltage-sep {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.imeis-textarea-wrap {
+  width: 100%;
+}
+
+.imeis-preview {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.result-block {
+  margin-top: 16px;
+}
+
+.result-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.batch-mock-table-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.batch-mock-result-table {
+  max-width: 100%;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.table-actions-left {
+  flex-shrink: 0;
+}
+
+.table-filters-right {
+  margin-left: auto;
+}
+
+.table-filter-select {
+  width: 120px;
+}
+
+.table-imei-search {
+  width: 200px;
+}
+
+.batch-mock-result-table :deep(.n-data-table) {
+  font-size: 12px;
+}
+
+.tip-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  font-size: 11px;
+  color: #6b7280;
+  cursor: help;
+}
+</style>
