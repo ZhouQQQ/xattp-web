@@ -38,6 +38,7 @@
                   <n-space :size="8" class="gateway-buttons">
                     <n-button
                       size="small"
+                      :disabled="batchMockSessionActive || batchRecordLoading"
                       :loading="envPickerLoading && envPickerSource === 'ebike'"
                       @click="openEnvPickerModal('ebike')"
                     >
@@ -45,6 +46,7 @@
                     </n-button>
                     <n-button
                       size="small"
+                      :disabled="batchMockSessionActive || batchRecordLoading"
                       :loading="envPickerLoading && envPickerSource === 'rental'"
                       @click="openEnvPickerModal('rental')"
                     >
@@ -52,6 +54,7 @@
                     </n-button>
                     <n-button
                       size="small"
+                      :disabled="batchMockSessionActive || batchRecordLoading"
                       :loading="envPickerLoading && envPickerSource === 'oversea'"
                       @click="openEnvPickerModal('oversea')"
                     >
@@ -181,7 +184,12 @@
             </n-gi>
             <n-gi :span="2">
               <n-form-item :label-width="0">
-                <n-button type="default" size="small" @click="resetDefaultCoords">
+                <n-button
+                  type="default"
+                  size="small"
+                  :disabled="batchMockSessionActive || batchRecordLoading"
+                  @click="resetDefaultCoords"
+                >
                   重置经纬度
                 </n-button>
               </n-form-item>
@@ -225,37 +233,57 @@
 
             <n-gi :span="12">
               <n-form-item class="form-actions">
-                <n-space>
+                <div class="form-actions-row">
+                  <n-space>
+                    <n-button
+                      v-if="!batchMockSessionActive"
+                      type="primary"
+                      :loading="createLoading"
+                      :disabled="batchRecordLoading"
+                      @click="handleCreate"
+                    >
+                      批量创建
+                    </n-button>
+                    <n-button
+                      v-else
+                      type="warning"
+                      :loading="stopMockLoading"
+                      :disabled="batchRecordLoading || checkedRowKeys.length === 0"
+                      @click="handleStopMock"
+                    >
+                      停止模拟（{{ checkedRowKeys.length }}）
+                    </n-button>
+                    <n-button
+                      v-if="batchMockSessionActive"
+                      type="default"
+                      :disabled="batchRecordLoading || checkedImeis.length === 0"
+                      @click="handleCopyCheckedImeis"
+                    >
+                      复制IMEI{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                    </n-button>
+                    <n-button type="default" :disabled="batchRecordLoading || batchMockSessionActive" @click="handleReset">
+                      重置
+                    </n-button>
+                  </n-space>
                   <n-button
-                    v-if="!batchMockSessionActive"
-                    type="primary"
-                    :loading="createLoading"
-                    :disabled="batchRecordLoading"
-                    @click="handleCreate"
+                    v-if="batchMockSessionActive"
+                    type="default"
+                    :disabled="batchRecordLoading || checkedImeis.length === 0 || sharedBindDisabledByEnv"
+                    @click="openBindAndOnlineModal"
+                    class="bind-online-right-btn"
                   >
-                    批量创建
-                  </n-button>
-                  <n-button
-                    v-else
-                    type="warning"
-                    :loading="stopMockLoading"
-                    :disabled="batchRecordLoading || checkedRowKeys.length === 0"
-                    @click="handleStopMock"
-                  >
-                    停止模拟（{{ checkedRowKeys.length }}）
+                    共享-绑定并上架{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
                   </n-button>
                   <n-button
                     v-if="batchMockSessionActive"
                     type="default"
-                    :disabled="batchRecordLoading || checkedImeis.length === 0"
-                    @click="handleCopyCheckedImeis"
+                    :disabled="batchRecordLoading || checkedImeis.length === 0 || rentalBatchAddDisabledByEnv"
+                    @click="openRentalBatchAddModal"
+                    class="rental-batch-add-right-btn"
                   >
-                    复制IMEI{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                    短租-批量入库{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
                   </n-button>
-                  <n-button type="default" :disabled="batchRecordLoading || batchMockSessionActive" @click="handleReset">
-                    重置
-                  </n-button>
-                </n-space>
+                </div>
               </n-form-item>
             </n-gi>
           </n-grid>
@@ -378,6 +406,145 @@
         </n-spin>
       </div>
     </n-modal>
+
+    <n-modal
+      v-model:show="bindAndOnlineShow"
+      preset="card"
+      title="批量绑定并上架"
+      :mask-closable="!bindAndOnlineLoading"
+      class="bind-online-modal"
+      style="width: 680px"
+    >
+      <n-form :model="bindAndOnlineForm" label-placement="left" label-width="110px">
+        <n-form-item label="环境" required>
+          <n-select
+            v-model:value="bindAndOnlineForm.env"
+            filterable
+            clearable
+            :loading="bindAndOnlineEnvLoading"
+            :options="bindAndOnlineEnvOptions"
+            placeholder="请选择环境"
+          />
+        </n-form-item>
+        <n-form-item label="租户ID" required>
+          <n-input v-model:value="bindAndOnlineForm.tenant_id" placeholder="请输入租户ID" clearable />
+        </n-form-item>
+        <n-form-item label="服务区" required>
+          <n-select
+            v-model:value="bindAndOnlineForm.service_area_id"
+            filterable
+            clearable
+            :loading="bindAndOnlineServiceAreaLoading"
+            :options="bindAndOnlineServiceAreaOptions"
+            placeholder="请选择服务区"
+          />
+        </n-form-item>
+        <n-form-item label="IMEI列表" required>
+          <div class="bind-online-imeis-wrap">
+            <n-input
+              v-model:value="bindAndOnlineForm.imeis_text"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 14 }"
+              placeholder="支持按换行、空格、逗号分隔 IMEI"
+              clearable
+            />
+            <div class="bind-online-imeis-tip">
+              已识别 {{ bindAndOnlineImeis.length }} 个有效 IMEI（15 位数字）
+            </div>
+          </div>
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-space justify="end">
+          <n-button :disabled="bindAndOnlineLoading" @click="bindAndOnlineShow = false">取消</n-button>
+          <n-button type="primary" :loading="bindAndOnlineLoading" @click="handleBindAndOnlineSubmit">确认绑定并上架</n-button>
+        </n-space>
+      </template>
+    </n-modal>
+
+    <n-modal
+      v-model:show="rentalBatchAddShow"
+      preset="card"
+      title="短租-批量入库"
+      :mask-closable="!rentalBatchAddLoading"
+      class="rental-batch-add-modal"
+      style="width: 760px"
+    >
+      <n-form :model="rentalBatchAddForm" label-placement="left" label-width="110px">
+        <n-form-item label="环境" required>
+          <n-select
+            v-model:value="rentalBatchAddForm.env"
+            filterable
+            clearable
+            :loading="rentalBatchAddEnvLoading"
+            :options="rentalBatchAddEnvOptions"
+            placeholder="请选择环境"
+          />
+        </n-form-item>
+        <n-form-item label="租户" required>
+          <n-select
+            v-model:value="rentalBatchAddForm.tenant_id"
+            filterable
+            clearable
+            :loading="rentalBatchAddTenantLoading"
+            :options="rentalBatchAddTenantOptions"
+            placeholder="请选择租户"
+          />
+        </n-form-item>
+        <n-form-item label="加盟商" required>
+          <n-select
+            v-model:value="rentalBatchAddForm.custom_id"
+            filterable
+            clearable
+            :loading="rentalBatchAddFranchiseeLoading"
+            :options="rentalBatchAddFranchiseeOptions"
+            placeholder="请选择加盟商"
+          />
+        </n-form-item>
+        <n-form-item label="门店" required>
+          <n-select
+            v-model:value="rentalBatchAddForm.shop_id"
+            filterable
+            clearable
+            :loading="rentalBatchAddShopLoading"
+            :options="rentalBatchAddShopOptions"
+            placeholder="请选择门店"
+          />
+        </n-form-item>
+        <n-form-item label="车型" required>
+          <n-select
+            v-model:value="rentalBatchAddForm.vehicle_model_id"
+            filterable
+            clearable
+            :loading="rentalBatchAddVehicleModelLoading"
+            :options="rentalBatchAddVehicleModelOptions"
+            placeholder="请选择车型"
+          />
+        </n-form-item>
+        <n-form-item label="IMEI列表" required>
+          <div class="bind-online-imeis-wrap">
+            <n-input
+              v-model:value="rentalBatchAddForm.imeis_text"
+              type="textarea"
+              :autosize="{ minRows: 6, maxRows: 14 }"
+              placeholder="支持按换行、空格、逗号分隔 IMEI"
+              clearable
+            />
+            <div class="bind-online-imeis-tip">
+              已识别 {{ rentalBatchAddImeis.length }} 个有效 IMEI（15 位数字）
+            </div>
+          </div>
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-space justify="end">
+          <n-button :disabled="rentalBatchAddLoading" @click="rentalBatchAddShow = false">取消</n-button>
+          <n-button type="primary" :loading="rentalBatchAddLoading" @click="handleRentalBatchAddSubmit">
+            确认批量入库
+          </n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
@@ -390,6 +557,12 @@ import {
   getEbikeEnvListAPI,
   getOverseaEnvListAPI,
   getRentalEnvListAPI,
+  rentalBusinessBatchAddEbikeAPI,
+  rentalBusinessFranchiseeAllAPI,
+  rentalBusinessTenantAllAPI,
+  rentalBusinessVehicleModelAllAPI,
+  xiaoanEcuBatchBindAndOnlineAPI,
+  xiaoanEcuServiceAreaAllAPI,
   xiaoanEcuMockBatchCreateAPI,
   xiaoanEcuMockBatchDeleteAPI,
   xiaoanEcuMockBatchRecordAPI,
@@ -422,6 +595,11 @@ interface BatchMockListRow {
   success: boolean;
   voltage: number | null;
   error: string;
+  bind_success: boolean | null;
+  online_success: boolean | null;
+  rental_add_success: boolean | null;
+  biz_scene: "shared_bind_online" | "rental_batch_add" | null;
+  car_id: string;
 }
 
 function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
@@ -447,6 +625,11 @@ function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
       success,
       voltage: typeof row.voltage === "number" && Number.isFinite(row.voltage) ? row.voltage : null,
       error,
+      bind_success: null,
+      online_success: null,
+      rental_add_success: null,
+      biz_scene: null,
+      car_id: "",
     });
   }
   return out.sort((a, b) => a.imei.localeCompare(b.imei, "en", { numeric: true }));
@@ -498,11 +681,22 @@ const ENV_GROUP_LABEL: Record<EnvSource, string> = {
   rental: "短租",
   oversea: "海外",
 };
+const BUSINESS_TYPE_BY_SOURCE: Record<EnvSource, 1 | 2 | 3> = {
+  ebike: 1,
+  rental: 2,
+  oversea: 3,
+};
+const businessTypeOptions = [
+  { label: "共享（1）", value: 1 },
+  { label: "短租（2）", value: 2 },
+  { label: "海外（3）", value: 3 },
+] as const;
 
 const defaultFormData: BatchFormData = {
   env: "test2",
   server: "",
   tenant_id: "",
+  business_type: null,
   voltage_min: 50,
   voltage_max: 54,
   lat: DEFAULT_COORD_LAT,
@@ -594,67 +788,468 @@ const filteredBatchMockListRows = computed(() => {
   }
   return rows;
 });
+interface BindAndOnlineFormData {
+  env: string;
+  tenant_id: string;
+  service_area_id: string;
+  imeis_text: string;
+}
+
+interface RentalBatchAddFormData {
+  env: string;
+  tenant_id: string;
+  tenant_name: string;
+  custom_id: string;
+  shop_id: string;
+  vehicle_model_id: string;
+  imeis_text: string;
+}
+
+const bindAndOnlineShow = ref(false);
+const bindAndOnlineLoading = ref(false);
+const bindAndOnlineEnvLoading = ref(false);
+const bindAndOnlineEnvOptions = ref<Array<{ label: string; value: string }>>([]);
+const bindAndOnlineServiceAreaLoading = ref(false);
+const bindAndOnlineServiceAreaOptions = ref<Array<{ label: string; value: string }>>([]);
+const bindAndOnlineForm = reactive<BindAndOnlineFormData>({
+  env: "",
+  tenant_id: "",
+  service_area_id: "",
+  imeis_text: "",
+});
+const bindAndOnlineImeis = computed(() =>
+  Array.from(new Set(parseImeisText(bindAndOnlineForm.imeis_text))).filter((imei) => isFifteenDigitImei(imei)),
+);
+const rentalBatchAddShow = ref(false);
+const rentalBatchAddLoading = ref(false);
+const rentalBatchAddEnvLoading = ref(false);
+const rentalBatchAddTenantLoading = ref(false);
+const rentalBatchAddFranchiseeLoading = ref(false);
+const rentalBatchAddShopLoading = ref(false);
+const rentalBatchAddVehicleModelLoading = ref(false);
+const rentalBatchAddEnvOptions = ref<Array<{ label: string; value: string }>>([]);
+const rentalBatchAddTenantOptions = ref<Array<{ label: string; value: string }>>([]);
+const rentalBatchAddFranchiseeOptions = ref<Array<{ label: string; value: string }>>([]);
+const rentalBatchAddShopOptions = ref<Array<{ label: string; value: string }>>([]);
+const rentalBatchAddVehicleModelOptions = ref<Array<{ label: string; value: string }>>([]);
+const rentalBatchAddForm = reactive<RentalBatchAddFormData>({
+  env: "",
+  tenant_id: "",
+  tenant_name: "",
+  custom_id: "",
+  shop_id: "",
+  vehicle_model_id: "",
+  imeis_text: "",
+});
+const rentalBatchAddImeis = computed(() =>
+  Array.from(new Set(parseImeisText(rentalBatchAddForm.imeis_text))).filter((imei) => isFifteenDigitImei(imei)),
+);
+const rentalFranchiseeShopMap = ref<Record<string, Array<{ label: string; value: string }>>>({});
+const currentCreateEnvSource = ref<EnvSource | null>(null);
+const showSharedBindCol = ref(false);
+const showRentalBatchAddCol = ref(false);
+
+async function loadBindAndOnlineEnvOptions() {
+  bindAndOnlineEnvLoading.value = true;
+  try {
+    const source: EnvSource = "ebike";
+    const result = await fetchEnvListForSource(source);
+    if (result.error) {
+      message.error(result.error);
+    }
+    // 复用“共享”环境接口的顺序与过滤，仅调整展示文案为 name(id)
+    const list = result.options.map((item) => {
+      const name = typeof item.record.name === "string" && item.record.name.trim() ? item.record.name.trim() : item.value;
+      return {
+        label: `${name}(${item.value})`,
+        value: item.value,
+      };
+    });
+    bindAndOnlineEnvOptions.value = list;
+    const currentEnv = bindAndOnlineForm.env.trim();
+    if (currentEnv && !list.some((item) => item.value === currentEnv)) {
+      bindAndOnlineEnvOptions.value = [{ label: `${currentEnv}（当前）`, value: currentEnv }, ...list];
+    }
+  } finally {
+    bindAndOnlineEnvLoading.value = false;
+  }
+}
+
+async function loadBindAndOnlineServiceAreaOptions() {
+  const env = bindAndOnlineForm.env.trim();
+  const tenantId = bindAndOnlineForm.tenant_id.trim();
+  if (!env || !tenantId) {
+    bindAndOnlineServiceAreaOptions.value = [];
+    bindAndOnlineForm.service_area_id = "";
+    return;
+  }
+  bindAndOnlineServiceAreaLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuServiceAreaAllAPI({ tenant_id: tenantId, env });
+    if (res != null && Number(res.code) !== 0) {
+      bindAndOnlineServiceAreaOptions.value = [];
+      bindAndOnlineForm.service_area_id = "";
+      message.error(res?.msg || "获取服务区失败");
+      return;
+    }
+    const list = Array.isArray(res?.data) ? res.data : [];
+    const options = list
+      .filter((item: any) => item && Number(item.carType) === 0)
+      .map((item: any) => {
+        const id = String(item.id ?? "").trim();
+        const name = String(item.name ?? "").trim();
+        return { label: `${name || id}(${id})`, value: id };
+      })
+      .filter((item: { label: string; value: string }) => !!item.value);
+    bindAndOnlineServiceAreaOptions.value = options;
+    if (!options.some((item) => item.value === bindAndOnlineForm.service_area_id)) {
+      bindAndOnlineForm.service_area_id = "";
+    }
+  } catch (error: any) {
+    bindAndOnlineServiceAreaOptions.value = [];
+    bindAndOnlineForm.service_area_id = "";
+    message.error(error?.message || String(error) || "获取服务区失败");
+  } finally {
+    bindAndOnlineServiceAreaLoading.value = false;
+  }
+}
+
+function extractIdAndName(
+  item: Record<string, unknown>,
+  idKeys: string[],
+  nameKeys: string[],
+): { id: string; name: string } {
+  const id = idKeys
+    .map((key) => String(item[key] ?? "").trim())
+    .find((value) => !!value) || "";
+  const name =
+    nameKeys
+      .map((key) => String(item[key] ?? "").trim())
+      .find((value) => !!value) || id;
+  return { id, name };
+}
+
+function parseShopOptionsFromFranchisee(franchisee: Record<string, unknown>): Array<{ label: string; value: string }> {
+  const candidateKeys = ["shopList", "shop_list", "shops", "storeList", "store_list", "shopInfos"];
+  const raw = candidateKeys
+    .map((key) => franchisee[key])
+    .find((value) => Array.isArray(value)) as unknown[] | undefined;
+  if (!raw) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const obj = item as Record<string, unknown>;
+      const { id, name } = extractIdAndName(
+        obj,
+        ["id", "shopId", "shop_id", "storeId", "store_id"],
+        ["name", "shopName", "shop_name", "storeName", "store_name"],
+      );
+      if (!id) return null;
+      return { label: `${name}(${id})`, value: id };
+    })
+    .filter((item): item is { label: string; value: string } => item != null);
+}
+
+async function loadRentalBatchAddEnvOptions() {
+  rentalBatchAddEnvLoading.value = true;
+  try {
+    const result = await fetchEnvListForSource("rental");
+    if (result.error) {
+      message.error(result.error);
+    }
+    const list = result.options.map((item) => {
+      const name = typeof item.record.name === "string" && item.record.name.trim() ? item.record.name.trim() : item.value;
+      return { label: `${name}(${item.value})`, value: item.value };
+    });
+    rentalBatchAddEnvOptions.value = list;
+    const currentEnv = rentalBatchAddForm.env.trim();
+    if (currentEnv && !list.some((item) => item.value === currentEnv)) {
+      rentalBatchAddEnvOptions.value = [{ label: `${currentEnv}（当前）`, value: currentEnv }, ...list];
+    }
+  } finally {
+    rentalBatchAddEnvLoading.value = false;
+  }
+}
+
+async function loadRentalBatchAddTenantOptions() {
+  const env = rentalBatchAddForm.env.trim();
+  if (!env) {
+    rentalBatchAddTenantOptions.value = [];
+    rentalBatchAddForm.tenant_id = "";
+    rentalBatchAddForm.tenant_name = "";
+    return;
+  }
+  rentalBatchAddTenantLoading.value = true;
+  try {
+    const res: any = await rentalBusinessTenantAllAPI({ env });
+    if (res != null && Number(res.code) !== 0) {
+      rentalBatchAddTenantOptions.value = [];
+      rentalBatchAddForm.tenant_id = "";
+      rentalBatchAddForm.tenant_name = "";
+      message.error(res?.msg || "获取租户失败");
+      return;
+    }
+    const rows = Array.isArray(res?.data) ? res.data : [];
+    const options = rows
+      .map((item: any) => {
+        if (!item || typeof item !== "object") return null;
+        const obj = item as Record<string, unknown>;
+        const { id, name } = extractIdAndName(
+          obj,
+          ["tenantId", "tenant_id", "id"],
+          ["tenantName", "tenant_name", "name"],
+        );
+        if (!id) return null;
+        return { label: `${name}(${id})`, value: id };
+      })
+      .filter((item: any) => item != null);
+    rentalBatchAddTenantOptions.value = options;
+    if (!options.some((item: any) => item.value === rentalBatchAddForm.tenant_id)) {
+      rentalBatchAddForm.tenant_id = "";
+      rentalBatchAddForm.tenant_name = "";
+    } else {
+      const selected = options.find((item: any) => item.value === rentalBatchAddForm.tenant_id);
+      rentalBatchAddForm.tenant_name = selected?.label?.replace(/\([^)]*\)\s*$/, "") || "";
+    }
+  } catch (error: any) {
+    rentalBatchAddTenantOptions.value = [];
+    rentalBatchAddForm.tenant_id = "";
+    rentalBatchAddForm.tenant_name = "";
+    message.error(error?.message || String(error) || "获取租户失败");
+  } finally {
+    rentalBatchAddTenantLoading.value = false;
+  }
+}
+
+async function loadRentalBatchAddFranchiseeOptions() {
+  const env = rentalBatchAddForm.env.trim();
+  const tenantId = rentalBatchAddForm.tenant_id.trim();
+  if (!env || !tenantId) {
+    rentalBatchAddFranchiseeOptions.value = [];
+    rentalBatchAddForm.custom_id = "";
+    rentalBatchAddShopOptions.value = [];
+    rentalBatchAddForm.shop_id = "";
+    rentalFranchiseeShopMap.value = {};
+    return;
+  }
+  rentalBatchAddFranchiseeLoading.value = true;
+  try {
+    const res: any = await rentalBusinessFranchiseeAllAPI({ env, tenant_id: tenantId });
+    if (res != null && Number(res.code) !== 0) {
+      rentalBatchAddFranchiseeOptions.value = [];
+      rentalBatchAddForm.custom_id = "";
+      rentalBatchAddShopOptions.value = [];
+      rentalBatchAddForm.shop_id = "";
+      rentalFranchiseeShopMap.value = {};
+      message.error(res?.msg || "获取加盟商失败");
+      return;
+    }
+    const rows = Array.isArray(res?.data) ? res.data : [];
+    const shopMap: Record<string, Array<{ label: string; value: string }>> = {};
+    const options = rows
+      .map((item: any) => {
+        if (!item || typeof item !== "object") return null;
+        const obj = item as Record<string, unknown>;
+        const { id, name } = extractIdAndName(
+          obj,
+          ["customId", "custom_id", "id", "agentId", "agent_id"],
+          ["customName", "custom_name", "name", "agentName", "agent_name"],
+        );
+        if (!id) return null;
+        shopMap[id] = parseShopOptionsFromFranchisee(obj);
+        return { label: `${name}(${id})`, value: id };
+      })
+      .filter((item: any) => item != null);
+    rentalFranchiseeShopMap.value = shopMap;
+    rentalBatchAddFranchiseeOptions.value = options;
+    if (!options.some((item: any) => item.value === rentalBatchAddForm.custom_id)) {
+      rentalBatchAddForm.custom_id = "";
+    }
+  } catch (error: any) {
+    rentalBatchAddFranchiseeOptions.value = [];
+    rentalBatchAddForm.custom_id = "";
+    rentalBatchAddShopOptions.value = [];
+    rentalBatchAddForm.shop_id = "";
+    rentalFranchiseeShopMap.value = {};
+    message.error(error?.message || String(error) || "获取加盟商失败");
+  } finally {
+    rentalBatchAddFranchiseeLoading.value = false;
+  }
+}
+
+function refreshRentalBatchAddShopOptions() {
+  const customId = rentalBatchAddForm.custom_id.trim();
+  const list = customId ? rentalFranchiseeShopMap.value[customId] || [] : [];
+  rentalBatchAddShopOptions.value = list;
+  if (!list.some((item) => item.value === rentalBatchAddForm.shop_id)) {
+    rentalBatchAddForm.shop_id = "";
+  }
+}
+
+async function loadRentalBatchAddVehicleModelOptions() {
+  const env = rentalBatchAddForm.env.trim();
+  const tenantId = rentalBatchAddForm.tenant_id.trim();
+  const customId = rentalBatchAddForm.custom_id.trim();
+  if (!env || !tenantId || !customId) {
+    rentalBatchAddVehicleModelOptions.value = [];
+    rentalBatchAddForm.vehicle_model_id = "";
+    return;
+  }
+  rentalBatchAddVehicleModelLoading.value = true;
+  try {
+    const res: any = await rentalBusinessVehicleModelAllAPI({
+      env,
+      tenant_id: tenantId,
+      custom_id: customId,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      rentalBatchAddVehicleModelOptions.value = [];
+      rentalBatchAddForm.vehicle_model_id = "";
+      message.error(res?.msg || "获取车型失败");
+      return;
+    }
+    const rows = Array.isArray(res?.data) ? res.data : [];
+    const options = rows
+      .map((item: any) => {
+        if (!item || typeof item !== "object") return null;
+        const obj = item as Record<string, unknown>;
+        const { id, name } = extractIdAndName(
+          obj,
+          ["id", "modelId", "model_id", "vehicleModelId", "vehicle_model_id"],
+          ["name", "modelName", "model_name", "vehicleModelName", "vehicle_model_name"],
+        );
+        if (!id) return null;
+        return { label: `${name}(${id})`, value: id };
+      })
+      .filter((item: any) => item != null);
+    rentalBatchAddVehicleModelOptions.value = options;
+    if (!options.some((item: any) => item.value === rentalBatchAddForm.vehicle_model_id)) {
+      rentalBatchAddForm.vehicle_model_id = "";
+    }
+  } catch (error: any) {
+    rentalBatchAddVehicleModelOptions.value = [];
+    rentalBatchAddForm.vehicle_model_id = "";
+    message.error(error?.message || String(error) || "获取车型失败");
+  } finally {
+    rentalBatchAddVehicleModelLoading.value = false;
+  }
+}
 
 const batchMockSessionActive = computed(() => batchMockListRows.value.some((row) => row.success && !!row.connect_id));
+const sharedBindDisabledByEnv = computed(() => formData.business_type !== 1);
+const rentalBatchAddDisabledByEnv = computed(() => formData.business_type !== 2);
 
 function batchMockRowKey(row: BatchMockListRow) {
   return row.row_key;
 }
 
-const batchMockTableColumns: DataTableColumns<BatchMockListRow> = [
-  { type: "selection", width: 42 },
-  {
-    title: "IMEI",
-    key: "imei",
-    width: 168,
+const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() => {
+  const cols: DataTableColumns<BatchMockListRow> = [
+    { type: "selection", width: 42 },
+    {
+      title: "IMEI",
+      key: "imei",
+      width: 168,
+      ellipsis: { tooltip: true },
+    },
+    {
+      title: "模拟成功？",
+      key: "success",
+      width: 72,
+      render(row) {
+        const tagNode = h(
+          NTag,
+          { type: row.success ? "success" : "error", size: "small", bordered: false },
+          { default: () => (row.success ? "是" : "否") },
+        );
+        if (row.success || !row.error) return tagNode;
+        return h(
+          NTooltip,
+          { trigger: "hover" },
+          {
+            trigger: () => tagNode,
+            default: () => row.error,
+          },
+        );
+      },
+    },
+    {
+      title: "经度",
+      key: "lng",
+      width: 108,
+      render(row) {
+        return row.lng != null ? String(row.lng) : "—";
+      },
+    },
+    {
+      title: "纬度",
+      key: "lat",
+      width: 108,
+      render(row) {
+        return row.lat != null ? String(row.lat) : "—";
+      },
+    },
+    {
+      title: "电压(V)",
+      key: "voltage",
+      width: 88,
+      render(row) {
+        return row.voltage != null ? String(row.voltage) : "—";
+      },
+    },
+  ];
+  if (showSharedBindCol.value) {
+    cols.push({
+      title: "绑定成功（共享）",
+      key: "bind_success",
+      width: 112,
+      render(row) {
+        if (row.biz_scene !== "shared_bind_online") return "—";
+        if (row.bind_success == null) return "—";
+        return h(
+          NTag,
+          { type: row.bind_success ? "success" : "error", size: "small", bordered: false },
+          { default: () => (row.bind_success ? "是" : "否") },
+        );
+      },
+    });
+  }
+  if (showRentalBatchAddCol.value) {
+    cols.push({
+      title: "入库成功（短租）",
+      key: "rental_add_success",
+      width: 112,
+      render(row) {
+        if (row.biz_scene !== "rental_batch_add") return "—";
+        if (row.rental_add_success == null) return "—";
+        const tagNode = h(
+          NTag,
+          { type: row.rental_add_success ? "success" : "error", size: "small", bordered: false },
+          { default: () => (row.rental_add_success ? "是" : "否") },
+        );
+        if (row.rental_add_success) return tagNode;
+        return h(
+          NTooltip,
+          { trigger: "hover" },
+          {
+            trigger: () => tagNode,
+            default: () => row.error || "未知错误",
+          },
+        );
+      },
+    });
+  }
+  cols.push({
+    title: "车辆号",
+    key: "car_id",
+    width: 120,
     ellipsis: { tooltip: true },
-  },
-  {
-    title: "经度",
-    key: "lng",
-    width: 108,
     render(row) {
-      return row.lng != null ? String(row.lng) : "—";
+      return row.car_id || "—";
     },
-  },
-  {
-    title: "纬度",
-    key: "lat",
-    width: 108,
-    render(row) {
-      return row.lat != null ? String(row.lat) : "—";
-    },
-  },
-  {
-    title: "电压(V)",
-    key: "voltage",
-    width: 88,
-    render(row) {
-      return row.voltage != null ? String(row.voltage) : "—";
-    },
-  },
-  {
-    title: "模拟成功？",
-    key: "success",
-    width: 72,
-    render(row) {
-      const tagNode = h(
-        NTag,
-        { type: row.success ? "success" : "error", size: "small", bordered: false },
-        { default: () => (row.success ? "是" : "否") },
-      );
-      if (row.success || !row.error) return tagNode;
-      return h(
-        NTooltip,
-        { trigger: "hover" },
-        {
-          trigger: () => tagNode,
-          default: () => row.error,
-        },
-      );
-    },
-  },
-];
+  });
+  return cols;
+});
 
 function handleSelectAllRows() {
   checkedRowKeys.value = filteredBatchMockListRows.value.map((row) => row.row_key);
@@ -761,15 +1356,22 @@ watch(
   },
 );
 
+watch(
+  () => formData.env,
+  (env) => {
+    if (!String(env ?? "").trim()) currentCreateEnvSource.value = null;
+  },
+);
+
 function onNumInputWheel() {
   // 避免 number 输入框聚焦时滚轮改变值
 }
 
-/** 顺序模式：86 + 8 位随机数字 + 00000，共 15 位 */
+/** 顺序模式：86 + 8 位随机数字 + 00001，共 15 位 */
 function fillRandomStartImei() {
   const n = Math.floor(Math.random() * 1e8);
   const mid = String(n).padStart(8, "0");
-  formData.start_imei = `86${mid}00000`;
+  formData.start_imei = `86${mid}00001`;
   saveFormToStorage();
 }
 
@@ -935,6 +1537,8 @@ function onEnvPickerAfterLeave() {
 }
 
 function applyEnvSelection(source: EnvSource, envKey: string, record: EnvRecord) {
+  currentCreateEnvSource.value = source;
+  formData.business_type = BUSINESS_TYPE_BY_SOURCE[source];
   formData.env = envKey;
   if (!envKey) return;
   const gateway = pickGatewayBySource(source, record);
@@ -964,6 +1568,9 @@ function handleReset() {
   checkedRowKeys.value = [];
   requestError.value = "";
   successSummary.value = "";
+  showSharedBindCol.value = false;
+  showRentalBatchAddCol.value = false;
+  currentCreateEnvSource.value = null;
   saveFormToStorage();
 }
 
@@ -981,6 +1588,12 @@ function applyBatchRecordDataToForm(res: unknown) {
   const env = typeof record.env === "string" ? record.env.trim() : "";
   if (env) {
     formData.env = env;
+  }
+  const businessType = Number(record.business_type);
+  if (businessType === 1 || businessType === 2 || businessType === 3) {
+    formData.business_type = businessType;
+  } else if (currentCreateEnvSource.value) {
+    formData.business_type = BUSINESS_TYPE_BY_SOURCE[currentCreateEnvSource.value];
   }
 
   const modeNum = Number(record.mode);
@@ -1092,6 +1705,275 @@ async function handleCopyCheckedImeis() {
   }
 }
 
+function openBindAndOnlineModal() {
+  const imeis = Array.from(new Set(checkedImeis.value));
+  if (imeis.length === 0) {
+    message.warning("请先勾选要绑定并上架的 IMEI");
+    return;
+  }
+  bindAndOnlineForm.env = formData.env?.trim() || defaultFormData.env;
+  bindAndOnlineForm.tenant_id = formData.tenant_id || "";
+  bindAndOnlineForm.service_area_id = "";
+  bindAndOnlineForm.imeis_text = imeis.join("\n");
+  void loadBindAndOnlineEnvOptions();
+  void loadBindAndOnlineServiceAreaOptions();
+  bindAndOnlineShow.value = true;
+}
+
+function openRentalBatchAddModal() {
+  const imeis = Array.from(new Set(checkedImeis.value));
+  if (imeis.length === 0) {
+    message.warning("请先勾选要批量入库的 IMEI");
+    return;
+  }
+  rentalBatchAddForm.env = formData.env?.trim() || defaultFormData.env;
+  rentalBatchAddForm.tenant_id = formData.tenant_id?.trim() || "";
+  rentalBatchAddForm.tenant_name = "";
+  rentalBatchAddForm.custom_id = "";
+  rentalBatchAddForm.shop_id = "";
+  rentalBatchAddForm.vehicle_model_id = "";
+  rentalBatchAddForm.imeis_text = imeis.join("\n");
+  rentalBatchAddShow.value = true;
+  void loadRentalBatchAddEnvOptions();
+  void loadRentalBatchAddTenantOptions();
+}
+
+async function handleRentalBatchAddSubmit() {
+  const env = rentalBatchAddForm.env.trim() || formData.env?.trim() || defaultFormData.env;
+  rentalBatchAddForm.env = env;
+  const tenantId = rentalBatchAddForm.tenant_id.trim();
+  const customId = rentalBatchAddForm.custom_id.trim();
+  const shopId = rentalBatchAddForm.shop_id.trim();
+  const vehicleModelId = rentalBatchAddForm.vehicle_model_id.trim();
+  if (!env) {
+    message.error("环境不能为空");
+    return;
+  }
+  if (!tenantId) {
+    message.error("租户不能为空");
+    return;
+  }
+  if (!customId) {
+    message.error("加盟商不能为空");
+    return;
+  }
+  if (!shopId) {
+    message.error("门店不能为空");
+    return;
+  }
+  if (!vehicleModelId) {
+    message.error("车型不能为空");
+    return;
+  }
+  const imeis = rentalBatchAddImeis.value;
+  if (imeis.length === 0) {
+    message.error("请填写至少 1 个有效 IMEI（15 位数字）");
+    return;
+  }
+  rentalBatchAddLoading.value = true;
+  try {
+    const res: any = await rentalBusinessBatchAddEbikeAPI({
+      env,
+      tenant_id: tenantId,
+      tenant_name: rentalBatchAddForm.tenant_name.trim() || undefined,
+      custom_id: customId,
+      shop_id: shopId,
+      vehicle_model_id: vehicleModelId,
+      imeis,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      message.error(res?.msg || "短租批量入库失败");
+      return;
+    }
+    const resultRows = Array.isArray(res?.data?.results) ? res.data.results : [];
+    if (resultRows.length > 0) {
+      const resultByImei = new Map<
+        string,
+        { rental_add_success: boolean | null; car_id: string; error: string }
+      >();
+      resultRows.forEach((item: any) => {
+        const imei = typeof item?.imei === "string" ? item.imei.trim() : "";
+        if (!imei) return;
+        const ok = Boolean(item?.success);
+        const errMsg = ok ? "" : item?.resp ? JSON.stringify(item.resp) : "短租批量入库失败";
+        resultByImei.set(imei, {
+          rental_add_success: ok,
+          car_id: typeof item?.car_id === "string" ? item.car_id.trim() : "",
+          error: errMsg,
+        });
+      });
+      batchMockListRows.value = batchMockListRows.value.map((row) => {
+        const info = resultByImei.get(row.imei);
+        if (!info) return row;
+        return {
+          ...row,
+          bind_success: null,
+          online_success: null,
+          rental_add_success: info.rental_add_success,
+          biz_scene: "rental_batch_add",
+          car_id: info.car_id || row.car_id,
+          error: info.error || row.error,
+        };
+      });
+    }
+    showSharedBindCol.value = false;
+    showRentalBatchAddCol.value = true;
+    rentalBatchAddShow.value = false;
+    const sc = Number(res?.data?.success_count);
+    const fc = Number(res?.data?.fail_count);
+    if (Number.isFinite(sc) || Number.isFinite(fc)) {
+      const successCount = Number.isFinite(sc) ? sc : 0;
+      const failCount = Number.isFinite(fc) ? fc : Math.max(0, imeis.length - successCount);
+      const tail = failCount > 0 ? `，失败 ${failCount} 台` : "";
+      message.success(`短租批量入库完成：成功 ${successCount} 台${tail}`);
+    } else {
+      message.success(`短租批量入库成功：${imeis.length} 台`);
+    }
+  } catch (error: any) {
+    message.error(error?.message || String(error) || "短租批量入库失败");
+  } finally {
+    rentalBatchAddLoading.value = false;
+  }
+}
+
+async function handleBindAndOnlineSubmit() {
+  const env = bindAndOnlineForm.env.trim() || formData.env?.trim() || defaultFormData.env;
+  bindAndOnlineForm.env = env;
+  const tenantId = bindAndOnlineForm.tenant_id.trim();
+  const serviceAreaId = bindAndOnlineForm.service_area_id.trim();
+  if (!env) {
+    message.error("环境不能为空");
+    return;
+  }
+  if (!tenantId) {
+    message.error("租户ID不能为空");
+    return;
+  }
+  if (!serviceAreaId) {
+    message.error("服务区ID不能为空");
+    return;
+  }
+  const imeis = bindAndOnlineImeis.value;
+  if (imeis.length === 0) {
+    message.error("请填写至少 1 个有效 IMEI（15 位数字）");
+    return;
+  }
+  bindAndOnlineLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuBatchBindAndOnlineAPI({
+      env,
+      tenant_id: tenantId,
+      service_area_id: serviceAreaId,
+      imeis,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      const msg = res?.msg || "批量绑定并上架失败";
+      message.error(msg);
+      return;
+    }
+    const resultRows = Array.isArray(res?.data?.results) ? res.data.results : [];
+    if (resultRows.length > 0) {
+      const resultByImei = new Map<
+        string,
+        { bind_success: boolean | null; online_success: boolean | null; car_id: string }
+      >();
+      resultRows.forEach((item: any) => {
+        const imei = typeof item?.imei === "string" ? item.imei.trim() : "";
+        if (!imei) return;
+        resultByImei.set(imei, {
+          bind_success: typeof item?.bind_success === "boolean" ? item.bind_success : null,
+          online_success: typeof item?.online_success === "boolean" ? item.online_success : null,
+          car_id: typeof item?.car_id === "string" ? item.car_id.trim() : "",
+        });
+      });
+      batchMockListRows.value = batchMockListRows.value.map((row) => {
+        const bindInfo = resultByImei.get(row.imei);
+        if (!bindInfo) return row;
+        return {
+          ...row,
+          bind_success: bindInfo.bind_success,
+          online_success: bindInfo.online_success,
+          rental_add_success: null,
+          biz_scene: "shared_bind_online",
+          car_id: bindInfo.car_id,
+        };
+      });
+    }
+    showSharedBindCol.value = true;
+    showRentalBatchAddCol.value = false;
+    bindAndOnlineShow.value = false;
+    const sc = Number(res?.data?.success_count);
+    const fc = Number(res?.data?.fail_count);
+    if (Number.isFinite(sc) || Number.isFinite(fc)) {
+      const successCount = Number.isFinite(sc) ? sc : 0;
+      const failCount = Number.isFinite(fc) ? fc : Math.max(0, imeis.length - successCount);
+      const tail = failCount > 0 ? `，失败 ${failCount} 台` : "";
+      message.success(`批量绑定并上架完成：成功 ${successCount} 台${tail}`);
+    } else {
+      message.success(`批量绑定并上架成功：${imeis.length} 台`);
+    }
+  } catch (error: any) {
+    const msg = error?.message || String(error) || "批量绑定并上架失败";
+    message.error(msg);
+  } finally {
+    bindAndOnlineLoading.value = false;
+  }
+}
+
+watch(
+  () => [bindAndOnlineForm.env, bindAndOnlineForm.tenant_id],
+  () => {
+    if (!bindAndOnlineShow.value) return;
+    void loadBindAndOnlineServiceAreaOptions();
+  },
+);
+
+watch(
+  () => rentalBatchAddForm.env,
+  () => {
+    if (!rentalBatchAddShow.value) return;
+    rentalBatchAddForm.tenant_id = "";
+    rentalBatchAddForm.tenant_name = "";
+    rentalBatchAddForm.custom_id = "";
+    rentalBatchAddForm.shop_id = "";
+    rentalBatchAddForm.vehicle_model_id = "";
+    rentalBatchAddFranchiseeOptions.value = [];
+    rentalBatchAddShopOptions.value = [];
+    rentalBatchAddVehicleModelOptions.value = [];
+    rentalFranchiseeShopMap.value = {};
+    void loadRentalBatchAddTenantOptions();
+  },
+);
+
+watch(
+  () => rentalBatchAddForm.tenant_id,
+  () => {
+    if (!rentalBatchAddShow.value) return;
+    const selected = rentalBatchAddTenantOptions.value.find((item) => item.value === rentalBatchAddForm.tenant_id);
+    rentalBatchAddForm.tenant_name = selected?.label?.replace(/\([^)]*\)\s*$/, "") || "";
+    rentalBatchAddForm.custom_id = "";
+    rentalBatchAddForm.shop_id = "";
+    rentalBatchAddForm.vehicle_model_id = "";
+    rentalBatchAddFranchiseeOptions.value = [];
+    rentalBatchAddShopOptions.value = [];
+    rentalBatchAddVehicleModelOptions.value = [];
+    rentalFranchiseeShopMap.value = {};
+    void loadRentalBatchAddFranchiseeOptions();
+  },
+);
+
+watch(
+  () => rentalBatchAddForm.custom_id,
+  () => {
+    if (!rentalBatchAddShow.value) return;
+    rentalBatchAddForm.shop_id = "";
+    rentalBatchAddForm.vehicle_model_id = "";
+    rentalBatchAddVehicleModelOptions.value = [];
+    refreshRentalBatchAddShopOptions();
+    void loadRentalBatchAddVehicleModelOptions();
+  },
+);
+
 async function loadBatchMockRecords() {
   if (batchRecordLoaded) return;
   batchRecordLoaded = true;
@@ -1103,6 +1985,8 @@ async function loadBatchMockRecords() {
     const rows = parseBatchMockListFromResponse(res);
     const mergedRows = rows.length > 0 ? rows : parseBatchMockListFromLegacyRecordResponse(res);
     batchMockListRows.value = mergedRows;
+    showSharedBindCol.value = false;
+    showRentalBatchAddCol.value = false;
     checkedRowKeys.value = mergedRows.filter((row) => row.success && !!row.connect_id).map((row) => row.row_key);
     saveFormToStorage();
   } catch {
@@ -1192,11 +2076,17 @@ async function handleCreate() {
   createLoading.value = true;
   requestError.value = "";
   successSummary.value = "";
+  showSharedBindCol.value = false;
+  showRentalBatchAddCol.value = false;
   const startAt = performance.now();
 
   try {
     const payload = buildBatchPayload(formData);
     const res: any = await xiaoanEcuMockBatchCreateAPI(payload);
+    const resBusinessType = Number(res?.data?.business_type);
+    if (resBusinessType === 1 || resBusinessType === 2 || resBusinessType === 3) {
+      formData.business_type = resBusinessType;
+    }
     const elapsedSec = ((performance.now() - startAt) / 1000).toFixed(2);
     if (res != null && Number(res.code) !== 0) {
       const msg = res?.msg || "批量创建失败";
@@ -1250,6 +2140,21 @@ async function handleCreate() {
 
 .form-actions {
   margin-top: 8px;
+}
+
+.form-actions-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.bind-online-right-btn {
+  margin-left: auto;
+}
+
+.rental-batch-add-right-btn {
+  margin-left: 0;
 }
 
 .mode-section {
@@ -1552,6 +2457,16 @@ async function handleCreate() {
 
 .table-imei-search {
   width: 200px;
+}
+
+.bind-online-imeis-wrap {
+  width: 100%;
+}
+
+.bind-online-imeis-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .batch-mock-result-table :deep(.n-data-table) {

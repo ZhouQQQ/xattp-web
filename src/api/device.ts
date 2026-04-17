@@ -110,6 +110,7 @@ export function xiaoanEcuMockCreateAPI(data: {
 export function xiaoanEcuMockBatchCreateAPI(data: {
   env: string;
   tenant_id?: string;
+  business_type?: 1 | 2 | 3;
   server?: string;
   voltage_min?: number;
   voltage_max?: number;
@@ -141,6 +142,67 @@ export function xiaoanEcuMockBatchRecordAPI() {
   return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/get_batch_record`, {
     params: { _ts: Date.now() },
   });
+}
+
+/** 小安中控批量工具：批量绑定并上架 */
+export function xiaoanEcuBatchBindAndOnlineAPI(data: {
+  env: string;
+  tenant_id: string;
+  service_area_id: string;
+  imeis: string[];
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/business_tool/batch_bind_and_online`, data);
+}
+
+/** 小安中控批量工具：按租户和环境查询服务区 */
+export function xiaoanEcuServiceAreaAllAPI(params: { tenant_id: string; env: string }) {
+  return AlovaInstance.Get(`${BASE_PATH}/business_tool/service_area/all`, { params });
+}
+
+/** 短租批量工具：获取环境下租户列表 */
+export function rentalBusinessTenantAllAPI(params: { env: string }) {
+  return AlovaInstance.Get(`${BASE_PATH}/rental_business_tool/tenant/all`, { params });
+}
+
+/** 短租批量工具：获取加盟商列表 */
+export function rentalBusinessFranchiseeAllAPI(params: { env: string; tenant_id?: string; tenant_name?: string }) {
+  return AlovaInstance.Get(`${BASE_PATH}/rental_business_tool/franchisee/all`, { params });
+}
+
+/** 短租批量工具：获取车型列表 */
+export function rentalBusinessVehicleModelAllAPI(params: {
+  env: string;
+  tenant_id?: string;
+  tenant_name?: string;
+  custom_id?: string;
+}) {
+  return AlovaInstance.Get(`${BASE_PATH}/rental_business_tool/vehicle_model/all`, { params });
+}
+
+/** 短租批量工具：批量入库车辆 */
+export function rentalBusinessBatchAddEbikeAPI(data: {
+  env: string;
+  tenant_id?: string;
+  tenant_name?: string;
+  custom_id: string;
+  vehicle_model_id: string;
+  shop_id: string;
+  imeis: string[];
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/rental_business_tool/ebike/batch_add`, data);
+}
+
+/** 短租工具：单车入库 */
+export function rentalBusinessAddEbikeAPI(data: {
+  env: string;
+  imei: string;
+  tenant_id?: string;
+  tenant_name?: string;
+  custom_id: string;
+  vehicle_model_id: string;
+  shop_id: string;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/rental_business_tool/ebike/add`, data);
 }
 
 /** 租车中控模拟：添加 mock 连接（接口 /ecu/mock/add，无租户ID/服务区） */

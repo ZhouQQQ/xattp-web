@@ -173,7 +173,8 @@
                 </n-button>
               </template>
               <template v-else>
-                <n-space :size="8">
+                <div class="create-actions-row">
+                  <n-space :size="8">
                   <n-button type="error" :loading="deleteLoading" @click="handleDisconnect">
                     <template #icon>
                       <n-icon :component="Trash" :size="18" />
@@ -192,7 +193,16 @@
                   <n-button type="default" @click="openTrackModal">
                     模拟轨迹
                   </n-button>
-                </n-space>
+                  </n-space>
+                  <n-button
+                    type="default"
+                    :loading="batchAddLoading"
+                    @click="openBatchAddModal"
+                    class="batch-add-right-btn"
+                  >
+                    入库车辆
+                  </n-button>
+                </div>
               </template>
             </n-form-item>
           </n-form>
@@ -355,16 +365,96 @@
         </n-form-item>
       </n-form>
     </n-modal>
+
+    <!-- 短租批量入库弹窗 -->
+    <n-modal
+      v-model:show="showBatchAddModal"
+      preset="card"
+      title="短租-入库车辆"
+      :mask-closable="!batchAddLoading"
+      style="width: 760px"
+    >
+      <n-form :model="batchAddForm" label-placement="left" label-width="110px">
+        <n-form-item label="环境" required>
+          <n-select
+            v-model:value="batchAddForm.env"
+            :options="batchAddEnvOptions"
+            filterable
+            :clearable="false"
+            :disabled="true"
+            placeholder="请选择环境"
+          />
+        </n-form-item>
+        <n-form-item label="租户" required>
+          <n-select
+            v-model:value="batchAddForm.tenant_id"
+            :options="batchAddTenantOptions"
+            :loading="batchAddTenantLoading"
+            filterable
+            clearable
+            placeholder="请选择租户"
+          />
+        </n-form-item>
+        <n-form-item label="加盟商" required>
+          <n-select
+            v-model:value="batchAddForm.custom_id"
+            :options="batchAddFranchiseeOptions"
+            :loading="batchAddFranchiseeLoading"
+            filterable
+            clearable
+            placeholder="请选择加盟商"
+          />
+        </n-form-item>
+        <n-form-item label="门店" required>
+          <n-select
+            v-model:value="batchAddForm.shop_id"
+            :options="batchAddShopOptions"
+            :loading="batchAddShopLoading"
+            filterable
+            clearable
+            placeholder="请选择门店"
+          />
+        </n-form-item>
+        <n-form-item label="车型" required>
+          <n-select
+            v-model:value="batchAddForm.vehicle_model_id"
+            :options="batchAddVehicleModelOptions"
+            :loading="batchAddVehicleModelLoading"
+            filterable
+            clearable
+            placeholder="请选择车型"
+          />
+        </n-form-item>
+        <n-form-item label="IMEI" required>
+          <n-input
+            v-model:value="batchAddForm.imei"
+            placeholder="IMEI（15 位数字，以 86 开头）"
+            clearable
+          />
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-space justify="end">
+          <n-button :disabled="batchAddLoading" @click="showBatchAddModal = false">取消</n-button>
+          <n-button type="primary" :loading="batchAddLoading" @click="handleBatchAddSubmit">确认入库</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 defineOptions({ name: "RentalEcuMock" });
 
-import { ref, reactive, nextTick } from "vue";
+import { ref, reactive, nextTick, computed, watch } from "vue";
 import { createDiscreteApi } from "naive-ui";
 import { Help, Gps, Trash, Dice } from "@vicons/tabler";
 import {
+  getRentalEnvListAPI,
+  rentalBusinessAddEbikeAPI,
+  rentalBusinessFranchiseeAllAPI,
+  rentalBusinessTenantAllAPI,
+  rentalBusinessVehicleModelAllAPI,
   rentalEcuMockAddAPI,
   xiaoanEcuMockCmdAllAPI,
   xiaoanEcuMockCmdSetAPI,
@@ -578,6 +668,38 @@ const connectId = ref("");
 const cmdMap = ref<Record<string, string>>({});
 const cmdLoadDone = ref(false);
 
+interface BatchAddFormData {
+  env: string;
+  tenant_id: string;
+  tenant_name: string;
+  custom_id: string;
+  shop_id: string;
+  vehicle_model_id: string;
+  imei: string;
+}
+const showBatchAddModal = ref(false);
+const batchAddLoading = ref(false);
+const batchAddTenantLoading = ref(false);
+const batchAddFranchiseeLoading = ref(false);
+const batchAddShopLoading = ref(false);
+const batchAddVehicleModelLoading = ref(false);
+const batchAddForm = reactive<BatchAddFormData>({
+  env: "",
+  tenant_id: "",
+  tenant_name: "",
+  custom_id: "",
+  shop_id: "",
+  vehicle_model_id: "",
+  imei: "",
+});
+const batchAddEnvOptions = ref<Array<{ label: string; value: string }>>([]);
+const batchAddTenantOptions = ref<Array<{ label: string; value: string }>>([]);
+const batchAddFranchiseeOptions = ref<Array<{ label: string; value: string }>>([]);
+const batchAddShopOptions = ref<Array<{ label: string; value: string }>>([]);
+const batchAddVehicleModelOptions = ref<Array<{ label: string; value: string }>>([]);
+const batchAddFranchiseeShopMap = ref<Record<string, Array<{ label: string; value: string }>>>({});
+const batchAddImei = computed(() => String(batchAddForm.imei || "").trim());
+
 /** 用于 Tab 展示与编辑的条目：key + 原始 value + 当前编辑 value */
 interface CmdEntry {
   key: string;
@@ -642,6 +764,273 @@ function onHasHelmetChange(val: boolean) {
   } else {
     formData.helmet_react = false;
     formData.helmet_lock = false;
+  }
+}
+
+function extractIdAndName(
+  item: Record<string, unknown>,
+  idKeys: string[],
+  nameKeys: string[],
+): { id: string; name: string } {
+  const id = idKeys.map((key) => String(item[key] ?? "").trim()).find((v) => !!v) || "";
+  const name = nameKeys.map((key) => String(item[key] ?? "").trim()).find((v) => !!v) || id;
+  return { id, name };
+}
+
+function parseShopOptionsFromFranchisee(franchisee: Record<string, unknown>): Array<{ label: string; value: string }> {
+  const candidateKeys = ["shopList", "shop_list", "shops", "storeList", "store_list", "shopInfos"];
+  const raw = candidateKeys
+    .map((key) => franchisee[key])
+    .find((value) => Array.isArray(value)) as unknown[] | undefined;
+  if (!raw) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const obj = item as Record<string, unknown>;
+      const { id, name } = extractIdAndName(
+        obj,
+        ["id", "shopId", "shop_id", "storeId", "store_id"],
+        ["name", "shopName", "shop_name", "storeName", "store_name"],
+      );
+      if (!id) return null;
+      return { label: `${name}(${id})`, value: id };
+    })
+    .filter((item): item is { label: string; value: string } => item != null);
+}
+
+async function loadBatchAddEnvOptions() {
+  try {
+    const res: any = await getRentalEnvListAPI();
+    if (res != null && Number(res.code) !== 0) {
+      message.error(res?.msg || "获取环境失败");
+      batchAddEnvOptions.value = [];
+      return;
+    }
+    const data = res?.data && typeof res.data === "object" ? (res.data as Record<string, unknown>) : {};
+    const options = Object.entries(data)
+      .map(([key, value]) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+        const record = value as Record<string, unknown>;
+        const order = Number(record.order);
+        const name = typeof record.name === "string" && record.name.trim() ? record.name.trim() : key;
+        if (!Number.isFinite(order)) return null;
+        return { label: `${name}(${key})`, value: key, order };
+      })
+      .filter((item): item is { label: string; value: string; order: number } => item != null)
+      .sort((a, b) => a.order - b.order)
+      .map((item) => ({ label: item.label, value: item.value }));
+    batchAddEnvOptions.value = options;
+  } catch (error: any) {
+    batchAddEnvOptions.value = [];
+    message.error(error?.message || String(error) || "获取环境失败");
+  }
+}
+
+async function loadBatchAddTenantOptions() {
+  const env = batchAddForm.env.trim();
+  if (!env) {
+    batchAddTenantOptions.value = [];
+    batchAddForm.tenant_id = "";
+    batchAddForm.tenant_name = "";
+    return;
+  }
+  batchAddTenantLoading.value = true;
+  try {
+    const res: any = await rentalBusinessTenantAllAPI({ env });
+    if (res != null && Number(res.code) !== 0) {
+      batchAddTenantOptions.value = [];
+      batchAddForm.tenant_id = "";
+      batchAddForm.tenant_name = "";
+      message.error(res?.msg || "获取租户失败");
+      return;
+    }
+    const rows = Array.isArray(res?.data) ? res.data : [];
+    const options = rows
+      .map((item: any) => {
+        if (!item || typeof item !== "object") return null;
+        const obj = item as Record<string, unknown>;
+        const { id, name } = extractIdAndName(obj, ["tenantId", "tenant_id", "id"], ["tenantName", "tenant_name", "name"]);
+        if (!id) return null;
+        return { label: `${name}(${id})`, value: id };
+      })
+      .filter((item: any) => item != null);
+    batchAddTenantOptions.value = options;
+    if (!options.some((item: any) => item.value === batchAddForm.tenant_id)) {
+      batchAddForm.tenant_id = "";
+      batchAddForm.tenant_name = "";
+    }
+  } catch (error: any) {
+    batchAddTenantOptions.value = [];
+    batchAddForm.tenant_id = "";
+    batchAddForm.tenant_name = "";
+    message.error(error?.message || String(error) || "获取租户失败");
+  } finally {
+    batchAddTenantLoading.value = false;
+  }
+}
+
+async function loadBatchAddFranchiseeOptions() {
+  const env = batchAddForm.env.trim();
+  const tenantId = batchAddForm.tenant_id.trim();
+  if (!env || !tenantId) {
+    batchAddFranchiseeOptions.value = [];
+    batchAddShopOptions.value = [];
+    batchAddForm.custom_id = "";
+    batchAddForm.shop_id = "";
+    batchAddFranchiseeShopMap.value = {};
+    return;
+  }
+  batchAddFranchiseeLoading.value = true;
+  try {
+    const res: any = await rentalBusinessFranchiseeAllAPI({ env, tenant_id: tenantId });
+    if (res != null && Number(res.code) !== 0) {
+      batchAddFranchiseeOptions.value = [];
+      batchAddShopOptions.value = [];
+      batchAddForm.custom_id = "";
+      batchAddForm.shop_id = "";
+      batchAddFranchiseeShopMap.value = {};
+      message.error(res?.msg || "获取加盟商失败");
+      return;
+    }
+    const rows = Array.isArray(res?.data) ? res.data : [];
+    const shopMap: Record<string, Array<{ label: string; value: string }>> = {};
+    const options = rows
+      .map((item: any) => {
+        if (!item || typeof item !== "object") return null;
+        const obj = item as Record<string, unknown>;
+        const { id, name } = extractIdAndName(
+          obj,
+          ["customId", "custom_id", "id", "agentId", "agent_id"],
+          ["customName", "custom_name", "name", "agentName", "agent_name"],
+        );
+        if (!id) return null;
+        shopMap[id] = parseShopOptionsFromFranchisee(obj);
+        return { label: `${name}(${id})`, value: id };
+      })
+      .filter((item: any) => item != null);
+    batchAddFranchiseeOptions.value = options;
+    batchAddFranchiseeShopMap.value = shopMap;
+  } catch (error: any) {
+    batchAddFranchiseeOptions.value = [];
+    batchAddShopOptions.value = [];
+    batchAddForm.custom_id = "";
+    batchAddForm.shop_id = "";
+    batchAddFranchiseeShopMap.value = {};
+    message.error(error?.message || String(error) || "获取加盟商失败");
+  } finally {
+    batchAddFranchiseeLoading.value = false;
+  }
+}
+
+function refreshBatchAddShopOptions() {
+  const customId = batchAddForm.custom_id.trim();
+  batchAddShopLoading.value = true;
+  const list = customId ? batchAddFranchiseeShopMap.value[customId] || [] : [];
+  batchAddShopOptions.value = list;
+  if (!list.some((item) => item.value === batchAddForm.shop_id)) {
+    batchAddForm.shop_id = "";
+  }
+  batchAddShopLoading.value = false;
+}
+
+async function loadBatchAddVehicleModelOptions() {
+  const env = batchAddForm.env.trim();
+  const tenantId = batchAddForm.tenant_id.trim();
+  const customId = batchAddForm.custom_id.trim();
+  if (!env || !tenantId || !customId) {
+    batchAddVehicleModelOptions.value = [];
+    batchAddForm.vehicle_model_id = "";
+    return;
+  }
+  batchAddVehicleModelLoading.value = true;
+  try {
+    const res: any = await rentalBusinessVehicleModelAllAPI({
+      env,
+      tenant_id: tenantId,
+      custom_id: customId,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      batchAddVehicleModelOptions.value = [];
+      batchAddForm.vehicle_model_id = "";
+      message.error(res?.msg || "获取车型失败");
+      return;
+    }
+    const rows = Array.isArray(res?.data) ? res.data : [];
+    const options = rows
+      .map((item: any) => {
+        if (!item || typeof item !== "object") return null;
+        const obj = item as Record<string, unknown>;
+        const { id, name } = extractIdAndName(
+          obj,
+          ["id", "modelId", "model_id", "vehicleModelId", "vehicle_model_id"],
+          ["name", "modelName", "model_name", "vehicleModelName", "vehicle_model_name"],
+        );
+        if (!id) return null;
+        return { label: `${name}(${id})`, value: id };
+      })
+      .filter((item: any) => item != null);
+    batchAddVehicleModelOptions.value = options;
+    if (!options.some((item: any) => item.value === batchAddForm.vehicle_model_id)) {
+      batchAddForm.vehicle_model_id = "";
+    }
+  } catch (error: any) {
+    batchAddVehicleModelOptions.value = [];
+    batchAddForm.vehicle_model_id = "";
+    message.error(error?.message || String(error) || "获取车型失败");
+  } finally {
+    batchAddVehicleModelLoading.value = false;
+  }
+}
+
+function openBatchAddModal() {
+  batchAddForm.env = formData.env?.trim() || "test";
+  batchAddForm.tenant_id = "";
+  batchAddForm.tenant_name = "";
+  batchAddForm.custom_id = "";
+  batchAddForm.shop_id = "";
+  batchAddForm.vehicle_model_id = "";
+  batchAddForm.imei = formData.imei?.trim() ? formData.imei.trim() : "";
+  showBatchAddModal.value = true;
+  void loadBatchAddEnvOptions();
+  void loadBatchAddTenantOptions();
+}
+
+async function handleBatchAddSubmit() {
+  const env = batchAddForm.env.trim();
+  const tenantId = batchAddForm.tenant_id.trim();
+  const customId = batchAddForm.custom_id.trim();
+  const shopId = batchAddForm.shop_id.trim();
+  const vehicleModelId = batchAddForm.vehicle_model_id.trim();
+  if (!env) return void message.error("环境不能为空");
+  if (!tenantId) return void message.error("租户不能为空");
+  if (!customId) return void message.error("加盟商不能为空");
+  if (!shopId) return void message.error("门店不能为空");
+  if (!vehicleModelId) return void message.error("车型不能为空");
+  const imei = batchAddImei.value;
+  if (!/^\d{15}$/.test(imei)) return void message.error("请填写有效 IMEI（15 位数字）");
+
+  batchAddLoading.value = true;
+  try {
+    const res: any = await rentalBusinessAddEbikeAPI({
+      env,
+      imei,
+      tenant_id: tenantId,
+      tenant_name: batchAddForm.tenant_name.trim() || undefined,
+      custom_id: customId,
+      shop_id: shopId,
+      vehicle_model_id: vehicleModelId,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      message.error(res?.msg || "入库失败");
+      return;
+    }
+    showBatchAddModal.value = false;
+    message.success("短租入库成功：1 台");
+  } catch (error: any) {
+    const msg = error?.message || String(error) || "入库失败";
+    message.error(msg);
+  } finally {
+    batchAddLoading.value = false;
   }
 }
 
@@ -1003,6 +1392,53 @@ async function handleTrackStart() {
   }
 }
 
+watch(
+  () => batchAddForm.env,
+  () => {
+    if (!showBatchAddModal.value) return;
+    batchAddForm.tenant_id = "";
+    batchAddForm.tenant_name = "";
+    batchAddForm.custom_id = "";
+    batchAddForm.shop_id = "";
+    batchAddForm.vehicle_model_id = "";
+    batchAddTenantOptions.value = [];
+    batchAddFranchiseeOptions.value = [];
+    batchAddShopOptions.value = [];
+    batchAddVehicleModelOptions.value = [];
+    batchAddFranchiseeShopMap.value = {};
+    void loadBatchAddTenantOptions();
+  },
+);
+
+watch(
+  () => batchAddForm.tenant_id,
+  () => {
+    if (!showBatchAddModal.value) return;
+    const selected = batchAddTenantOptions.value.find((item) => item.value === batchAddForm.tenant_id);
+    batchAddForm.tenant_name = selected?.label?.replace(/\([^)]*\)\s*$/, "") || "";
+    batchAddForm.custom_id = "";
+    batchAddForm.shop_id = "";
+    batchAddForm.vehicle_model_id = "";
+    batchAddFranchiseeOptions.value = [];
+    batchAddShopOptions.value = [];
+    batchAddVehicleModelOptions.value = [];
+    batchAddFranchiseeShopMap.value = {};
+    void loadBatchAddFranchiseeOptions();
+  },
+);
+
+watch(
+  () => batchAddForm.custom_id,
+  () => {
+    if (!showBatchAddModal.value) return;
+    batchAddForm.shop_id = "";
+    batchAddForm.vehicle_model_id = "";
+    batchAddVehicleModelOptions.value = [];
+    refreshBatchAddShopOptions();
+    void loadBatchAddVehicleModelOptions();
+  },
+);
+
 function openAddCmd() {
   addForm.cmd = "";
   addForm.value = '{"code":0}';
@@ -1120,6 +1556,17 @@ async function handleCloseTab(name: string) {
 .form-section .form-item-buttons {
   margin-top: 6px;
   margin-bottom: 0;
+}
+
+.create-actions-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.batch-add-right-btn {
+  margin-left: auto;
 }
 
 /* 模拟成功后的只读输入框：灰底只读样式，可选中、可复制 */
@@ -1440,4 +1887,5 @@ async function handleCloseTab(name: string) {
 .track-clear-btn:hover {
   color: #f56c6c;
 }
+
 </style>
