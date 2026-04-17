@@ -385,7 +385,7 @@
 defineOptions({ name: "XiaoanEcuMockBatch" });
 
 import { computed, h, onMounted, reactive, ref, watch } from "vue";
-import { createDiscreteApi, NTag, type DataTableColumns, type DataTableRowKey } from "naive-ui";
+import { createDiscreteApi, NTag, NTooltip, type DataTableColumns, type DataTableRowKey } from "naive-ui";
 import {
   getEbikeEnvListAPI,
   getOverseaEnvListAPI,
@@ -414,12 +414,14 @@ type EnvRecord = Record<string, unknown>;
 
 /** 批量创建接口 data.list 单行 */
 interface BatchMockListRow {
+  row_key: string;
   connect_id: string;
   imei: string;
   lat: number | null;
   lng: number | null;
   success: boolean;
   voltage: number | null;
+  error: string;
 }
 
 function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
@@ -427,19 +429,24 @@ function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
   const raw = r?.data?.list;
   if (!Array.isArray(raw)) return [];
   const out: BatchMockListRow[] = [];
-  for (const item of raw) {
+  for (let i = 0; i < raw.length; i += 1) {
+    const item = raw[i];
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
     const connect_id = typeof row.connect_id === "string" ? row.connect_id.trim() : "";
-    if (!connect_id) continue;
-    const imei = typeof row.imei === "string" ? row.imei : "";
+    const imei = typeof row.imei === "string" ? row.imei.trim() : "";
+    const success = Boolean(row.success);
+    const error = typeof row.error === "string" ? row.error.trim() : "";
+    const row_key = connect_id || `${imei || "unknown"}__${success ? "success" : "fail"}__${i}`;
     out.push({
+      row_key,
       connect_id,
       imei,
       lat: typeof row.lat === "number" && Number.isFinite(row.lat) ? row.lat : null,
       lng: typeof row.lng === "number" && Number.isFinite(row.lng) ? row.lng : null,
-      success: Boolean(row.success),
+      success,
       voltage: typeof row.voltage === "number" && Number.isFinite(row.voltage) ? row.voltage : null,
+      error,
     });
   }
   return out.sort((a, b) => a.imei.localeCompare(b.imei, "en", { numeric: true }));
@@ -466,9 +473,18 @@ function parseBatchMockListFromLegacyRecordResponse(res: unknown): BatchMockList
       }
     }
   }
-  const dedup = new Map<string, BatchMockListRow>();
-  rows.forEach((r) => dedup.set(r.connect_id, r));
-  return Array.from(dedup.values()).sort((a, b) => a.imei.localeCompare(b.imei, "en", { numeric: true }));
+  const successDedup = new Map<string, BatchMockListRow>();
+  const failedRows: BatchMockListRow[] = [];
+  rows.forEach((r) => {
+    if (r.connect_id) {
+      successDedup.set(r.connect_id, r);
+      return;
+    }
+    failedRows.push(r);
+  });
+  return [...Array.from(successDedup.values()), ...failedRows].sort((a, b) =>
+    a.imei.localeCompare(b.imei, "en", { numeric: true }),
+  );
 }
 
 interface EnvOption {
@@ -554,7 +570,7 @@ const batchMockListRows = ref<BatchMockListRow[]>([]);
 const checkedRowKeys = ref<DataTableRowKey[]>([]);
 const checkedImeis = computed(() =>
   batchMockListRows.value
-    .filter((row) => checkedRowKeys.value.includes(row.connect_id))
+    .filter((row) => checkedRowKeys.value.includes(row.row_key))
     .map((row) => row.imei)
     .filter((imei) => /^\d{15}$/.test(imei)),
 );
@@ -579,10 +595,10 @@ const filteredBatchMockListRows = computed(() => {
   return rows;
 });
 
-const batchMockSessionActive = computed(() => batchMockListRows.value.length > 0);
+const batchMockSessionActive = computed(() => batchMockListRows.value.some((row) => row.success && !!row.connect_id));
 
 function batchMockRowKey(row: BatchMockListRow) {
-  return row.connect_id;
+  return row.row_key;
 }
 
 const batchMockTableColumns: DataTableColumns<BatchMockListRow> = [
@@ -618,27 +634,36 @@ const batchMockTableColumns: DataTableColumns<BatchMockListRow> = [
     },
   },
   {
-    title: "成功",
+    title: "模拟成功",
     key: "success",
     width: 72,
     render(row) {
-      return h(
+      const tagNode = h(
         NTag,
         { type: row.success ? "success" : "error", size: "small", bordered: false },
         { default: () => (row.success ? "是" : "否") },
+      );
+      if (row.success || !row.error) return tagNode;
+      return h(
+        NTooltip,
+        { trigger: "hover" },
+        {
+          trigger: () => tagNode,
+          default: () => row.error,
+        },
       );
     },
   },
 ];
 
 function handleSelectAllRows() {
-  checkedRowKeys.value = filteredBatchMockListRows.value.map((row) => row.connect_id);
+  checkedRowKeys.value = filteredBatchMockListRows.value.map((row) => row.row_key);
 }
 
 function handleInvertSelectedRows() {
   const selected = new Set(checkedRowKeys.value.map((k) => String(k)));
   checkedRowKeys.value = filteredBatchMockListRows.value
-    .map((row) => row.connect_id)
+    .map((row) => row.row_key)
     .filter((key) => !selected.has(String(key)));
 }
 
@@ -875,9 +900,9 @@ async function openEnvPickerModal(source: EnvSource) {
       return;
     }
     envPickerOptions.value = options;
-    if (options.length === 0) {
-      message.warning("没有可展示的环境（需配置 order 且网关地址不为空）");
-    }
+    // if (options.length === 0) {
+    //   message.warning("没有环境");
+    // }
   } finally {
     if (reqId === envPickerRequestId) envPickerLoading.value = false;
   }
@@ -1078,7 +1103,7 @@ async function loadBatchMockRecords() {
     const rows = parseBatchMockListFromResponse(res);
     const mergedRows = rows.length > 0 ? rows : parseBatchMockListFromLegacyRecordResponse(res);
     batchMockListRows.value = mergedRows;
-    checkedRowKeys.value = mergedRows.map((row) => row.connect_id);
+    checkedRowKeys.value = mergedRows.filter((row) => row.success && !!row.connect_id).map((row) => row.row_key);
     saveFormToStorage();
   } catch {
     // 历史记录加载失败不阻塞页面主流程
@@ -1108,7 +1133,7 @@ async function handleStopMock() {
   const imeis = Array.from(
     new Set(
       batchMockListRows.value
-        .filter((r) => keys.includes(r.connect_id))
+        .filter((r) => keys.includes(r.row_key))
         .map((r) => String(r.imei ?? "").trim())
         .filter((im) => /^\d{15}$/.test(im)),
     ),
@@ -1184,10 +1209,17 @@ async function handleCreate() {
 
     const list = parseBatchMockListFromResponse(res);
     batchMockListRows.value = list;
-    if (list.length > 0) {
-      checkedRowKeys.value = list.map((row) => row.connect_id);
-      successSummary.value = `批量创建成功，耗时 ${elapsedSec} 秒`;
-      message.success(`批量创建成功（耗时 ${elapsedSec} 秒）`);
+    const successRows = list.filter((row) => row.success && !!row.connect_id);
+    const failRows = list.filter((row) => !row.success);
+    checkedRowKeys.value = successRows.map((row) => row.row_key);
+    if (successRows.length > 0) {
+      const tail = failRows.length > 0 ? `，失败 ${failRows.length} 台` : "";
+      successSummary.value = `批量创建完成：成功 ${successRows.length} 台${tail}（耗时 ${elapsedSec} 秒）`;
+      message.success(successSummary.value);
+    } else if (failRows.length > 0) {
+      const firstError = failRows.find((row) => !!row.error)?.error || "请查看下方失败原因";
+      requestError.value = `批量创建失败：共 ${failRows.length} 台失败，原因示例：${firstError}`;
+      message.error("批量创建失败，请查看下方失败原因");
     } else {
       checkedRowKeys.value = [];
       const count = getCreatedCount();
