@@ -8,13 +8,33 @@
             <n-gi :span="12">
               <n-form-item label="设备网关" required>
                 <div class="gateway-row">
-                  <n-input
-                    v-model:value="formData.server"
-                    placeholder="请输入设备网关，或点击右侧「共享 / 短租 / 海外」在弹窗中选择环境并自动填充"
-                    clearable
-                    size="small"
-                    class="gateway-input"
-                  />
+                  <div class="gateway-main-row">
+                    <n-input
+                      v-model:value="formData.server"
+                      placeholder="请输入设备网关，或点击下方「共享 / 短租 / 海外」在弹窗中选择环境并自动填充"
+                      clearable
+                      size="small"
+                      class="gateway-input"
+                    />
+                    <div class="tenant-inline">
+                      <div class="tenant-label-row">
+                        <span>租户ID</span>
+                        <n-tooltip trigger="hover" style="margin-left: 8px;">
+                          <template #trigger>
+                            <span class="tip-text">?</span>
+                          </template>
+                          共享环境需要填入租户ID入住，否则后续无法绑定。
+                        </n-tooltip>
+                      </div>
+                      <n-input
+                        v-model:value="formData.tenant_id"
+                        placeholder="当共享时请输入，设备入驻需要"
+                        clearable
+                        size="small"
+                        class="tenant-input"
+                      />
+                    </div>
+                  </div>
                   <n-space :size="8" class="gateway-buttons">
                     <n-button
                       size="small"
@@ -295,15 +315,15 @@
       @after-leave="onEnvPickerAfterLeave"
     >
       <div class="env-picker-body">
-        <p class="env-picker-hint">
+        <!-- <p class="env-picker-hint">
           点击任意一行即可写入「设备网关」与环境标识并关闭窗口。环境较多时可用顶部搜索缩小范围，列表按页展示、无需在框内滚动。
-        </p>
+        </p> -->
         <n-spin :show="envPickerLoading">
           <div v-if="!envPickerLoading && envPickerOptions.length === 0" class="env-picker-empty-wrap">
             <n-empty description="暂无可选环境" size="medium">
               <template #extra>
                 <p class="env-picker-empty-tip">
-                  需配置 order，且网关字段有效（共享/海外：<code>ebike_target_addr</code>；短租：字段 <code>3</code>）
+                  <!-- 需配置 order，且网关字段有效（共享/海外：<code>ebike_target_addr</code>；短租：字段 <code>3</code>） -->
                 </p>
               </template>
             </n-empty>
@@ -466,6 +486,7 @@ const ENV_GROUP_LABEL: Record<EnvSource, string> = {
 const defaultFormData: BatchFormData = {
   env: "test2",
   server: "",
+  tenant_id: "",
   voltage_min: 50,
   voltage_max: 54,
   lat: DEFAULT_COORD_LAT,
@@ -1225,7 +1246,15 @@ async function handleCreate() {
 
 .gateway-row {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.gateway-main-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
 }
 
@@ -1235,7 +1264,26 @@ async function handleCreate() {
 }
 
 .gateway-buttons {
+  margin-left: 0;
+}
+
+.tenant-label-row {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  font-size: 14px;
+  color: #111827;
+}
+
+.tenant-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tenant-input {
+  width: 240px;
 }
 
 .env-picker-body {

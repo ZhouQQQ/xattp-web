@@ -3,6 +3,7 @@ export type BatchCreateMode = 1 | 2 | 3;
 export interface BatchFormData {
   env: string;
   server: string;
+  tenant_id: string;
   voltage_min: number | null;
   voltage_max: number | null;
   lat: number | null;
@@ -17,6 +18,7 @@ export interface BatchFormData {
 export interface BatchPayload {
   env: string;
   server?: string;
+  tenant_id?: string;
   voltage_min?: number;
   voltage_max?: number;
   lat?: number;
@@ -105,6 +107,8 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
 
   const server = form.server.trim();
   if (server) payload.server = server;
+  const tenantId = form.tenant_id.trim();
+  if (tenantId) payload.tenant_id = tenantId;
   if (typeof form.voltage_min === "number" && !Number.isNaN(form.voltage_min)) {
     payload.voltage_min = Math.trunc(form.voltage_min);
   }
