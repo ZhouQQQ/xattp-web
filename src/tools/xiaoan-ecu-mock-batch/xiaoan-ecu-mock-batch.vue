@@ -634,7 +634,7 @@ const batchMockTableColumns: DataTableColumns<BatchMockListRow> = [
     },
   },
   {
-    title: "模拟成功",
+    title: "模拟成功？",
     key: "success",
     width: 72,
     render(row) {
