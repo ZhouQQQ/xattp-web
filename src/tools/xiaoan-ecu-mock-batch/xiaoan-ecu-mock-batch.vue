@@ -546,7 +546,7 @@
 defineOptions({ name: "XiaoanEcuMockBatch" });
 
 import { computed, h, onMounted, reactive, ref, watch } from "vue";
-import { createDiscreteApi, NTag, NTooltip, type DataTableColumns, type DataTableRowKey } from "naive-ui";
+import { createDiscreteApi, NButton, NInputNumber, NTag, NTooltip, type DataTableColumns, type DataTableRowKey } from "naive-ui";
 import {
   getEbikeEnvListAPI,
   getOverseaEnvListAPI,
@@ -560,6 +560,7 @@ import {
   xiaoanEcuMockBatchCreateAPI,
   xiaoanEcuMockBatchDeleteAPI,
   xiaoanEcuMockBatchRecordAPI,
+  xiaoanEcuMockUpdateAPI,
 } from "@/api/device";
 import {
   buildBatchPayload,
@@ -1140,14 +1141,111 @@ function batchMockRowKey(row: BatchMockListRow) {
   return row.row_key;
 }
 
+interface RowEditDraft {
+  lng: number | null;
+  lat: number | null;
+  voltage: number | null;
+}
+const rowEditDraftMap = ref<Record<string, RowEditDraft>>({});
+const rowUpdateLoadingMap = ref<Record<string, boolean>>({});
+
+function getRowEditDraft(row: BatchMockListRow): RowEditDraft | null {
+  return rowEditDraftMap.value[row.row_key] ?? null;
+}
+
+function setRowEditDraftValue(
+  rowKey: string,
+  key: keyof RowEditDraft,
+  val: number | null,
+) {
+  const draft = rowEditDraftMap.value[rowKey];
+  if (!draft) return;
+  rowEditDraftMap.value = {
+    ...rowEditDraftMap.value,
+    [rowKey]: {
+      ...draft,
+      [key]: typeof val === "number" && Number.isFinite(val) ? val : null,
+    },
+  };
+}
+
+function startEditRow(row: BatchMockListRow) {
+  if (!row.is_mock_success) {
+    message.warning("仅模拟成功的数据支持编辑");
+    return;
+  }
+  if (!row.connect_id) {
+    message.error("该行缺少 connect_id，无法编辑");
+    return;
+  }
+  rowEditDraftMap.value = {
+    ...rowEditDraftMap.value,
+    [row.row_key]: {
+      lng: row.lng,
+      lat: row.lat,
+      voltage: row.voltage,
+    },
+  };
+}
+
+function cancelEditRow(rowKey: string) {
+  const next = { ...rowEditDraftMap.value };
+  delete next[rowKey];
+  rowEditDraftMap.value = next;
+}
+
+async function saveEditRow(row: BatchMockListRow) {
+  const draft = getRowEditDraft(row);
+  if (!draft) return;
+  if (!row.connect_id) {
+    message.error("connect_id 为空，无法保存");
+    return;
+  }
+  rowUpdateLoadingMap.value = { ...rowUpdateLoadingMap.value, [row.row_key]: true };
+  try {
+    const payload: Record<string, unknown> = {
+      connect_id: row.connect_id,
+      bin68_immediately: true,
+    };
+    if (draft.lng != null) payload.lng = draft.lng;
+    if (draft.lat != null) payload.lat = draft.lat;
+    if (draft.voltage != null) payload.voltage = draft.voltage;
+    const res: any = await xiaoanEcuMockUpdateAPI(payload);
+    if (res != null && Number(res.code) !== 0) {
+      message.error(res?.msg || "保存失败");
+      return;
+    }
+    row.lng = draft.lng;
+    row.lat = draft.lat;
+    row.voltage = draft.voltage;
+    cancelEditRow(row.row_key);
+    message.success("保存成功");
+  } catch (error: any) {
+    message.error(error?.message || String(error) || "保存失败");
+  } finally {
+    const next = { ...rowUpdateLoadingMap.value };
+    delete next[row.row_key];
+    rowUpdateLoadingMap.value = next;
+  }
+}
+
 const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() => {
   const cols: DataTableColumns<BatchMockListRow> = [
     { type: "selection", width: 42 },
     {
       title: "IMEI",
       key: "imei",
-      width: 168,
+      width: 140,
       ellipsis: { tooltip: true },
+    },
+    {
+      title: "创建时间",
+      key: "create_datetime",
+      width: 170,
+      ellipsis: { tooltip: true },
+      render(row) {
+        return row.create_datetime || "—";
+      },
     },
     {
       title: "模拟成功？",
@@ -1175,6 +1273,16 @@ const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() =>
       key: "lng",
       width: 108,
       render(row) {
+        const draft = getRowEditDraft(row);
+        if (draft) {
+          return h(NInputNumber, {
+            value: draft.lng,
+            "onUpdate:value": (val: number | null) => setRowEditDraftValue(row.row_key, "lng", val),
+            size: "small",
+            showButton: false,
+            style: "width: 96px",
+          });
+        }
         return row.lng != null ? String(row.lng) : "—";
       },
     },
@@ -1183,6 +1291,16 @@ const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() =>
       key: "lat",
       width: 108,
       render(row) {
+        const draft = getRowEditDraft(row);
+        if (draft) {
+          return h(NInputNumber, {
+            value: draft.lat,
+            "onUpdate:value": (val: number | null) => setRowEditDraftValue(row.row_key, "lat", val),
+            size: "small",
+            showButton: false,
+            style: "width: 96px",
+          });
+        }
         return row.lat != null ? String(row.lat) : "—";
       },
     },
@@ -1191,6 +1309,18 @@ const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() =>
       key: "voltage",
       width: 88,
       render(row) {
+        const draft = getRowEditDraft(row);
+        if (draft) {
+          return h(NInputNumber, {
+            value: draft.voltage,
+            "onUpdate:value": (val: number | null) => setRowEditDraftValue(row.row_key, "voltage", val),
+            min: 0,
+            max: 72,
+            size: "small",
+            showButton: false,
+            style: "width: 76px",
+          });
+        }
         return row.voltage != null ? String(row.voltage) : "—";
       },
     },
@@ -1237,12 +1367,45 @@ const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() =>
     });
   }
   cols.push({
-    title: "创建时间",
-    key: "create_datetime",
+    title: "操作",
+    key: "actions",
     width: 170,
-    ellipsis: { tooltip: true },
+    fixed: "right",
     render(row) {
-      return row.create_datetime || "—";
+      const draft = getRowEditDraft(row);
+      const loading = !!rowUpdateLoadingMap.value[row.row_key];
+      if (draft) {
+        return h("div", { class: "row-action-wrap" }, [
+          h(
+            NButton,
+            {
+              size: "tiny",
+              type: "primary",
+              loading,
+              onClick: () => void saveEditRow(row),
+            },
+            { default: () => "保存" },
+          ),
+          h(
+            NButton,
+            {
+              size: "tiny",
+              disabled: loading,
+              onClick: () => cancelEditRow(row.row_key),
+            },
+            { default: () => "取消" },
+          ),
+        ]);
+      }
+      return h(
+        NButton,
+        {
+          size: "tiny",
+          disabled: !row.connect_id || !row.is_mock_success,
+          onClick: () => startEditRow(row),
+        },
+        { default: () => "编辑" },
+      );
     },
   });
   return cols;
@@ -2479,6 +2642,12 @@ async function handleCreate() {
 
 .batch-mock-result-table :deep(.n-data-table-td) {
   line-height: 1.2;
+}
+
+.row-action-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tip-text {
