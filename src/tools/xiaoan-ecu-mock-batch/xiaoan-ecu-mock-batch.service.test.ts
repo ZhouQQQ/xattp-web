@@ -10,6 +10,8 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
   return {
     env: "test2",
     server: "device-test2.xiaoantech.com:9880",
+    tenant_id: "",
+    business_type: null,
     voltage_min: 50,
     voltage_max: 54,
     lat: 30.500136,
@@ -57,7 +59,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     expect(error).toBe("指定模式存在非法 imei: abc");
   });
 
-  it("会限制随机模式创建数量上限", () => {
+  it("随机模式允许大于 10000 的创建数量", () => {
     const error = validateBatchForm(
       createForm({
         mode: 1,
@@ -65,7 +67,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
       }),
     );
 
-    expect(error).toBe("测试期间最大数量只支持 10000");
+    expect(error).toBeNull();
   });
 
   it("会限制电压上限", () => {

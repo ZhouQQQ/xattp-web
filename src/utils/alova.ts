@@ -8,11 +8,16 @@ const AUTH_WHITELIST = [
     '/api/v1/auth/login',
     // '/api/v1/auth/info'
 ];
+const GLOBAL_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 
 export const AlovaInstance = createAlova({
     requestAdapter: adapterFetch(),
     cacheFor: 0,
     beforeRequest(method) {
+        // 全局请求超时：10 分钟（未单独设置时生效）
+        if (method.config.timeout == null) {
+            method.config.timeout = GLOBAL_REQUEST_TIMEOUT_MS;
+        }
         const token = localStorage.getItem('token');
         // 添加 token 到请求头
         if (!method.meta?.ignoreToken && token) {

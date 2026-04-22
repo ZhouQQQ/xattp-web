@@ -5,32 +5,45 @@
         <div class="form-section">
           <n-form :model="formData" label-placement="left" label-width="140px">
             <n-grid :cols="2" :x-gap="12" :y-gap="2">
-              <n-gi>
-                <n-form-item label="类型" path="ecu_type">
-                  <n-radio-group v-model:value="formData.ecu_type" :disabled="!!connectId" name="ecu_type">
-                    <n-space>
-                      <n-radio
-                        v-for="opt in controllerTypeOptions"
-                        :key="opt.value"
-                        :value="opt.value"
-                        :disabled="opt.disabled"
-                      >
-                        {{ opt.label }}
-                      </n-radio>
-                    </n-space>
-                  </n-radio-group>
-                </n-form-item>
-              </n-gi>
-              <n-gi>
-                <n-form-item label="环境" path="env" required>
-                  <n-radio-group v-model:value="formData.env" :disabled="!!connectId" name="env">
-                    <n-space>
-                      <n-radio v-for="opt in envRadioOptions" :key="opt.value" :value="opt.value">
-                        {{ opt.label }}
-                      </n-radio>
-                    </n-space>
-                  </n-radio-group>
-                </n-form-item>
+              <n-gi :span="2">
+                <div class="gateway-config-row">
+                  <n-form-item label="类型" path="target_mode" required class="target-mode-item">
+                    <n-select
+                      v-model:value="formData.target_mode"
+                      :options="targetModeOptions"
+                      :disabled="!!connectId"
+                      :clearable="false"
+                      placeholder="请选择设备网关"
+                      style="width: 220px"
+                    />
+                  </n-form-item>
+                  <n-form-item
+                    v-if="formData.target_mode === 'env'"
+                    label="环境"
+                    path="env"
+                    required
+                    class="gateway-target-item"
+                  >
+                    <n-radio-group v-model:value="formData.env" :disabled="!!connectId" name="env">
+                      <n-space>
+                        <n-radio v-for="opt in envRadioOptions" :key="opt.value" :value="opt.value">
+                          {{ opt.label }}
+                        </n-radio>
+                      </n-space>
+                    </n-radio-group>
+                  </n-form-item>
+                  <n-form-item v-else label="网关地址" path="server" required class="gateway-target-item">
+                    <n-input
+                      v-model:value="formData.server"
+                      placeholder="请输入设备网关地址"
+                      clearable
+                      size="small"
+                      style="width: 620px"
+                      :readonly="!!connectId"
+                      :class="{ 'input-readonly-gray': connectId }"
+                    />
+                  </n-form-item>
+                </div>
               </n-gi>
               <n-gi :span="2">
                 <n-form-item label="IMEI" path="imei" required>
@@ -195,6 +208,7 @@
                   </n-button>
                   </n-space>
                   <n-button
+                    v-if="formData.target_mode === 'env'"
                     type="default"
                     :loading="batchAddLoading"
                     @click="openBatchAddModal"
@@ -385,6 +399,15 @@
             placeholder="请选择环境"
           />
         </n-form-item>
+        <n-form-item label="IMEI" required>
+          <n-input
+            v-model:value="batchAddForm.imei"
+            placeholder="IMEI（15 位数字，以 86 开头）"
+            clearable
+            :readonly="true"
+            :class="{ 'input-readonly-gray': true }"
+          />
+        </n-form-item>
         <n-form-item label="租户" required>
           <n-select
             v-model:value="batchAddForm.tenant_id"
@@ -423,13 +446,6 @@
             filterable
             clearable
             placeholder="请选择车型"
-          />
-        </n-form-item>
-        <n-form-item label="IMEI" required>
-          <n-input
-            v-model:value="batchAddForm.imei"
-            placeholder="IMEI（15 位数字，以 86 开头）"
-            clearable
           />
         </n-form-item>
       </n-form>
@@ -522,13 +538,11 @@ const vFitTextareaHeight = {
 
 const STORAGE_KEY = "XATTP_RENTAL_ECU_MOCK_FORM";
 
-/** 中控类型：1 电柜 2 智能协议中控 3 共享协议中控 */
-type EcuType = 1 | 2 | 3;
-
 /** 表单持久化结构（与 formData 字段一致，用于 localStorage） */
 interface StoredForm {
+  target_mode?: "env" | "server";
   env?: string;
-  ecu_type?: EcuType;
+  server?: string;
   imei?: string;
   lng?: number | null;
   lat?: number | null;
@@ -545,8 +559,9 @@ interface StoredForm {
 
 /** 默认表单值 */
 const defaultFormData = {
+  target_mode: "env" as "env" | "server",
   env: "test",
-  ecu_type: 3 as EcuType,
+  server: "",
   imei: "",
   lng: 114.434888,
   lat: 30.500136,
@@ -567,14 +582,16 @@ function getInitialFormData(): typeof defaultFormData {
     if (!raw) return { ...defaultFormData };
     const data = JSON.parse(raw) as StoredForm;
     return {
+      target_mode:
+        data.target_mode === "server" || data.target_mode === "env"
+          ? data.target_mode
+          : defaultFormData.target_mode,
       env:
         typeof data.env === "string" && data.env.trim()
           ? data.env.trim()
           : defaultFormData.env,
-      ecu_type:
-        data.ecu_type === 1 || data.ecu_type === 2 || data.ecu_type === 3
-          ? data.ecu_type
-          : defaultFormData.ecu_type,
+      server:
+        typeof data.server === "string" ? data.server : defaultFormData.server,
       imei:
         typeof data.imei === "string" ? data.imei : defaultFormData.imei,
       lng:
@@ -625,12 +642,9 @@ const envRadioOptions = [
   { label: "uat", value: "uat" },
   { label: "prod", value: "prod" },
 ];
-
-/** 中控类型 radio 选项：显示顺序 3 2 1，智能协议中控与电柜未开发故禁用 */
-const controllerTypeOptions = [
-  { label: "共享协议", value: 3 as EcuType, disabled: false },
-  { label: "智能协议", value: 2 as EcuType, disabled: true },
-  // { label: "电柜", value: 1 as EcuType, disabled: true },
+const targetModeOptions = [
+  { label: "选择环境", value: "env" },
+  { label: "指定网关", value: "server" },
 ];
 
 const formData = reactive(getInitialFormData());
@@ -639,8 +653,9 @@ const formData = reactive(getInitialFormData());
 function saveFormToStorage() {
   try {
     const payload: StoredForm = {
+      target_mode: formData.target_mode,
       env: formData.env,
-      ecu_type: formData.ecu_type,
+      server: formData.server,
       imei: formData.imei,
       lng: formData.lng,
       lat: formData.lat,
@@ -983,6 +998,10 @@ async function loadBatchAddVehicleModelOptions() {
 }
 
 function openBatchAddModal() {
+  if (formData.target_mode !== "env") {
+    message.warning("指定网关模式不支持入库车辆");
+    return;
+  }
   batchAddForm.env = formData.env?.trim() || "test";
   batchAddForm.tenant_id = "";
   batchAddForm.tenant_name = "";
@@ -1036,20 +1055,32 @@ async function handleBatchAddSubmit() {
 
 /** 创建 mock 连接 */
 async function handleCreate() {
-  if (!formData.env || !formData.imei?.trim()) {
-    message.error("请填写 环境、IMEI");
+  const useServer = formData.target_mode === "server";
+  const server = formData.server?.trim() || "";
+  const env = formData.env?.trim() || "";
+  if (!formData.imei?.trim()) {
+    message.error("请填写 IMEI");
+    return;
+  }
+  if (useServer && !server) {
+    message.error("请填写 指定网关（server）");
+    return;
+  }
+  if (!useServer && !env) {
+    message.error("请填写 环境");
     return;
   }
   createLoading.value = true;
   createError.value = "";
   try {
     const payload: Record<string, unknown> = {
-      env: formData.env,
       imei: formData.imei.trim(),
       voltage: formData.voltage ?? 55,
       version: formData.version || "1.2.3",
       business_type: 2,
     };
+    if (useServer) payload.server = server;
+    else payload.env = env;
     if (formData.lng != null) payload.lng = formData.lng;
     if (formData.lat != null) payload.lat = formData.lat;
     if (formData.battery_sn != null && formData.battery_sn !== "")
@@ -1057,7 +1088,6 @@ async function handleCreate() {
     if (formData.battery_soc != null) payload.battery_soc = formData.battery_soc;
     payload.seat_locked = formData.seat_locked;
     payload.power_exists = formData.power_exists;
-    if (formData.ecu_type) payload.ecu_type = formData.ecu_type;
     payload.has_helmet = formData.has_helmet;
     payload.helmet_react = formData.helmet_react;
     payload.helmet_lock = formData.helmet_lock;
@@ -1556,6 +1586,17 @@ async function handleCloseTab(name: string) {
 .form-section .form-item-buttons {
   margin-top: 6px;
   margin-bottom: 0;
+}
+
+.gateway-config-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.gateway-target-item {
+  flex: 1;
+  min-width: 0;
 }
 
 .create-actions-row {

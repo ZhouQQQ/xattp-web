@@ -66,9 +66,6 @@ export function validateBatchForm(form: BatchFormData): string | null {
     if (!Number.isInteger(form.num) || Number(form.num) <= 0) {
       return "随机模式下 num 必须是大于 0 的整数";
     }
-    if (Number(form.num) > 10000) {
-      return "测试期间最大数量只支持 10000";
-    }
   }
 
   if (form.mode === 2) {
@@ -77,9 +74,6 @@ export function validateBatchForm(form: BatchFormData): string | null {
     }
     if (!Number.isInteger(form.num) || Number(form.num) <= 0) {
       return "顺序模式下 num 必须是大于 0 的整数";
-    }
-    if (Number(form.num) > 10000) {
-      return "测试期间最大数量只支持 10000";
     }
   }
 
@@ -91,10 +85,6 @@ export function validateBatchForm(form: BatchFormData): string | null {
     const invalid = imeis.find((item) => !isFifteenDigitImei(item));
     if (invalid) {
       return `指定模式存在非法 imei: ${invalid}`;
-    }
-    const validCount = imeis.filter((item) => isFifteenDigitImei(item)).length;
-    if (validCount > 10000) {
-      return "测试期间最大数量只支持 10000";
     }
   }
 

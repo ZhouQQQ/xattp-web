@@ -90,8 +90,6 @@
                     type="number"
                     inputmode="numeric"
                     min="1"
-                    max="10000"
-                    maxlength="5"
                     placeholder="请输入随机创建数量"
                     clearable
                     size="small"
@@ -99,7 +97,6 @@
                     @update:value="onNumInputStrUpdate"
                     @wheel.prevent="onNumInputWheel"
                   />
-                  <div class="num-tip">测试期间最大数量只支持 10000</div>
                 </div>
               </n-form-item>
             </n-gi>
@@ -130,8 +127,6 @@
                       type="number"
                       inputmode="numeric"
                       min="1"
-                      max="10000"
-                      maxlength="5"
                       placeholder="请输入顺序创建数量"
                       clearable
                       size="small"
@@ -139,7 +134,6 @@
                       @update:value="onNumInputStrUpdate"
                       @wheel.prevent="onNumInputWheel"
                     />
-                    <div class="num-tip">测试期间最大数量只支持 10000</div>
                   </div>
                 </n-form-item>
               </n-gi>
@@ -323,7 +317,7 @@
             :data="filteredBatchMockListRows"
             :row-key="batchMockRowKey"
             size="small"
-            :pagination="{ pageSize: 100 }"
+            :pagination="{ pageSize: 1000 }"
             :max-height="520"
             striped
             bordered
@@ -592,7 +586,7 @@ interface BatchMockListRow {
   imei: string;
   lat: number | null;
   lng: number | null;
-  success: boolean;
+  is_mock_success: boolean;
   voltage: number | null;
   error: string;
   bind_success: boolean | null;
@@ -600,6 +594,7 @@ interface BatchMockListRow {
   rental_add_success: boolean | null;
   biz_scene: "shared_bind_online" | "rental_batch_add" | null;
   car_id: string;
+  create_datetime: string;
 }
 
 function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
@@ -613,16 +608,16 @@ function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
     const row = item as Record<string, unknown>;
     const connect_id = typeof row.connect_id === "string" ? row.connect_id.trim() : "";
     const imei = typeof row.imei === "string" ? row.imei.trim() : "";
-    const success = Boolean(row.success);
+    const is_mock_success = Boolean(row.is_mock_success);
     const error = typeof row.error === "string" ? row.error.trim() : "";
-    const row_key = connect_id || `${imei || "unknown"}__${success ? "success" : "fail"}__${i}`;
+    const row_key = connect_id || `${imei || "unknown"}__${is_mock_success ? "success" : "fail"}__${i}`;
     out.push({
       row_key,
       connect_id,
       imei,
       lat: typeof row.lat === "number" && Number.isFinite(row.lat) ? row.lat : null,
       lng: typeof row.lng === "number" && Number.isFinite(row.lng) ? row.lng : null,
-      success,
+      is_mock_success,
       voltage: typeof row.voltage === "number" && Number.isFinite(row.voltage) ? row.voltage : null,
       error,
       bind_success: null,
@@ -630,6 +625,7 @@ function parseBatchMockListFromResponse(res: unknown): BatchMockListRow[] {
       rental_add_success: null,
       biz_scene: null,
       car_id: "",
+      create_datetime: typeof row.create_datetime === "string" ? row.create_datetime.trim() : "",
     });
   }
   return out.sort((a, b) => a.imei.localeCompare(b.imei, "en", { numeric: true }));
@@ -779,9 +775,9 @@ const filteredBatchMockListRows = computed(() => {
   const kw = tableImeiKeyword.value.trim();
   let rows = batchMockListRows.value;
   if (tableSuccessFilter.value === "success") {
-    rows = rows.filter((row) => row.success);
+    rows = rows.filter((row) => row.is_mock_success);
   } else if (tableSuccessFilter.value === "fail") {
-    rows = rows.filter((row) => !row.success);
+    rows = rows.filter((row) => !row.is_mock_success);
   }
   if (kw) {
     rows = rows.filter((row) => row.imei.includes(kw));
@@ -1135,7 +1131,8 @@ async function loadRentalBatchAddVehicleModelOptions() {
   }
 }
 
-const batchMockSessionActive = computed(() => batchMockListRows.value.some((row) => row.success && !!row.connect_id));
+// 只要结果表存在数据（无论成功/失败），都视为处于“开始模拟”状态，需先停止后才能再次创建
+const batchMockSessionActive = computed(() => batchMockListRows.value.length > 0);
 const sharedBindDisabledByEnv = computed(() => formData.business_type !== 1);
 const rentalBatchAddDisabledByEnv = computed(() => formData.business_type !== 2);
 
@@ -1154,15 +1151,15 @@ const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() =>
     },
     {
       title: "模拟成功？",
-      key: "success",
+      key: "is_mock_success",
       width: 72,
       render(row) {
         const tagNode = h(
           NTag,
-          { type: row.success ? "success" : "error", size: "small", bordered: false },
-          { default: () => (row.success ? "是" : "否") },
+          { type: row.is_mock_success ? "success" : "error", size: "small", bordered: false },
+          { default: () => (row.is_mock_success ? "是" : "否") },
         );
-        if (row.success || !row.error) return tagNode;
+        if (row.is_mock_success || !row.error) return tagNode;
         return h(
           NTooltip,
           { trigger: "hover" },
@@ -1240,12 +1237,12 @@ const batchMockTableColumns = computed<DataTableColumns<BatchMockListRow>>(() =>
     });
   }
   cols.push({
-    title: "车辆号",
-    key: "car_id",
-    width: 120,
+    title: "创建时间",
+    key: "create_datetime",
+    width: 170,
     ellipsis: { tooltip: true },
     render(row) {
-      return row.car_id || "—";
+      return row.create_datetime || "—";
     },
   });
   return cols;
@@ -1322,12 +1319,12 @@ const parsedImeis = computed(() => parseImeisText(formData.imeis_text));
 const validImeis = computed(() => parsedImeis.value.filter((item) => isFifteenDigitImei(item)));
 const modeTipText = computed(() => {
   if (formData.mode === 1) {
-    return "随机模式：只需要填写数量，后端会自动生成对应数量的随机 15 位 IMEI。测试期间最多 10000 台。";
+    return "随机模式：只需要填写数量，后端会自动生成对应数量的随机 15 位 IMEI。";
   }
   if (formData.mode === 2) {
-    return "顺序模式：填写起始 IMEI 和数量，后端会按起始值依次递增生成 IMEI。测试期间最多 10000 台。";
+    return "顺序模式：填写起始 IMEI 和数量，后端会按起始值依次递增生成 IMEI。";
   }
-  return "指定模式：手动输入 IMEI 列表，支持换行、空格、逗号分隔，后端按输入内容创建。测试期间最多 10000 条合法 IMEI（15 位数字）。";
+  return "指定模式：手动输入 IMEI 列表，支持换行、空格、逗号分隔，后端按输入内容创建。";
 });
 
 function saveFormToStorage() {
@@ -1377,7 +1374,7 @@ function fillRandomStartImei() {
 
 function onNumInputStrUpdate(value: string | null) {
   const raw = String(value ?? "");
-  const digits = raw.replace(/\D/g, "").slice(0, 5);
+  const digits = raw.replace(/\D/g, "");
   numInputStr.value = digits;
   if (!digits) {
     formData.num = null;
@@ -1390,7 +1387,7 @@ function onNumInputStrUpdate(value: string | null) {
     saveFormToStorage();
     return;
   }
-  const clamped = Math.min(10000, Math.max(1, n));
+  const clamped = Math.max(1, n);
   formData.num = clamped;
   numInputStr.value = String(clamped);
   saveFormToStorage();
@@ -1606,7 +1603,7 @@ function applyBatchRecordDataToForm(res: unknown) {
 
   const num = Number(record.num);
   if (Number.isInteger(num) && num > 0) {
-    const clamped = Math.min(10000, Math.max(1, Math.trunc(num)));
+    const clamped = Math.max(1, Math.trunc(num));
     formData.num = clamped;
     numInputStr.value = String(clamped);
   } else {
@@ -1979,7 +1976,7 @@ async function loadBatchMockRecords() {
   batchRecordLoaded = true;
   batchRecordLoading.value = true;
   try {
-    const res: any = await xiaoanEcuMockBatchRecordAPI();
+    const res: any = await xiaoanEcuMockBatchRecordAPI({ source: "batch" });
     if (res != null && Number(res.code) !== 0) return;
     applyBatchRecordDataToForm(res);
     const rows = parseBatchMockListFromResponse(res);
@@ -1987,7 +1984,7 @@ async function loadBatchMockRecords() {
     batchMockListRows.value = mergedRows;
     showSharedBindCol.value = false;
     showRentalBatchAddCol.value = false;
-    checkedRowKeys.value = mergedRows.filter((row) => row.success && !!row.connect_id).map((row) => row.row_key);
+    checkedRowKeys.value = mergedRows.map((row) => row.row_key);
     saveFormToStorage();
   } catch {
     // 历史记录加载失败不阻塞页面主流程
@@ -2082,6 +2079,7 @@ async function handleCreate() {
 
   try {
     const payload = buildBatchPayload(formData);
+    payload.business_type = 1;
     const res: any = await xiaoanEcuMockBatchCreateAPI(payload);
     const resBusinessType = Number(res?.data?.business_type);
     if (resBusinessType === 1 || resBusinessType === 2 || resBusinessType === 3) {
@@ -2099,9 +2097,9 @@ async function handleCreate() {
 
     const list = parseBatchMockListFromResponse(res);
     batchMockListRows.value = list;
-    const successRows = list.filter((row) => row.success && !!row.connect_id);
-    const failRows = list.filter((row) => !row.success);
-    checkedRowKeys.value = successRows.map((row) => row.row_key);
+    const successRows = list.filter((row) => row.is_mock_success && !!row.connect_id);
+    const failRows = list.filter((row) => !row.is_mock_success);
+    checkedRowKeys.value = list.map((row) => row.row_key);
     if (successRows.length > 0) {
       const tail = failRows.length > 0 ? `，失败 ${failRows.length} 台` : "";
       successSummary.value = `批量创建完成：成功 ${successRows.length} 台${tail}（耗时 ${elapsedSec} 秒）`;
@@ -2471,6 +2469,16 @@ async function handleCreate() {
 
 .batch-mock-result-table :deep(.n-data-table) {
   font-size: 12px;
+}
+
+.batch-mock-result-table :deep(.n-data-table-th),
+.batch-mock-result-table :deep(.n-data-table-td) {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.batch-mock-result-table :deep(.n-data-table-td) {
+  line-height: 1.2;
 }
 
 .tip-text {

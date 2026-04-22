@@ -138,9 +138,9 @@ export function xiaoanEcuMockBatchDeleteAPI(data: {
 }
 
 /** 小安中控批量模拟：获取当前用户批量创建记录 */
-export function xiaoanEcuMockBatchRecordAPI() {
-  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/get_batch_record`, {
-    params: { _ts: Date.now() },
+export function xiaoanEcuMockBatchRecordAPI(params?: { source?: string }) {
+  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/list`, {
+    params: { _ts: Date.now(), ...params },
   });
 }
 
@@ -209,6 +209,7 @@ export function rentalBusinessAddEbikeAPI(data: {
 export function rentalEcuMockAddAPI(data: {
   env: string;
   imei: string;
+  business_type?: 1 | 2 | 3;
   tenant_id?: string;
   lng?: number;
   lat?: number;
