@@ -1,5 +1,6 @@
 export type BatchCreateMode = 1 | 2 | 3;
 export type CoordMode = "scatter" | "fixed";
+export type CreateMode = 1 | 2;
 
 export interface BatchFormData {
   env: string;
@@ -13,6 +14,8 @@ export interface BatchFormData {
   radius_m: number | null;
   coord_mode: CoordMode;
   mode: BatchCreateMode;
+  create_mode: CreateMode;
+  serial_interval_ms: number;
   num: number | null;
   start_imei: string;
   imeis_text: string;
@@ -32,6 +35,8 @@ export interface BatchPayload {
   coord_mode?: CoordMode;
   coordinates?: Array<{ lat: number; lng: number }>;
   mode: BatchCreateMode;
+  create_mode?: CreateMode;
+  serial_interval_ms?: number;
   num?: number;
   start_imei?: string;
   imeis?: string[];
@@ -129,6 +134,13 @@ export function validateBatchForm(form: BatchFormData): string | null {
     }
   }
 
+  if (form.create_mode !== 1 && form.create_mode !== 2) {
+    return "创建模式无效，仅支持：1(并行创建)、2(串行创建)";
+  }
+  if (!Number.isInteger(form.serial_interval_ms) || form.serial_interval_ms < 0) {
+    return "串行间隔必须是大于等于 0 的整数（ms）";
+  }
+
   return null;
 }
 
@@ -136,6 +148,8 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
   const payload: BatchPayload = {
     env: form.env.trim(),
     mode: form.mode,
+    create_mode: form.create_mode,
+    serial_interval_ms: Math.trunc(form.serial_interval_ms),
   };
 
   const server = form.server.trim();

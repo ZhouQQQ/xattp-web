@@ -275,6 +275,35 @@
             </n-gi>
 
             <n-gi :span="12">
+              <n-form-item label="创建模式" required>
+                <div class="mode-section">
+                  <n-space :size="12" align="center">
+                    <n-radio-group v-model:value="formData.create_mode" name="create-mode">
+                      <n-space :size="8">
+                        <n-radio :value="1">并行创建</n-radio>
+                        <n-radio :value="2">串行创建</n-radio>
+                      </n-space>
+                    </n-radio-group>
+                    <template v-if="formData.create_mode === 2">
+                      <span class="mode-tip">间隔(ms)</span>
+                      <n-input-number
+                        v-model:value="formData.serial_interval_ms"
+                        :min="0"
+                        :show-button="false"
+                        size="small"
+                        style="width: 140px"
+                        @update:value="saveFormToStorage"
+                      />
+                    </template>
+                  </n-space>
+                  <div class="mode-tip">
+                    {{ createModeTipText }}
+                  </div>
+                </div>
+              </n-form-item>
+            </n-gi>
+
+            <n-gi :span="12">
               <n-form-item class="form-actions">
                 <div class="form-actions-row">
                   <n-space>
@@ -751,6 +780,8 @@ const defaultFormData: BatchFormData = {
   radius_m: 10000,
   coord_mode: "scatter",
   mode: 1,
+  create_mode: 1,
+  serial_interval_ms: 10,
   num: 10,
   start_imei: "",
   imeis_text: "",
@@ -793,6 +824,18 @@ function getInitialFormData(): BatchFormData {
     }
     if (merged.coord_mode !== "scatter" && merged.coord_mode !== "fixed") {
       merged.coord_mode = defaultFormData.coord_mode;
+    }
+    if (merged.create_mode !== 1 && merged.create_mode !== 2) {
+      merged.create_mode = defaultFormData.create_mode;
+    }
+    if (
+      merged.serial_interval_ms == null ||
+      !Number.isFinite(Number(merged.serial_interval_ms)) ||
+      Number(merged.serial_interval_ms) < 0
+    ) {
+      merged.serial_interval_ms = defaultFormData.serial_interval_ms;
+    } else {
+      merged.serial_interval_ms = Math.trunc(Number(merged.serial_interval_ms));
     }
     return merged;
   } catch {
@@ -1559,6 +1602,12 @@ const modeTipText = computed(() => {
   }
   return "指定模式：手动输入 IMEI 列表，支持换行、空格、逗号分隔，后端按输入内容创建。";
 });
+const createModeTipText = computed(() => {
+  if (formData.create_mode === 2) {
+    return `串行创建：每隔 ${formData.serial_interval_ms}ms 启动一个中控模拟，按顺序逐个创建。`;
+  }
+  return "并行创建：尽可能并发创建中控模拟，整体创建速度更快。";
+});
 
 function saveFormToStorage() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...formData }));
@@ -1590,6 +1639,32 @@ watch(
   () => formData.env,
   (env) => {
     if (!String(env ?? "").trim()) currentCreateEnvSource.value = null;
+  },
+);
+
+watch(
+  () => formData.create_mode,
+  (mode) => {
+    if (mode !== 1 && mode !== 2) {
+      formData.create_mode = 1;
+    }
+    if (formData.serial_interval_ms == null || !Number.isFinite(Number(formData.serial_interval_ms))) {
+      formData.serial_interval_ms = 10;
+    }
+    formData.serial_interval_ms = Math.max(0, Math.trunc(Number(formData.serial_interval_ms)));
+    saveFormToStorage();
+  },
+);
+
+watch(
+  () => formData.serial_interval_ms,
+  (value) => {
+    if (value == null || !Number.isFinite(Number(value))) {
+      formData.serial_interval_ms = 10;
+    } else {
+      formData.serial_interval_ms = Math.max(0, Math.trunc(Number(value)));
+    }
+    saveFormToStorage();
   },
 );
 

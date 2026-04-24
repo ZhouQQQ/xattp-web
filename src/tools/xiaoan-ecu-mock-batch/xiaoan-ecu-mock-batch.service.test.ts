@@ -20,6 +20,8 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
     radius_m: 10000,
     coord_mode: "scatter",
     mode: 1,
+    create_mode: 1,
+    serial_interval_ms: 10,
     num: 3,
     start_imei: "",
     imeis_text: "",
@@ -96,6 +98,8 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     expect(payload).toEqual({
       env: "test2",
       mode: 3,
+      create_mode: 1,
+      serial_interval_ms: 10,
       server: "mock.example.com",
       voltage_min: 50,
       voltage_max: 54,
@@ -162,5 +166,18 @@ describe("xiaoan-ecu-mock-batch.service", () => {
   it("可以按每行经纬度解析 coordinates 文本", () => {
     const points = parseCoordinatesText("114.2,30.1");
     expect(points).toEqual([{ lat: 30.1, lng: 114.2 }]);
+  });
+
+  it("串行模式会写入 create_mode 与串行间隔", () => {
+    const payload = buildBatchPayload(
+      createForm({
+        mode: 1,
+        num: 2,
+        create_mode: 2,
+        serial_interval_ms: 25.9,
+      }),
+    );
+    expect(payload.create_mode).toBe(2);
+    expect(payload.serial_interval_ms).toBe(25);
   });
 });

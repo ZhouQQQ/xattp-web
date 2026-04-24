@@ -119,6 +119,8 @@ export function xiaoanEcuMockBatchCreateAPI(data: {
   radius_m?: number;
   coord_mode?: "scatter" | "fixed";
   coordinates?: Array<{ lat: number; lng: number }>;
+  create_mode?: 1 | 2;
+  serial_interval_ms?: number;
   mode: 1 | 2 | 3;
   num?: number;
   start_imei?: string;
