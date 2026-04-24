@@ -151,17 +151,27 @@
               </n-form-item>
             </n-gi>
 
-            <n-gi :span="3">
+            <n-gi :span="12">
+              <n-form-item label="经纬度模式" required>
+                <n-radio-group v-model:value="formData.coord_mode" name="coord-mode">
+                  <n-space :size="8">
+                    <n-radio value="scatter">中心点分散</n-radio>
+                    <n-radio value="fixed">指定经纬度</n-radio>
+                  </n-space>
+                </n-radio-group>
+              </n-form-item>
+            </n-gi>
+            <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
               <n-form-item label="经度(GCJ02)">
                 <n-input-number v-model:value="formData.lng" :show-button="false" size="small" style="width: 100%" />
               </n-form-item>
             </n-gi>
-            <n-gi :span="3">
+            <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
               <n-form-item label="纬度(GCJ02)">
                 <n-input-number v-model:value="formData.lat" :show-button="false" size="small" style="width: 100%" />
               </n-form-item>
             </n-gi>
-            <n-gi :span="4">
+            <n-gi :span="4" v-if="formData.coord_mode === 'scatter'">
               <n-form-item label="随机半径(m)">
                 <template #label>
                   <span>随机半径(m)</span>
@@ -174,6 +184,45 @@
                 </template>
                 <n-input-number placeholder="请输入,为0时表示不随机" v-model:value="formData.radius_m" :min="0" :show-button="false" size="small"
                   style="width: 100%" />
+              </n-form-item>
+            </n-gi>
+            <n-gi :span="10" v-if="formData.coord_mode === 'fixed'">
+              <n-form-item label="经纬度列表" required>
+                <div class="imeis-textarea-wrap">
+                  <n-input
+                    v-model:value="formData.coordinates_text"
+                    type="textarea"
+                    :autosize="{ minRows: 5, maxRows: 10 }"
+                    placeholder="请输入一行一个经纬度，格式：lng,lat（经度在前、纬度在后）"
+                    clearable
+                    size="small"
+                    @update:value="saveFormToStorage"
+                  />
+                  <div class="imeis-preview">
+                    已识别 {{ parsedCoordinates.count }} 个经纬度，本次创建中控模拟数量 {{ expectedCoordinateCount }}
+                    <template
+                      v-if="
+                        expectedCoordinateCount > 0 &&
+                        parsedCoordinates.count > 0 &&
+                        parsedCoordinates.count === expectedCoordinateCount
+                      "
+                    >
+                      （与创建数量一致，按顺序指定经纬度）
+                    </template>
+                    <template
+                      v-else-if="
+                        expectedCoordinateCount > 0 &&
+                        parsedCoordinates.count > 0 &&
+                        parsedCoordinates.count !== expectedCoordinateCount
+                      "
+                    >
+                      （与创建数量不一致，将从上述经纬度随机分散）
+                    </template>
+                  </div>
+                  <div class="imeis-preview" v-if="parsedCoordinates.error">
+                    {{ parsedCoordinates.error }}
+                  </div>
+                </div>
               </n-form-item>
             </n-gi>
             <n-gi :span="2">
@@ -565,6 +614,7 @@ import {
 import {
   buildBatchPayload,
   isFifteenDigitImei,
+  parseCoordinatesText,
   parseImeisText,
   validateBatchForm,
   type BatchFormData,
@@ -699,10 +749,12 @@ const defaultFormData: BatchFormData = {
   lat: DEFAULT_COORD_LAT,
   lng: DEFAULT_COORD_LNG,
   radius_m: 10000,
+  coord_mode: "scatter",
   mode: 1,
   num: 10,
   start_imei: "",
   imeis_text: "",
+  coordinates_text: "",
 };
 
 function getInitialFormData(): BatchFormData {
@@ -738,6 +790,9 @@ function getInitialFormData(): BatchFormData {
     // 随机半径默认 10000（m）；缓存缺省或非法时回退，0 表示不随机仍保留
     if (merged.radius_m == null || !Number.isFinite(Number(merged.radius_m)) || Number(merged.radius_m) < 0) {
       merged.radius_m = defaultFormData.radius_m;
+    }
+    if (merged.coord_mode !== "scatter" && merged.coord_mode !== "fixed") {
+      merged.coord_mode = defaultFormData.coord_mode;
     }
     return merged;
   } catch {
@@ -1480,6 +1535,21 @@ watch(envPickerFilteredTotal, (n) => {
 
 const parsedImeis = computed(() => parseImeisText(formData.imeis_text));
 const validImeis = computed(() => parsedImeis.value.filter((item) => isFifteenDigitImei(item)));
+const expectedCoordinateCount = computed(() => getCreatedCount());
+const parsedCoordinates = computed(() => {
+  try {
+    const points = parseCoordinatesText(formData.coordinates_text);
+    return {
+      count: points.length,
+      error: "",
+    };
+  } catch (error: unknown) {
+    return {
+      count: 0,
+      error: error instanceof Error ? error.message : "经纬度列表格式错误",
+    };
+  }
+});
 const modeTipText = computed(() => {
   if (formData.mode === 1) {
     return "随机模式：只需要填写数量，后端会自动生成对应数量的随机 15 位 IMEI。";
@@ -1520,6 +1590,16 @@ watch(
   () => formData.env,
   (env) => {
     if (!String(env ?? "").trim()) currentCreateEnvSource.value = null;
+  },
+);
+
+watch(
+  () => formData.coord_mode,
+  (mode) => {
+    if (mode === "fixed") {
+      formData.radius_m = 0;
+      saveFormToStorage();
+    }
   },
 );
 
@@ -1709,6 +1789,11 @@ function applyEnvSelection(source: EnvSource, envKey: string, record: EnvRecord)
 }
 
 function resetDefaultCoords() {
+  if (formData.coord_mode === "fixed") {
+    formData.coordinates_text = "";
+    saveFormToStorage();
+    return;
+  }
   formData.lng = DEFAULT_COORD_LNG;
   formData.lat = DEFAULT_COORD_LAT;
   saveFormToStorage();
@@ -1815,6 +1900,12 @@ function applyBatchRecordDataToForm(res: unknown) {
   syncVoltageSliderFromForm();
 
   const radius = Number(record.radius_m);
+  const recCoordMode = typeof record.coord_mode === "string" ? record.coord_mode.trim() : "";
+  if (recCoordMode === "scatter" || recCoordMode === "fixed") {
+    formData.coord_mode = recCoordMode;
+  } else {
+    formData.coord_mode = Number.isFinite(radius) && radius > 0 ? "scatter" : "fixed";
+  }
   if (Number.isFinite(radius) && radius >= 0) {
     formData.radius_m = radius;
   }
@@ -1824,6 +1915,19 @@ function applyBatchRecordDataToForm(res: unknown) {
   if (Number.isFinite(recLng) && Number.isFinite(recLat)) {
     formData.lng = recLng;
     formData.lat = recLat;
+  }
+
+  const recordCoordinates = Array.isArray(record.coordinates) ? record.coordinates : [];
+  if (recordCoordinates.length > 0) {
+    formData.coordinates_text = recordCoordinates
+      .map((item) => {
+        const lat = Number((item as Record<string, unknown>)?.lat);
+        const lng = Number((item as Record<string, unknown>)?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+        return `${lng},${lat}`;
+      })
+      .filter(Boolean)
+      .join("\n");
     return;
   }
 
@@ -1831,6 +1935,15 @@ function applyBatchRecordDataToForm(res: unknown) {
   if (firstPos) {
     formData.lng = Number(firstPos.lng);
     formData.lat = Number(firstPos.lat);
+  }
+  if (formData.coord_mode === "fixed") {
+    const fallbackPoint =
+      Number.isFinite(Number(formData.lat)) && Number.isFinite(Number(formData.lng))
+        ? [{ lat: Number(formData.lat), lng: Number(formData.lng) }]
+        : [];
+    formData.coordinates_text = fallbackPoint.length > 0 ? `${fallbackPoint[0].lng},${fallbackPoint[0].lat}` : "";
+  } else {
+    formData.coordinates_text = "";
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBatchPayload,
+  parseCoordinatesText,
   parseImeisText,
   validateBatchForm,
   type BatchFormData,
@@ -17,10 +18,12 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
     lat: 30.500136,
     lng: 114.434888,
     radius_m: 10000,
+    coord_mode: "scatter",
     mode: 1,
     num: 3,
     start_imei: "",
     imeis_text: "",
+    coordinates_text: "",
     ...overrides,
   };
 }
@@ -98,8 +101,66 @@ describe("xiaoan-ecu-mock-batch.service", () => {
       voltage_max: 54,
       lat: 30.500136,
       lng: 114.434888,
+      coord_mode: "scatter",
       radius_m: 10000,
+      num: 2,
       imeis: ["861234567890123", "861234567890124"],
     });
+  });
+
+  it("指定经纬度模式会按数量补齐 coordinates", () => {
+    const payload = buildBatchPayload(
+      createForm({
+        mode: 2,
+        num: 3,
+        start_imei: "861234567890123",
+        coord_mode: "fixed",
+        coordinates_text: "114.456,30.123\n114.457,30.124\n114.458,30.125",
+      }),
+    );
+
+    expect(payload.coordinates).toEqual([
+      { lat: 30.123, lng: 114.456 },
+      { lat: 30.124, lng: 114.457 },
+      { lat: 30.125, lng: 114.458 },
+    ]);
+    expect(payload.num).toBe(3);
+    expect(payload.radius_m).toBe(0);
+  });
+
+  it("指定经纬度模式在数量与创建数不一致时仍可通过校验（原样提交 coordinates，由后端处理）", () => {
+    const error = validateBatchForm(
+      createForm({
+        mode: 1,
+        num: 2,
+        coord_mode: "fixed",
+        coordinates_text: "114.456,30.123",
+      }),
+    );
+    expect(error).toBeNull();
+  });
+
+  it("指定经纬度数量与创建数不一致时仍原样提交 coordinates", () => {
+    const payload = buildBatchPayload(
+      createForm({
+        mode: 1,
+        num: 3,
+        coord_mode: "fixed",
+        coordinates_text: "114.0,30.0\n116.0,32.0",
+        radius_m: 0,
+      }),
+    );
+    expect(payload.coord_mode).toBe("fixed");
+    expect(payload.radius_m).toBe(0);
+    expect(payload.num).toBe(3);
+    expect(payload.coordinates).toEqual([
+      { lat: 30.0, lng: 114.0 },
+      { lat: 32.0, lng: 116.0 },
+    ]);
+  });
+
+  it("可以按每行经纬度解析 coordinates 文本", () => {
+    const points = parseCoordinatesText("114.2,30.1");
+    expect(points).toEqual([{ lat: 30.1, lng: 114.2 }]);
   });
 });

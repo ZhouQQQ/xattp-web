@@ -171,21 +171,37 @@ const tools = computed<ToolCategory[]>(() => [
     padding: 20px 0;
 }
 
+.hero-wrapper {
+    display: block;
+    text-decoration: none;
+
+    &:hover,
+    &:focus,
+    &:active,
+    &:visited {
+        text-decoration: none;
+    }
+}
+
 .sider-content {
-    padding-top: 80px;
+    padding-top: 0;
     padding-bottom: 0px;
 }
 
 .text-wrapper {
-    position: absolute;
-    left: 0;
+    position: relative;
     width: 100%;
     text-align: center;
-    top: 14px;
+    padding-top: 14px;
+    padding-bottom: 0;
+    z-index: 1;
+    background-color: v-bind('themeVars.bodyColor');
+    overflow: hidden;
 
     .title {
         font-size: 22px;
-        font-weight: 550;
+        font-weight: 600;
+        letter-spacing: 0.3px;
         color: v-bind('themeVars.primaryColor');
     }
 
@@ -200,6 +216,8 @@ const tools = computed<ToolCategory[]>(() => [
     .subtitle {
         font-size: 10px;
         color: v-bind('themeVars.primaryColorPressed');
+        opacity: 0.9;
+        letter-spacing: 1px;
     }
 }
 </style>

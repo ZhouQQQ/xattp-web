@@ -1,4 +1,5 @@
 export type BatchCreateMode = 1 | 2 | 3;
+export type CoordMode = "scatter" | "fixed";
 
 export interface BatchFormData {
   env: string;
@@ -10,10 +11,12 @@ export interface BatchFormData {
   lat: number | null;
   lng: number | null;
   radius_m: number | null;
+  coord_mode: CoordMode;
   mode: BatchCreateMode;
   num: number | null;
   start_imei: string;
   imeis_text: string;
+  coordinates_text: string;
 }
 
 export interface BatchPayload {
@@ -26,6 +29,8 @@ export interface BatchPayload {
   lat?: number;
   lng?: number;
   radius_m?: number;
+  coord_mode?: CoordMode;
+  coordinates?: Array<{ lat: number; lng: number }>;
   mode: BatchCreateMode;
   num?: number;
   start_imei?: string;
@@ -41,6 +46,30 @@ export function parseImeisText(input: string): string[] {
 
 export function isFifteenDigitImei(input: string): boolean {
   return /^\d{15}$/.test(String(input ?? "").trim());
+}
+
+export function parseCoordinatesText(input: string): Array<{ lat: number; lng: number }> {
+  const lines = String(input ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) {
+    throw new Error("请先填写经纬度列表（每行一个，格式：lng,lat 经度在前、纬度在后）");
+  }
+  const points: Array<{ lat: number; lng: number }> = [];
+  lines.forEach((line, idx) => {
+    const parts = line.split(/[\s,，]+/).filter(Boolean);
+    if (parts.length !== 2) {
+      throw new Error(`coordinates[${idx}] 必须是一行一个经纬度，格式如：114.434888,30.500136（经度,纬度）`);
+    }
+    const pointLng = Number(parts[0]);
+    const pointLat = Number(parts[1]);
+    if (!Number.isFinite(pointLat) || !Number.isFinite(pointLng)) {
+      throw new Error(`coordinates[${idx}] 的经度、纬度必须是数字`);
+    }
+    points.push({ lat: pointLat, lng: pointLng });
+  });
+  return points;
 }
 
 export function validateBatchForm(form: BatchFormData): string | null {
@@ -60,6 +89,10 @@ export function validateBatchForm(form: BatchFormData): string | null {
   }
   if (vmin > vmax) {
     return "最小电压不能大于最大电压";
+  }
+
+  if (form.coord_mode === "scatter" && (!Number.isFinite(Number(form.lat)) || !Number.isFinite(Number(form.lng)))) {
+    return "经纬度必须是有效数字";
   }
 
   if (form.mode === 1) {
@@ -88,6 +121,14 @@ export function validateBatchForm(form: BatchFormData): string | null {
     }
   }
 
+  if (form.coord_mode === "fixed") {
+    try {
+      parseCoordinatesText(form.coordinates_text);
+    } catch (error: unknown) {
+      return error instanceof Error ? error.message : "指定经纬度模式下 coordinates 无效";
+    }
+  }
+
   return null;
 }
 
@@ -110,17 +151,33 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
   if (typeof form.voltage_max === "number" && !Number.isNaN(form.voltage_max)) {
     payload.voltage_max = Math.trunc(form.voltage_max);
   }
-  if (typeof form.lat === "number" && !Number.isNaN(form.lat)) payload.lat = form.lat;
-  if (typeof form.lng === "number" && !Number.isNaN(form.lng)) payload.lng = form.lng;
-  if (typeof form.radius_m === "number" && !Number.isNaN(form.radius_m)) payload.radius_m = form.radius_m;
-
+  let createdCount = 0;
   if (form.mode === 1) {
-    payload.num = Number(form.num);
+    createdCount = Number(form.num);
+    payload.num = createdCount;
   } else if (form.mode === 2) {
     payload.start_imei = form.start_imei.trim();
-    payload.num = Number(form.num);
+    createdCount = Number(form.num);
+    payload.num = createdCount;
   } else {
-    payload.imeis = parseImeisText(form.imeis_text);
+    const imeis = parseImeisText(form.imeis_text);
+    payload.imeis = imeis;
+    createdCount = imeis.length;
+    payload.num = createdCount;
+  }
+
+  if (form.coord_mode === "scatter") {
+    if (typeof form.lat === "number" && !Number.isNaN(form.lat)) payload.lat = form.lat;
+    if (typeof form.lng === "number" && !Number.isNaN(form.lng)) payload.lng = form.lng;
+    payload.coord_mode = "scatter";
+    if (typeof form.radius_m === "number" && !Number.isNaN(form.radius_m)) payload.radius_m = form.radius_m;
+  } else {
+    const points = parseCoordinatesText(form.coordinates_text);
+    if (typeof form.lat === "number" && !Number.isNaN(form.lat)) payload.lat = form.lat;
+    if (typeof form.lng === "number" && !Number.isNaN(form.lng)) payload.lng = form.lng;
+    payload.coord_mode = "fixed";
+    payload.radius_m = 0;
+    payload.coordinates = points;
   }
 
   return payload;
