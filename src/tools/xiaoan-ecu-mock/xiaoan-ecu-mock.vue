@@ -141,6 +141,43 @@
                 </n-form-item>
               </n-gi>
               <n-gi :span="6">
+                <n-form-item label="电池SN" path="battery_sn">
+                  <n-input
+                    v-model:value="formData.battery_sn"
+                    placeholder="选填，可清除"
+                    clearable
+                    size="small"
+                    style="width: 100%"
+                  />
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="6">
+                <n-form-item label="电池SOC" path="battery_soc">
+                  <div class="battery-soc-row">
+                    <n-slider
+                      v-model:value="formData.battery_soc"
+                      :min="0"
+                      :max="100"
+                      :step="1"
+                      size="small"
+                      :disabled="!formData.battery_sn?.trim()"
+                      style="flex: 1"
+                    />
+                    <n-input-number
+                      v-model:value="formData.battery_soc"
+                      :min="0"
+                      :max="100"
+                      :show-button="false"
+                      size="small"
+                      style="width: 72px"
+                      placeholder="SOC"
+                      :disabled="!formData.battery_sn?.trim()"
+                    />
+                    <span class="soc-unit">%</span>
+                  </div>
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="6">
                 <n-form-item label="电源状态" path="power_exists">
                   <n-space :size="8" align="center">
                     <span class="switch-label">断开</span>
@@ -408,7 +445,7 @@ import { ref, reactive, nextTick } from "vue";
 import { createDiscreteApi } from "naive-ui";
 import { Help, Gps, Trash, Dice } from "@vicons/tabler";
 import {
-  xiaoanEcuMockCreateAPI,
+  rentalEcuMockAddAPI,
   xiaoanEcuMockCmdAllAPI,
   xiaoanEcuMockListAPI,
   xiaoanEcuMockCmdSetAPI,
@@ -489,6 +526,8 @@ interface StoredForm {
   lng?: number | null;
   lat?: number | null;
   voltage?: number | null;
+  battery_sn?: string;
+  battery_soc?: number | null;
   version?: string;
   service_area_id?: string;
   service_area_name?: string;
@@ -510,6 +549,8 @@ const defaultFormData = {
   lng: 114.434888,
   lat: 30.500136,
   voltage: 55,
+  battery_sn: "",
+  battery_soc: 100,
   version: "1.2.3",
   service_area_id: "",
   service_area_name: "",
@@ -553,6 +594,15 @@ function getInitialFormData(): typeof defaultFormData {
         typeof data.voltage === "number" && !Number.isNaN(data.voltage)
           ? data.voltage
           : defaultFormData.voltage,
+      battery_sn:
+        typeof data.battery_sn === "string" ? data.battery_sn : defaultFormData.battery_sn,
+      battery_soc:
+        typeof data.battery_soc === "number" &&
+        !Number.isNaN(data.battery_soc) &&
+        data.battery_soc >= 0 &&
+        data.battery_soc <= 100
+          ? data.battery_soc
+          : defaultFormData.battery_soc,
       version:
         typeof data.version === "string"
           ? data.version
@@ -712,6 +762,8 @@ function applyExistingMockToForm(item: Record<string, unknown>) {
   const lng = pickNumber(item, ["lng", "longitude"]);
   const lat = pickNumber(item, ["lat", "latitude"]);
   const voltage = pickNumber(item, ["voltage"]);
+  const batterySn = pickString(item, ["battery_sn", "batterySn"]);
+  const batterySoc = pickNumber(item, ["battery_soc", "batterySoc"]);
   const version = pickString(item, ["version"]);
   const serviceAreaId = pickString(item, ["service_area_id", "serviceAreaId"]);
   const serviceAreaName = pickString(item, ["service_area_name", "serviceAreaName"]);
@@ -729,6 +781,8 @@ function applyExistingMockToForm(item: Record<string, unknown>) {
   if (typeof lng === "number") formData.lng = lng;
   if (typeof lat === "number") formData.lat = lat;
   if (typeof voltage === "number") formData.voltage = voltage;
+  if (typeof batterySn === "string") formData.battery_sn = batterySn;
+  if (typeof batterySoc === "number") formData.battery_soc = batterySoc;
   if (typeof version === "string") formData.version = version;
   formData.service_area_id = typeof serviceAreaId === "string" ? serviceAreaId : "";
   formData.service_area_name = typeof serviceAreaName === "string" ? serviceAreaName : "";
@@ -806,6 +860,8 @@ function saveFormToStorage() {
       lng: formData.lng,
       lat: formData.lat,
       voltage: formData.voltage,
+      battery_sn: formData.battery_sn,
+      battery_soc: formData.battery_soc,
       version: formData.version,
       service_area_id: formData.service_area_id,
       service_area_name: formData.service_area_name,
@@ -1032,6 +1088,7 @@ async function handleCreate() {
   try {
     const payload: Record<string, unknown> = {
       env: formData.env,
+      business_type: 1,
       tenant_id: formData.tenant_id.trim(),
       imei,
       voltage: formData.voltage ?? 55,
@@ -1042,6 +1099,10 @@ async function handleCreate() {
     }
     if (formData.lng != null) payload.lng = formData.lng;
     if (formData.lat != null) payload.lat = formData.lat;
+    if (formData.battery_sn != null && formData.battery_sn !== "") {
+      payload.battery_sn = formData.battery_sn.trim();
+    }
+    if (formData.battery_soc != null) payload.battery_soc = formData.battery_soc;
     if (formData.serviceAreaInputMode === "name" && formData.service_area_name?.trim()) {
       payload.service_area_name = formData.service_area_name.trim();
     } else if (formData.service_area_id?.trim()) {
@@ -1054,7 +1115,7 @@ async function handleCreate() {
     payload.helmet_lock = formData.helmet_lock;
     payload.tlv = parseTlvFormValue(formData.tlv);
 
-    const res: any = await xiaoanEcuMockCreateAPI(payload);
+    const res: any = await rentalEcuMockAddAPI(payload);
     if (!checkResCode(res)) return;
     const data = res?.data;
     let id = "";
@@ -1098,6 +1159,10 @@ async function handleUpdate() {
     if (formData.lng != null) payload.lng = formData.lng;
     if (formData.lat != null) payload.lat = formData.lat;
     if (formData.voltage != null) payload.voltage = formData.voltage;
+    if (formData.battery_sn != null && formData.battery_sn !== "") {
+      payload.battery_sn = formData.battery_sn.trim();
+    }
+    if (formData.battery_soc != null) payload.battery_soc = formData.battery_soc;
     if (formData.version != null && formData.version !== "")
       payload.version = formData.version;
     payload.seat_locked = formData.seat_locked;
@@ -1572,6 +1637,19 @@ async function handleCloseTab(name: string) {
   align-items: center;
   width: 100%;
   min-height: 28px;
+}
+
+.battery-soc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.soc-unit {
+  color: #6b7280;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .tlv-input-row {

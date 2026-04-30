@@ -80,13 +80,13 @@ tools:
     title: 短租切车
     description: 用于短租业务切车,自动判断电柜、智能中控、共享中控，并切换到目标环境
   rental-cabinet-mock:
-    title: 短租电柜模拟（内测）
+    title: 短租电柜模拟
     description: 模拟电柜设备，可视化仓门与电池状态，支持内联编辑所有参数
   xiaoan-ecu-mock:
-    title: 小安中控模拟（内测）
+    title: 小安中控模拟
     description: 模拟小安协议中控的通信，用于调试和测试
   rental-ecu-mock:
-    title: 短租中控模拟（内测） 
+    title: 短租中控模拟 
     description: 短租中控模拟,用于测试和调试短租中控的通信,暂时只支持共享协议中控
   quick-set-ecu-voice:
     title: 快捷语音位设置

@@ -77,6 +77,52 @@ export function parseCoordinatesText(input: string): Array<{ lat: number; lng: n
   return points;
 }
 
+export interface CsvImeiLngLatRow {
+  imei: string;
+  lng: number;
+  lat: number;
+}
+
+export function parseImeiLngLatCsv(input: string): CsvImeiLngLatRow[] {
+  const lines = String(input ?? "")
+    .replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) {
+    throw new Error("CSV 至少需要包含表头和一行数据");
+  }
+  const header = lines[0].split(",").map((item) => item.trim().toLowerCase());
+  const imeiIdx = header.findIndex((item) => item === "imei");
+  const lngIdx = header.findIndex((item) => item === "lng" || item === "lon" || item === "longitude");
+  const latIdx = header.findIndex((item) => item === "lat" || item === "latitude");
+  if (imeiIdx < 0 || lngIdx < 0 || latIdx < 0) {
+    throw new Error("CSV 表头必须包含 imei,lng,lat 字段");
+  }
+
+  const rows: CsvImeiLngLatRow[] = [];
+  lines.slice(1).forEach((line, idx) => {
+    const cols = line.split(",").map((item) => item.trim());
+    const rowNo = idx + 2;
+    const imei = cols[imeiIdx] ?? "";
+    const lngRaw = cols[lngIdx] ?? "";
+    const latRaw = cols[latIdx] ?? "";
+    if (!isFifteenDigitImei(imei)) {
+      throw new Error(`CSV 第 ${rowNo} 行 IMEI 非法，必须是 15 位数字`);
+    }
+    const lng = Number(lngRaw);
+    const lat = Number(latRaw);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      throw new Error(`CSV 第 ${rowNo} 行经纬度非法，必须是数字`);
+    }
+    rows.push({ imei, lng, lat });
+  });
+  if (rows.length === 0) {
+    throw new Error("CSV 未包含有效数据行");
+  }
+  return rows;
+}
+
 export function validateBatchForm(form: BatchFormData): string | null {
   if (!form.env?.trim()) return "请先点击右侧「共享 / 短租 / 海外」在弹窗中选择环境并填充设备网关";
   if (!form.server?.trim()) return "请输入设备网关";

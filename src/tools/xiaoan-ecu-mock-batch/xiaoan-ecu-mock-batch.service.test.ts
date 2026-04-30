@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBatchPayload,
+  parseImeiLngLatCsv,
   parseCoordinatesText,
   parseImeisText,
   validateBatchForm,
@@ -179,5 +180,17 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     );
     expect(payload.create_mode).toBe(2);
     expect(payload.serial_interval_ms).toBe(25);
+  });
+
+  it("可以解析 imei,lng,lat 格式 CSV", () => {
+    const rows = parseImeiLngLatCsv("imei,lng,lat\n960494089394149,114.43439,30.500556\n960771639836381,114.434437,30.500528");
+    expect(rows).toEqual([
+      { imei: "960494089394149", lng: 114.43439, lat: 30.500556 },
+      { imei: "960771639836381", lng: 114.434437, lat: 30.500528 },
+    ]);
+  });
+
+  it("CSV 缺少表头字段时会报错", () => {
+    expect(() => parseImeiLngLatCsv("imei,lng\n960494089394149,114.43439")).toThrow("CSV 表头必须包含 imei,lng,lat 字段");
   });
 });

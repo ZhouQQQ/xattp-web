@@ -28,6 +28,8 @@ const { t } = useI18n();
 const i18nKey = computed<string>(() => route.path.trim().replace('/', ''));
 const toolTitle = computed<string>(() => t(`tools.${i18nKey.value}.title`, String(route.meta.name)));
 const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.description`, String(route.meta.description)));
+const toolTag = computed<string | undefined>(() => route.meta?.tag as string | undefined);
+const showInternalBetaNotice = computed<boolean>(() => toolTag.value === '内测');
 </script>
 
 <template>
@@ -35,8 +37,11 @@ const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.descrip
     <div class="tool-layout">
       <div class="tool-header">
         <div flex flex-nowrap items-center justify-between>
-          <n-h1>
+          <n-h1 flex items-center gap-10px>
             {{ toolTitle }}
+            <n-tag v-if="toolTag" size="small" type="warning">
+              {{ toolTag }}
+            </n-tag>
           </n-h1>
           <div>
             <FavoriteButton :tool="{ name: route.meta.name, path: route.path } as Tool" />
@@ -48,6 +53,9 @@ const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.descrip
         <div class="description">
           {{ toolDescription }}
         </div>
+        <n-alert v-if="showInternalBetaNotice" class="internal-beta-notice" type="warning" :show-icon="true">
+          当前处于内测，可能会出现连接中断/不存在/数据异常等问题
+        </n-alert>
       </div>
     </div>
 
@@ -99,6 +107,10 @@ const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.descrip
     .description {
       margin: 0;
       opacity: 0.7;
+    }
+
+    .internal-beta-notice {
+      margin-top: 10px;
     }
   }
 }

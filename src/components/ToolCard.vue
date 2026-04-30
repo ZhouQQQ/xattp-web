@@ -31,6 +31,9 @@ const theme = useThemeVars();
 
       <div class="truncat my-5px text-lg text-black dark:text-white">
         {{ tool.name }}
+        <n-tag v-if="tool.tag" class="ml-8px align-middle" size="small" type="warning">
+          {{ tool.tag }}
+        </n-tag>
       </div>
 
       <div class="line-clamp-2 text-neutral-500 dark:text-neutral-400">

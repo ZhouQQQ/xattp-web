@@ -1,6 +1,7 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as tenantDashboard } from './tenant-dashboard';
 import { tool as xiaoanEcuMockBatch } from './xiaoan-ecu-mock-batch';
 import { tool as addTester } from './add-tester';
 import { tool as rentalCabinetMock } from './rental-cabinet-mock';
@@ -109,28 +110,21 @@ export const toolsByCategory: ToolCategory[] = [
         components: [
             ebikeSwitch,
             mutiTableSqlGen,
-            clearRealname,           
+            clearRealname,
             releaseMergeCheck,
-            // ecuMock,
-            xiaoanEcuMock,
-            ,
             ecuVoiceIdx,
             addTester,
+            xiaoanEcuMock,
+            tenantDashboard,
         ],
     },
     {
         name: 'Rental-Business',
-        components: [
-            rentalSwitch,
-            rentalEcuMock,
-            rentalCabinetMock,
-        ],
+        components: [rentalSwitch, rentalEcuMock, rentalCabinetMock],
     },
     {
         name: 'Oversea-Business',
-        components: [
-            overseaSwitch,
-        ],
+        components: [overseaSwitch],
     },
     // {
     //     name: 'Business',

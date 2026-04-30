@@ -3,417 +3,300 @@
     <n-card>
       <n-spin :show="batchRecordLoading">
         <div class="form-section">
-        <n-form :model="formData" :disabled="batchMockSessionActive || batchRecordLoading" label-placement="left" label-width="110px">
-          <n-grid :cols="12" :x-gap="12" :y-gap="4">
-            <n-gi :span="12">
-              <n-form-item label="设备网关" required>
-                <div class="gateway-row">
-                  <div class="gateway-main-row">
-                    <n-input
-                      v-model:value="formData.server"
-                      placeholder="请输入设备网关，或点击下方「共享 / 短租 / 海外」在弹窗中选择环境并自动填充"
-                      clearable
-                      size="small"
-                      class="gateway-input"
-                    />
-                    <div class="tenant-inline">
-                      <div class="tenant-label-row">
-                        <span>租户ID</span>
-                        <n-tooltip trigger="hover" style="margin-left: 8px;">
-                          <template #trigger>
-                            <span class="tip-text">?</span>
-                          </template>
-                          共享环境需要填入租户ID入住，否则后续无法绑定。
-                        </n-tooltip>
+          <n-form :model="formData" :disabled="batchMockSessionActive || batchRecordLoading" label-placement="left"
+            label-width="110px">
+            <n-grid :cols="12" :x-gap="12" :y-gap="4">
+              <n-gi :span="12">
+                <n-form-item label="设备网关" required>
+                  <div class="gateway-row">
+                    <div class="gateway-main-row">
+                      <n-input v-model:value="formData.server" placeholder="请输入设备网关，或点击下方「共享 / 短租 / 海外」在弹窗中选择环境并自动填充"
+                        clearable size="small" class="gateway-input" />
+                      <div class="tenant-inline">
+                        <div class="tenant-label-row">
+                          <span>租户ID</span>
+                          <n-tooltip trigger="hover" style="margin-left: 8px;">
+                            <template #trigger>
+                              <span class="tip-text">?</span>
+                            </template>
+                            共享环境需要填入租户ID入住，否则后续无法绑定。
+                          </n-tooltip>
+                        </div>
+                        <n-input v-model:value="formData.tenant_id" placeholder="当共享时请输入，设备入驻需要" clearable size="small"
+                          class="tenant-input" />
                       </div>
-                      <n-input
-                        v-model:value="formData.tenant_id"
-                        placeholder="当共享时请输入，设备入驻需要"
-                        clearable
-                        size="small"
-                        class="tenant-input"
-                      />
+                    </div>
+                    <n-space :size="8" class="gateway-buttons">
+                      <n-button size="small" :disabled="batchMockSessionActive || batchRecordLoading"
+                        :loading="envPickerLoading && envPickerSource === 'ebike'" @click="openEnvPickerModal('ebike')">
+                        共享
+                      </n-button>
+                      <n-button size="small" :disabled="batchMockSessionActive || batchRecordLoading"
+                        :loading="envPickerLoading && envPickerSource === 'rental'"
+                        @click="openEnvPickerModal('rental')">
+                        短租
+                      </n-button>
+                      <n-button size="small" :disabled="batchMockSessionActive || batchRecordLoading"
+                        :loading="envPickerLoading && envPickerSource === 'oversea'"
+                        @click="openEnvPickerModal('oversea')">
+                        海外
+                      </n-button>
+                    </n-space>
+                  </div>
+                </n-form-item>
+              </n-gi>
+
+              <n-gi :span="12">
+                <n-form-item label="IMEI规则" required>
+                  <div class="mode-section">
+                    <n-radio-group v-model:value="formData.mode" name="batch-mode">
+                      <n-space>
+                        <n-radio :value="1">随机模式</n-radio>
+                        <n-radio :value="2">顺序模式</n-radio>
+                        <n-radio :value="3">指定模式</n-radio>
+                      </n-space>
+                    </n-radio-group>
+                    <div class="mode-tip">
+                      {{ modeTipText }}
                     </div>
                   </div>
-                  <n-space :size="8" class="gateway-buttons">
-                    <n-button
-                      size="small"
-                      :disabled="batchMockSessionActive || batchRecordLoading"
-                      :loading="envPickerLoading && envPickerSource === 'ebike'"
-                      @click="openEnvPickerModal('ebike')"
-                    >
-                      共享
-                    </n-button>
-                    <n-button
-                      size="small"
-                      :disabled="batchMockSessionActive || batchRecordLoading"
-                      :loading="envPickerLoading && envPickerSource === 'rental'"
-                      @click="openEnvPickerModal('rental')"
-                    >
-                      短租
-                    </n-button>
-                    <n-button
-                      size="small"
-                      :disabled="batchMockSessionActive || batchRecordLoading"
-                      :loading="envPickerLoading && envPickerSource === 'oversea'"
-                      @click="openEnvPickerModal('oversea')"
-                    >
-                      海外
-                    </n-button>
-                  </n-space>
-                </div>
-              </n-form-item>
-            </n-gi>
-
-            <n-gi :span="12">
-              <n-form-item label="IMEI规则" required>
-                <div class="mode-section">
-                  <n-radio-group v-model:value="formData.mode" name="batch-mode">
-                    <n-space>
-                      <n-radio :value="1">随机模式</n-radio>
-                      <n-radio :value="2">顺序模式</n-radio>
-                      <n-radio :value="3">指定模式</n-radio>
-                    </n-space>
-                  </n-radio-group>
-                  <div class="mode-tip">
-                    {{ modeTipText }}
-                  </div>
-                </div>
-              </n-form-item>
-            </n-gi>
-
-            <n-gi :span="12" v-if="formData.mode === 1">
-              <n-form-item label="创建数量" required>
-                <div class="num-field">
-                  <n-input
-                    :value="numInputStr"
-                    type="number"
-                    inputmode="numeric"
-                    min="1"
-                    placeholder="请输入随机创建数量"
-                    clearable
-                    size="small"
-                    class="num-input"
-                    @update:value="onNumInputStrUpdate"
-                    @wheel.prevent="onNumInputWheel"
-                  />
-                </div>
-              </n-form-item>
-            </n-gi>
-
-            <template v-if="formData.mode === 2">
-              <n-gi :span="6">
-                <n-form-item label="起始IMEI" required>
-                  <div class="start-imei-row">
-                    <n-input
-                      v-model:value="formData.start_imei"
-                      class="start-imei-input"
-                      placeholder="15 位数字"
-                      clearable
-                      size="small"
-                      maxlength="15"
-                    />
-                    <n-button size="small" class="start-imei-random-btn" @click="fillRandomStartImei">
-                      随机
-                    </n-button>
-                  </div>
                 </n-form-item>
               </n-gi>
-              <n-gi :span="6">
+
+              <n-gi :span="12" v-if="formData.mode === 1">
                 <n-form-item label="创建数量" required>
                   <div class="num-field">
-                    <n-input
-                      :value="numInputStr"
-                      type="number"
-                      inputmode="numeric"
-                      min="1"
-                      placeholder="请输入顺序创建数量"
-                      clearable
-                      size="small"
-                      class="num-input"
-                      @update:value="onNumInputStrUpdate"
-                      @wheel.prevent="onNumInputWheel"
-                    />
+                    <n-input :value="numInputStr" type="number" inputmode="numeric" min="1" placeholder="请输入随机创建数量"
+                      clearable size="small" class="num-input" @update:value="onNumInputStrUpdate"
+                      @wheel.prevent="onNumInputWheel" />
                   </div>
                 </n-form-item>
               </n-gi>
-            </template>
 
-            <n-gi :span="12" v-if="formData.mode === 3">
-              <n-form-item label="IMEI 列表" required>
-                <div class="imeis-textarea-wrap">
-                  <n-input v-model:value="formData.imeis_text" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }"
-                    placeholder="请输入 IMEI 列表，支持按换行、空格、逗号分隔" clearable size="small" />
-                  <div class="imeis-preview">
-                    已识别 {{ validImeis.length }} 个有效 IMEI（15 位数字）
+              <template v-if="formData.mode === 2">
+                <n-gi :span="6">
+                  <n-form-item label="起始IMEI" required>
+                    <div class="start-imei-row">
+                      <n-input v-model:value="formData.start_imei" class="start-imei-input" placeholder="15 位数字"
+                        clearable size="small" maxlength="15" />
+                      <n-button size="small" class="start-imei-random-btn" @click="fillRandomStartImei">
+                        随机
+                      </n-button>
+                    </div>
+                  </n-form-item>
+                </n-gi>
+                <n-gi :span="6">
+                  <n-form-item label="创建数量" required>
+                    <div class="num-field">
+                      <n-input :value="numInputStr" type="number" inputmode="numeric" min="1" placeholder="请输入顺序创建数量"
+                        clearable size="small" class="num-input" @update:value="onNumInputStrUpdate"
+                        @wheel.prevent="onNumInputWheel" />
+                    </div>
+                  </n-form-item>
+                </n-gi>
+              </template>
+
+              <n-gi :span="12" v-if="formData.mode === 3">
+                <n-form-item label="IMEI 列表" required>
+                  <div class="imeis-textarea-wrap">
+                    <n-input v-model:value="formData.imeis_text" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }"
+                      placeholder="请输入 IMEI 列表，支持按换行、空格、逗号分隔" clearable size="small" />
+                    <div class="imeis-preview">
+                      已识别 {{ validImeis.length }} 个有效 IMEI（15 位数字）
+                    </div>
+                    <div class="imeis-preview csv-actions-row">
+                      <n-upload class="csv-upload-inline" :default-upload="false" :show-file-list="false"
+                        accept=".csv,text/csv" @before-upload="handleImeiLngLatCsvBeforeUpload">
+                        <n-button size="small">上传CSV</n-button>
+                      </n-upload>
+                      <n-button tag="a" size="small"
+                        href="https://ebike-dianlv-test2.xiaoantech.com/xattp/template/imei_lng_lat.csv"
+                        target="_blank">
+                        下载模板
+                      </n-button>
+                    </div>
                   </div>
-                </div>
-              </n-form-item>
-            </n-gi>
+                </n-form-item>
+              </n-gi>
 
-            <n-gi :span="12">
-              <n-form-item label="经纬度模式" required>
-                <n-radio-group v-model:value="formData.coord_mode" name="coord-mode">
-                  <n-space :size="8">
-                    <n-radio value="scatter">中心点分散</n-radio>
-                    <n-radio value="fixed">指定经纬度</n-radio>
-                  </n-space>
-                </n-radio-group>
-              </n-form-item>
-            </n-gi>
-            <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
-              <n-form-item label="经度(GCJ02)">
-                <n-input-number v-model:value="formData.lng" :show-button="false" size="small" style="width: 100%" />
-              </n-form-item>
-            </n-gi>
-            <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
-              <n-form-item label="纬度(GCJ02)">
-                <n-input-number v-model:value="formData.lat" :show-button="false" size="small" style="width: 100%" />
-              </n-form-item>
-            </n-gi>
-            <n-gi :span="4" v-if="formData.coord_mode === 'scatter'">
-              <n-form-item label="随机半径(m)">
-                <template #label>
-                  <span>随机半径(m)</span>
-                  <n-tooltip trigger="hover" style="margin-left: 8px;">
-                    <template #trigger>
-                      <span class="tip-text">?</span>
-                    </template>
-                    会以当前经纬度为中心，在该半径范围内随机生成坐标
-                  </n-tooltip>
-                </template>
-                <n-input-number placeholder="请输入,为0时表示不随机" v-model:value="formData.radius_m" :min="0" :show-button="false" size="small"
-                  style="width: 100%" />
-              </n-form-item>
-            </n-gi>
-            <n-gi :span="10" v-if="formData.coord_mode === 'fixed'">
-              <n-form-item label="经纬度列表" required>
-                <div class="imeis-textarea-wrap">
-                  <n-input
-                    v-model:value="formData.coordinates_text"
-                    type="textarea"
-                    :autosize="{ minRows: 5, maxRows: 10 }"
-                    placeholder="请输入一行一个经纬度，格式：lng,lat（经度在前、纬度在后）"
-                    clearable
-                    size="small"
-                    @update:value="saveFormToStorage"
-                  />
-                  <div class="imeis-preview">
-                    已识别 {{ parsedCoordinates.count }} 个经纬度，本次创建中控模拟数量 {{ expectedCoordinateCount }}
-                    <template
-                      v-if="
+              <n-gi :span="12">
+                <n-form-item label="经纬度模式" required>
+                  <n-radio-group v-model:value="formData.coord_mode" name="coord-mode">
+                    <n-space :size="8">
+                      <n-radio value="scatter">中心点分散</n-radio>
+                      <n-radio value="fixed">指定经纬度</n-radio>
+                    </n-space>
+                  </n-radio-group>
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
+                <n-form-item label="经度(GCJ02)">
+                  <n-input-number v-model:value="formData.lng" :show-button="false" size="small" style="width: 100%" />
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
+                <n-form-item label="纬度(GCJ02)">
+                  <n-input-number v-model:value="formData.lat" :show-button="false" size="small" style="width: 100%" />
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="4" v-if="formData.coord_mode === 'scatter'">
+                <n-form-item label="随机半径(m)">
+                  <template #label>
+                    <span>随机半径(m)</span>
+                    <n-tooltip trigger="hover" style="margin-left: 8px;">
+                      <template #trigger>
+                        <span class="tip-text">?</span>
+                      </template>
+                      会以当前经纬度为中心，在该半径范围内随机生成坐标
+                    </n-tooltip>
+                  </template>
+                  <n-input-number placeholder="请输入,为0时表示不随机" v-model:value="formData.radius_m" :min="0"
+                    :show-button="false" size="small" style="width: 100%" />
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="10" v-if="formData.coord_mode === 'fixed'">
+                <n-form-item label="经纬度列表" required>
+                  <div class="imeis-textarea-wrap">
+                    <n-input v-model:value="formData.coordinates_text" type="textarea"
+                      :autosize="{ minRows: 5, maxRows: 10 }" placeholder="请输入一行一个经纬度，格式：lng,lat（经度在前、纬度在后）" clearable
+                      size="small" @update:value="saveFormToStorage" />
+                    <div class="imeis-preview">
+                      已识别 {{ parsedCoordinates.count }} 个经纬度，本次创建中控模拟数量 {{ expectedCoordinateCount }}
+                      <template v-if="
                         expectedCoordinateCount > 0 &&
                         parsedCoordinates.count > 0 &&
                         parsedCoordinates.count === expectedCoordinateCount
-                      "
-                    >
-                      （与创建数量一致，按顺序指定经纬度）
-                    </template>
-                    <template
-                      v-else-if="
+                      ">
+                        （与创建数量一致，按顺序指定经纬度）
+                      </template>
+                      <template v-else-if="
                         expectedCoordinateCount > 0 &&
                         parsedCoordinates.count > 0 &&
                         parsedCoordinates.count !== expectedCoordinateCount
-                      "
-                    >
-                      （与创建数量不一致，将从上述经纬度随机分散）
-                    </template>
+                      ">
+                        （与创建数量不一致，将从上述经纬度随机分散）
+                      </template>
+                    </div>
+                    <div class="imeis-preview" v-if="parsedCoordinates.error">
+                      {{ parsedCoordinates.error }}
+                    </div>
                   </div>
-                  <div class="imeis-preview" v-if="parsedCoordinates.error">
-                    {{ parsedCoordinates.error }}
-                  </div>
-                </div>
-              </n-form-item>
-            </n-gi>
-            <n-gi :span="2">
-              <n-form-item :label-width="0">
-                <n-button
-                  type="default"
-                  size="small"
-                  :disabled="batchMockSessionActive || batchRecordLoading"
-                  @click="resetDefaultCoords"
-                >
-                  重置经纬度
-                </n-button>
-              </n-form-item>
-            </n-gi>
-
-            <n-gi :span="12">
-              <n-form-item label="电压范围（V）">
-                <div class="voltage-range">
-                  <n-slider
-                    v-model:value="voltageSlider"
-                    range
-                    :min="VOLTAGE_MIN"
-                    :max="VOLTAGE_MAX"
-                    :step="1"
-                    @update:value="onVoltageSliderUpdate"
-                  />
-                  <div class="voltage-inputs">
-                    <n-input-number
-                      v-model:value="formData.voltage_min"
-                      :min="VOLTAGE_MIN"
-                      :max="VOLTAGE_MAX"
-                      :show-button="false"
-                      size="small"
-                      placeholder="最小"
-                      @update:value="onVoltageNumberUpdate"
-                    />
-                    <span class="voltage-sep">~</span>
-                    <n-input-number
-                      v-model:value="formData.voltage_max"
-                      :min="VOLTAGE_MIN"
-                      :max="VOLTAGE_MAX"
-                      :show-button="false"
-                      size="small"
-                      placeholder="最大"
-                      @update:value="onVoltageNumberUpdate"
-                    />
-                  </div>
-                </div>
-              </n-form-item>
-            </n-gi>
-
-            <n-gi :span="12">
-              <n-form-item label="创建模式" required>
-                <div class="mode-section">
-                  <n-space :size="12" align="center">
-                    <n-radio-group v-model:value="formData.create_mode" name="create-mode">
-                      <n-space :size="8">
-                        <n-radio :value="1">并行创建</n-radio>
-                        <n-radio :value="2">串行创建</n-radio>
-                      </n-space>
-                    </n-radio-group>
-                    <template v-if="formData.create_mode === 2">
-                      <span class="mode-tip">间隔(ms)</span>
-                      <n-input-number
-                        v-model:value="formData.serial_interval_ms"
-                        :min="0"
-                        :show-button="false"
-                        size="small"
-                        style="width: 140px"
-                        @update:value="saveFormToStorage"
-                      />
-                    </template>
-                  </n-space>
-                  <div class="mode-tip">
-                    {{ createModeTipText }}
-                  </div>
-                </div>
-              </n-form-item>
-            </n-gi>
-
-            <n-gi :span="12">
-              <n-form-item class="form-actions">
-                <div class="form-actions-row">
-                  <n-space>
-                    <n-button
-                      v-if="!batchMockSessionActive"
-                      type="primary"
-                      :loading="createLoading"
-                      :disabled="batchRecordLoading"
-                      @click="handleCreate"
-                    >
-                      批量创建
-                    </n-button>
-                    <n-button
-                      v-else
-                      type="warning"
-                      :loading="stopMockLoading"
-                      :disabled="batchRecordLoading || checkedRowKeys.length === 0"
-                      @click="handleStopMock"
-                    >
-                      停止模拟（{{ checkedRowKeys.length }}）
-                    </n-button>
-                    <n-button
-                      v-if="batchMockSessionActive"
-                      type="default"
-                      :disabled="batchRecordLoading || checkedImeis.length === 0"
-                      @click="handleCopyCheckedImeis"
-                    >
-                      复制IMEI{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
-                    </n-button>
-                    <n-button type="default" :disabled="batchRecordLoading || batchMockSessionActive" @click="handleReset">
-                      重置
-                    </n-button>
-                  </n-space>
-                  <n-button
-                    v-if="batchMockSessionActive"
-                    type="default"
-                    :disabled="batchRecordLoading || checkedImeis.length === 0 || sharedBindDisabledByEnv"
-                    @click="openBindAndOnlineModal"
-                    class="bind-online-right-btn"
-                  >
-                    共享-绑定并上架{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="2">
+                <n-form-item :label-width="0">
+                  <n-button type="default" size="small" :disabled="batchMockSessionActive || batchRecordLoading"
+                    @click="resetDefaultCoords">
+                    重置经纬度
                   </n-button>
-                  <n-button
-                    v-if="batchMockSessionActive"
-                    type="default"
-                    :disabled="batchRecordLoading || checkedImeis.length === 0 || rentalBatchAddDisabledByEnv"
-                    @click="openRentalBatchAddModal"
-                    class="rental-batch-add-right-btn"
-                  >
-                    短租-批量入库{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
-                  </n-button>
-                </div>
-              </n-form-item>
-            </n-gi>
-          </n-grid>
-        </n-form>
+                </n-form-item>
+              </n-gi>
 
-        <n-alert v-if="requestError" class="result-block" type="error" :title="requestError" />
+              <n-gi :span="12">
+                <n-form-item label="电压范围（V）">
+                  <div class="voltage-range">
+                    <n-slider v-model:value="voltageSlider" range :min="VOLTAGE_MIN" :max="VOLTAGE_MAX" :step="1"
+                      @update:value="onVoltageSliderUpdate" />
+                    <div class="voltage-inputs">
+                      <n-input-number v-model:value="formData.voltage_min" :min="VOLTAGE_MIN" :max="VOLTAGE_MAX"
+                        :show-button="false" size="small" placeholder="最小" @update:value="onVoltageNumberUpdate" />
+                      <span class="voltage-sep">~</span>
+                      <n-input-number v-model:value="formData.voltage_max" :min="VOLTAGE_MIN" :max="VOLTAGE_MAX"
+                        :show-button="false" size="small" placeholder="最大" @update:value="onVoltageNumberUpdate" />
+                    </div>
+                  </div>
+                </n-form-item>
+              </n-gi>
 
-        <n-alert v-if="successSummary" class="result-block" type="success" :title="successSummary" />
+              <n-gi :span="12">
+                <n-form-item label="创建模式" required>
+                  <div class="mode-section">
+                    <n-space :size="12" align="center">
+                      <n-radio-group v-model:value="formData.create_mode" name="create-mode">
+                        <n-space :size="8">
+                          <n-radio :value="1">并行创建</n-radio>
+                          <n-radio :value="2">串行创建</n-radio>
+                        </n-space>
+                      </n-radio-group>
+                      <template v-if="formData.create_mode === 2">
+                        <span class="mode-tip">间隔(ms)</span>
+                        <n-input-number v-model:value="formData.serial_interval_ms" :min="0" :show-button="false"
+                          size="small" style="width: 140px" @update:value="saveFormToStorage" />
+                      </template>
+                    </n-space>
+                    <div class="mode-tip">
+                      {{ createModeTipText }}
+                    </div>
+                  </div>
+                </n-form-item>
+              </n-gi>
 
-        <div v-if="batchMockListRows.length > 0" class="result-block batch-mock-result-table">
-          <div class="table-actions">
-            <n-space :size="8" align="center" class="table-actions-left">
-              <n-button size="small" quaternary type="primary" :disabled="batchRecordLoading" @click="handleSelectAllRows">全选</n-button>
-              <n-button size="small" quaternary :disabled="batchRecordLoading" @click="handleInvertSelectedRows">反选</n-button>
-            </n-space>
-            <n-space :size="8" align="center" class="table-filters-right">
-              <n-select
-                v-model:value="tableSuccessFilter"
-                size="small"
-                :options="tableSuccessFilterOptions"
-                :disabled="batchRecordLoading"
-                class="table-filter-select"
-              />
-              <n-input
-                v-model:value="tableImeiKeyword"
-                size="small"
-                clearable
-                :disabled="batchRecordLoading"
-                placeholder="输入IMEI模糊搜索"
-                class="table-imei-search"
-              />
-            </n-space>
+              <n-gi :span="12">
+                <n-form-item class="form-actions">
+                  <div class="form-actions-row">
+                    <n-space>
+                      <n-button v-if="!batchMockSessionActive" type="primary" :loading="createLoading"
+                        :disabled="batchRecordLoading" @click="handleCreate">
+                        批量创建
+                      </n-button>
+                      <n-button v-else type="warning" :loading="stopMockLoading"
+                        :disabled="batchRecordLoading || checkedRowKeys.length === 0" @click="handleStopMock">
+                        停止模拟（{{ checkedRowKeys.length }}）
+                      </n-button>
+                      <n-button v-if="batchMockSessionActive" type="default"
+                        :disabled="batchRecordLoading || checkedImeis.length === 0" @click="handleCopyCheckedImeis">
+                        复制IMEI{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                      </n-button>
+                      <n-button type="default" :disabled="batchRecordLoading || batchMockSessionActive"
+                        @click="handleReset">
+                        重置
+                      </n-button>
+                    </n-space>
+                    <n-button v-if="batchMockSessionActive" type="default"
+                      :disabled="batchRecordLoading || checkedImeis.length === 0 || sharedBindDisabledByEnv"
+                      @click="openBindAndOnlineModal" class="bind-online-right-btn">
+                      共享-绑定并上架{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                    </n-button>
+                    <n-button v-if="batchMockSessionActive" type="default"
+                      :disabled="batchRecordLoading || checkedImeis.length === 0 || rentalBatchAddDisabledByEnv"
+                      @click="openRentalBatchAddModal" class="rental-batch-add-right-btn">
+                      短租-批量入库{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                    </n-button>
+                  </div>
+                </n-form-item>
+              </n-gi>
+            </n-grid>
+          </n-form>
+
+          <n-alert v-if="requestError" class="result-block" type="error" :title="requestError" />
+
+          <n-alert v-if="successSummary" class="result-block" type="success" :title="successSummary" />
+
+          <div v-if="batchMockListRows.length > 0" class="result-block batch-mock-result-table">
+            <div class="table-actions">
+              <n-space :size="8" align="center" class="table-actions-left">
+                <n-button size="small" quaternary type="primary" :disabled="batchRecordLoading"
+                  @click="handleSelectAllRows">全选</n-button>
+                <n-button size="small" quaternary :disabled="batchRecordLoading"
+                  @click="handleInvertSelectedRows">反选</n-button>
+              </n-space>
+              <n-space :size="8" align="center" class="table-filters-right">
+                <n-select v-model:value="tableSuccessFilter" size="small" :options="tableSuccessFilterOptions"
+                  :disabled="batchRecordLoading" class="table-filter-select" />
+                <n-input v-model:value="tableImeiKeyword" size="small" clearable :disabled="batchRecordLoading"
+                  placeholder="输入IMEI模糊搜索" class="table-imei-search" />
+              </n-space>
+            </div>
+            <n-data-table v-model:checked-row-keys="checkedRowKeys" :columns="batchMockTableColumns"
+              :data="filteredBatchMockListRows" :row-key="batchMockRowKey" size="small" :pagination="{ pageSize: 1000 }"
+              :max-height="520" striped bordered />
           </div>
-          <n-data-table
-            v-model:checked-row-keys="checkedRowKeys"
-            :columns="batchMockTableColumns"
-            :data="filteredBatchMockListRows"
-            :row-key="batchMockRowKey"
-            size="small"
-            :pagination="{ pageSize: 1000 }"
-            :max-height="520"
-            striped
-            bordered
-          />
-        </div>
         </div>
       </n-spin>
     </n-card>
 
-    <n-modal
-      v-model:show="envPickerShow"
-      preset="card"
-      :title="envPickerTitle"
-      :mask-closable="true"
-      class="env-picker-modal"
-      style="width: 600px"
-      @after-leave="onEnvPickerAfterLeave"
-    >
+    <n-modal v-model:show="envPickerShow" preset="card" :title="envPickerTitle" :mask-closable="true"
+      class="env-picker-modal" style="width: 600px" @after-leave="onEnvPickerAfterLeave">
       <div class="env-picker-body">
         <!-- <p class="env-picker-hint">
           点击任意一行即可写入「设备网关」与环境标识并关闭窗口。环境较多时可用顶部搜索缩小范围，列表按页展示、无需在框内滚动。
@@ -437,25 +320,13 @@
           </div>
           <div v-else-if="!envPickerLoading" class="env-picker-list-panel">
             <div class="env-picker-toolbar">
-              <n-input
-                v-model:value="envPickerSearch"
-                clearable
-                size="small"
-                placeholder="筛选：名称、环境 key、网关地址"
-                class="env-picker-search-input"
-              />
+              <n-input v-model:value="envPickerSearch" clearable size="small" placeholder="筛选：名称、环境 key、网关地址"
+                class="env-picker-search-input" />
               <span class="env-picker-count">{{ envPickerFilteredTotal }} / {{ envPickerOptions.length }}</span>
             </div>
             <ul class="env-picker-list">
-              <li
-                v-for="item in envPickerPageItems"
-                :key="item.value"
-                class="env-picker-item"
-                role="button"
-                tabindex="0"
-                @click="applyEnvFromPicker(item)"
-                @keydown.enter.prevent="applyEnvFromPicker(item)"
-              >
+              <li v-for="item in envPickerPageItems" :key="item.value" class="env-picker-item" role="button"
+                tabindex="0" @click="applyEnvFromPicker(item)" @keydown.enter.prevent="applyEnvFromPicker(item)">
                 <div class="env-picker-item-top">
                   <span class="env-picker-name" :title="envPickerItemName(item)">{{ envPickerItemName(item) }}</span>
                   <n-tag size="small" :bordered="false" type="info" class="env-picker-key-tag">
@@ -466,60 +337,33 @@
               </li>
             </ul>
             <div v-if="envPickerFilteredTotal > ENV_PICKER_PAGE_SIZE" class="env-picker-pagination-wrap">
-              <n-pagination
-                v-model:page="envPickerPage"
-                :page-size="ENV_PICKER_PAGE_SIZE"
-                :item-count="envPickerFilteredTotal"
-                size="small"
-                show-quick-jumper
-              />
+              <n-pagination v-model:page="envPickerPage" :page-size="ENV_PICKER_PAGE_SIZE"
+                :item-count="envPickerFilteredTotal" size="small" show-quick-jumper />
             </div>
           </div>
         </n-spin>
       </div>
     </n-modal>
 
-    <n-modal
-      v-model:show="bindAndOnlineShow"
-      preset="card"
-      title="批量绑定并上架"
-      :mask-closable="!bindAndOnlineLoading"
-      class="bind-online-modal"
-      style="width: 680px"
-    >
+    <n-modal v-model:show="bindAndOnlineShow" preset="card" title="批量绑定并上架" :mask-closable="!bindAndOnlineLoading"
+      class="bind-online-modal" style="width: 680px">
       <n-form :model="bindAndOnlineForm" label-placement="left" label-width="110px">
         <n-form-item label="环境" required>
-          <n-select
-            v-model:value="bindAndOnlineForm.env"
-            filterable
-            clearable
-            :loading="bindAndOnlineEnvLoading"
-            :options="bindAndOnlineEnvOptions"
-            placeholder="请选择环境"
-          />
+          <n-select v-model:value="bindAndOnlineForm.env" filterable clearable :loading="bindAndOnlineEnvLoading"
+            :options="bindAndOnlineEnvOptions" placeholder="请选择环境" />
         </n-form-item>
         <n-form-item label="租户ID" required>
           <n-input v-model:value="bindAndOnlineForm.tenant_id" placeholder="请输入租户ID" clearable />
         </n-form-item>
         <n-form-item label="服务区" required>
-          <n-select
-            v-model:value="bindAndOnlineForm.service_area_id"
-            filterable
-            clearable
-            :loading="bindAndOnlineServiceAreaLoading"
-            :options="bindAndOnlineServiceAreaOptions"
-            placeholder="请选择服务区"
-          />
+          <n-select v-model:value="bindAndOnlineForm.service_area_id" filterable clearable
+            :loading="bindAndOnlineServiceAreaLoading" :options="bindAndOnlineServiceAreaOptions"
+            placeholder="请选择服务区" />
         </n-form-item>
         <n-form-item label="IMEI列表" required>
           <div class="bind-online-imeis-wrap">
-            <n-input
-              v-model:value="bindAndOnlineForm.imeis_text"
-              type="textarea"
-              :autosize="{ minRows: 6, maxRows: 14 }"
-              placeholder="支持按换行、空格、逗号分隔 IMEI"
-              clearable
-            />
+            <n-input v-model:value="bindAndOnlineForm.imeis_text" type="textarea"
+              :autosize="{ minRows: 6, maxRows: 14 }" placeholder="支持按换行、空格、逗号分隔 IMEI" clearable />
             <div class="bind-online-imeis-tip">
               已识别 {{ bindAndOnlineImeis.length }} 个有效 IMEI（15 位数字）
             </div>
@@ -534,74 +378,35 @@
       </template>
     </n-modal>
 
-    <n-modal
-      v-model:show="rentalBatchAddShow"
-      preset="card"
-      title="短租-批量入库"
-      :mask-closable="!rentalBatchAddLoading"
-      class="rental-batch-add-modal"
-      style="width: 760px"
-    >
+    <n-modal v-model:show="rentalBatchAddShow" preset="card" title="短租-批量入库" :mask-closable="!rentalBatchAddLoading"
+      class="rental-batch-add-modal" style="width: 760px">
       <n-form :model="rentalBatchAddForm" label-placement="left" label-width="110px">
         <n-form-item label="环境" required>
-          <n-select
-            v-model:value="rentalBatchAddForm.env"
-            filterable
-            clearable
-            :loading="rentalBatchAddEnvLoading"
-            :options="rentalBatchAddEnvOptions"
-            placeholder="请选择环境"
-          />
+          <n-select v-model:value="rentalBatchAddForm.env" filterable clearable :loading="rentalBatchAddEnvLoading"
+            :options="rentalBatchAddEnvOptions" placeholder="请选择环境" />
         </n-form-item>
         <n-form-item label="租户" required>
-          <n-select
-            v-model:value="rentalBatchAddForm.tenant_id"
-            filterable
-            clearable
-            :loading="rentalBatchAddTenantLoading"
-            :options="rentalBatchAddTenantOptions"
-            placeholder="请选择租户"
-          />
+          <n-select v-model:value="rentalBatchAddForm.tenant_id" filterable clearable
+            :loading="rentalBatchAddTenantLoading" :options="rentalBatchAddTenantOptions" placeholder="请选择租户" />
         </n-form-item>
         <n-form-item label="加盟商" required>
-          <n-select
-            v-model:value="rentalBatchAddForm.custom_id"
-            filterable
-            clearable
-            :loading="rentalBatchAddFranchiseeLoading"
-            :options="rentalBatchAddFranchiseeOptions"
-            placeholder="请选择加盟商"
-          />
+          <n-select v-model:value="rentalBatchAddForm.custom_id" filterable clearable
+            :loading="rentalBatchAddFranchiseeLoading" :options="rentalBatchAddFranchiseeOptions"
+            placeholder="请选择加盟商" />
         </n-form-item>
         <n-form-item label="门店" required>
-          <n-select
-            v-model:value="rentalBatchAddForm.shop_id"
-            filterable
-            clearable
-            :loading="rentalBatchAddShopLoading"
-            :options="rentalBatchAddShopOptions"
-            placeholder="请选择门店"
-          />
+          <n-select v-model:value="rentalBatchAddForm.shop_id" filterable clearable :loading="rentalBatchAddShopLoading"
+            :options="rentalBatchAddShopOptions" placeholder="请选择门店" />
         </n-form-item>
         <n-form-item label="车型" required>
-          <n-select
-            v-model:value="rentalBatchAddForm.vehicle_model_id"
-            filterable
-            clearable
-            :loading="rentalBatchAddVehicleModelLoading"
-            :options="rentalBatchAddVehicleModelOptions"
-            placeholder="请选择车型"
-          />
+          <n-select v-model:value="rentalBatchAddForm.vehicle_model_id" filterable clearable
+            :loading="rentalBatchAddVehicleModelLoading" :options="rentalBatchAddVehicleModelOptions"
+            placeholder="请选择车型" />
         </n-form-item>
         <n-form-item label="IMEI列表" required>
           <div class="bind-online-imeis-wrap">
-            <n-input
-              v-model:value="rentalBatchAddForm.imeis_text"
-              type="textarea"
-              :autosize="{ minRows: 6, maxRows: 14 }"
-              placeholder="支持按换行、空格、逗号分隔 IMEI"
-              clearable
-            />
+            <n-input v-model:value="rentalBatchAddForm.imeis_text" type="textarea"
+              :autosize="{ minRows: 6, maxRows: 14 }" placeholder="支持按换行、空格、逗号分隔 IMEI" clearable />
             <div class="bind-online-imeis-tip">
               已识别 {{ rentalBatchAddImeis.length }} 个有效 IMEI（15 位数字）
             </div>
@@ -643,6 +448,7 @@ import {
 import {
   buildBatchPayload,
   isFifteenDigitImei,
+  parseImeiLngLatCsv,
   parseCoordinatesText,
   parseImeisText,
   validateBatchForm,
@@ -1711,6 +1517,28 @@ function onNumInputStrUpdate(value: string | null) {
   saveFormToStorage();
 }
 
+async function handleImeiLngLatCsvBeforeUpload(data: { file: { file?: File | null } }) {
+  const rawFile = data?.file?.file;
+  if (!(rawFile instanceof File)) {
+    message.error("读取 CSV 文件失败");
+    return false;
+  }
+  try {
+    const text = await rawFile.text();
+    const rows = parseImeiLngLatCsv(text);
+    formData.mode = 3;
+    formData.coord_mode = "fixed";
+    formData.radius_m = 0;
+    formData.imeis_text = rows.map((row) => row.imei).join("\n");
+    formData.coordinates_text = rows.map((row) => `${row.lng},${row.lat}`).join("\n");
+    saveFormToStorage();
+    message.success(`CSV 导入成功：共 ${rows.length} 条`);
+  } catch (error: any) {
+    message.error(error?.message || "CSV 解析失败");
+  }
+  return false;
+}
+
 function normalizeVoltagePair(a: number | null, b: number | null): [number, number] {
   const clamp = (n: number) => Math.min(VOLTAGE_MAX, Math.max(VOLTAGE_MIN, n));
   const x = clamp(Math.trunc(Number(a ?? 0)));
@@ -2761,6 +2589,24 @@ async function handleCreate() {
   margin-top: 6px;
   font-size: 12px;
   color: #6b7280;
+}
+
+.csv-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.csv-actions-row>* {
+  flex: none;
+}
+
+.csv-upload-inline {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
 }
 
 .result-block {

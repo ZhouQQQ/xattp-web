@@ -4,6 +4,7 @@ export interface Tool {
   name: string
   path: string
   description: string
+  tag?: string
   keywords: string[]
   component: () => Promise<Component>
   icon: Component

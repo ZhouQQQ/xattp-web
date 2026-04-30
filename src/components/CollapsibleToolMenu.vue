@@ -9,7 +9,15 @@ const props = withDefaults(defineProps<{ toolsByCategory?: ToolCategory[] }>(), 
 const { toolsByCategory } = toRefs(props);
 const route = useRoute();
 
-const makeLabel = (tool: Tool) => () => h(RouterLink, { to: tool.path }, { default: () => tool.name });
+const makeLabel = (tool: Tool) => () =>
+  h(RouterLink, { to: tool.path, class: 'menu-link-label' }, {
+    default: () => [
+      h('span', { class: 'menu-link-title' }, tool.name),
+      ...(tool.tag
+        ? [h('span', { class: 'menu-link-tag menu-link-tag-internal-beta' }, tool.tag)]
+        : []),
+    ],
+  });
 const makeIcon = (tool: Tool) => () => h(MenuIconItem, { tool });
 
 const collapsedCategories = useStorage<Record<string, boolean>>(
@@ -85,6 +93,33 @@ const themeVars = useThemeVars();
     ::v-deep(.n-menu-item-content::before) {
       left: 0;
       right: 13px;
+    }
+
+    ::v-deep(.menu-link-label) {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    ::v-deep(.menu-link-title) {
+      line-height: 1;
+    }
+
+    ::v-deep(.menu-link-tag) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      padding: 0 6px;
+      font-size: 11px;
+      line-height: 16px;
+      white-space: nowrap;
+    }
+
+    ::v-deep(.menu-link-tag-internal-beta) {
+      color: #8a4b00;
+      background-color: #fff3d6;
+      border: 1px solid #ffd591;
     }
   }
 
