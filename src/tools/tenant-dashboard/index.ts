@@ -9,5 +9,4 @@ export const tool = defineTool({
   component: () => import('./tenant-dashboard.vue'),
   icon: List,
   createdAt: new Date('2026-04-30'),
-  allowUsers: ['15072314455'],
 });

@@ -1,10 +1,24 @@
 export interface TenantItem {
+  carTotal?: number | null;
   domainName?: string;
   env?: string | number;
   logo?: string;
   tenantId: string;
   tenantDesc?: string;
   tenantName?: string;
+}
+
+function pickCarTotal(row: Record<string, unknown>): number | null {
+  const raw = row.car_total ?? row.carTotal;
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s || s.toLowerCase() === "none") return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  return null;
 }
 
 export interface TenantGrayItem {
@@ -33,6 +47,7 @@ export function normalizeTenantList(raw: unknown): TenantItem[] {
       const tenantId = String(row.tenantId ?? "").trim();
       if (!tenantId) return null;
       return {
+        carTotal: pickCarTotal(row),
         domainName: typeof row.domainName === "string" ? row.domainName.trim() : "",
         env: typeof row.env === "string" || typeof row.env === "number" ? row.env : "",
         logo: typeof row.logo === "string" ? row.logo.trim() : "",

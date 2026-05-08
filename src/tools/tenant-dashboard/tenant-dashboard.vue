@@ -3,13 +3,8 @@
     <n-card>
       <div v-if="!isFullscreen" class="toolbar">
         <div class="search-row">
-          <n-input
-            v-model:value="searchKeyword"
-            clearable
-            size="large"
-            class="search-input search-input-mac"
-            placeholder="搜索：租户ID / 租户名称"
-          />
+          <n-input v-model:value="searchKeyword" clearable size="large" class="search-input search-input-mac"
+            placeholder="搜索：租户ID / 租户名称" />
           <div class="toolbar-actions">
             <n-dropdown trigger="click" :options="refreshMenuOptions" @select="handleRefreshMenuSelect">
               <n-button size="small" class="refresh-dropdown-btn">
@@ -18,8 +13,8 @@
             </n-dropdown>
             <n-checkbox-group v-model:value="grayEnvFilters" class="gray-filter-group">
               <n-space :size="6">
-                <n-checkbox value="prod">prod</n-checkbox>
-                <n-checkbox value="prod2">prod2</n-checkbox>
+                <n-checkbox value="prod">华为云(prod)</n-checkbox>
+                <n-checkbox value="prod2">阿里云(prod2)</n-checkbox>
               </n-space>
             </n-checkbox-group>
           </div>
@@ -28,68 +23,88 @@
 
       <div v-if="!isFullscreen" class="meta">
         <span>租户总数 {{ filteredTenants.length }}</span>
-        <span>灰度上次更新时间：{{ lastGrayAtText }}</span>
+        <span>灰度租户刷新时间：{{ lastGrayAtText }}</span>
       </div>
 
-      <n-spin :show="initialLoading" class="board-spin">
-        <div class="panels">
-          <div v-for="panel in panels" :key="panel.key" class="panel" :class="`panel-${panel.key}`">
-            <div class="panel-header">
-              <span class="panel-title">
-                {{ panel.title }}
-              </span>
-              <div class="panel-header-actions">
-                <n-tag size="small" :bordered="false" type="default">{{ panel.items.length }}</n-tag>
-                <n-button
-                  size="tiny"
-                  circle
-                  quaternary
-                  type="primary"
-                  :disabled="panel.items.length === 0"
-                  title="复制本组"
-                  @click.stop="copyPanelTenants(panel)"
-                >
-                  <n-icon :component="Copy" />
-                </n-button>
+      <n-spin :show="initialLoading" class="board-spin" :content-style="spinContentStyle"
+        description="首次加载所有租户较耗时，请稍候">
+        <div class="board-spin-slot">
+          <div class="panels">
+            <div v-for="panel in panels" :key="panel.key" class="panel" :class="`panel-${panel.key}`">
+              <div class="panel-header">
+                <div class="panel-header-left">
+                  <span class="panel-title">
+                    {{ panel.title }}
+                  </span>
+                  <n-tag size="small" :bordered="false" type="default" class="panel-tenant-count-tag"
+                    title="本组租户数">
+                    <span class="panel-tenant-count-inner">
+                      <n-icon :component="BuildingWarehouse" class="panel-tenant-count-icon" />
+                      <span>{{ panel.items.length }}</span>
+                    </span>
+                  </n-tag>
+                  <n-tooltip trigger="hover" placement="top">
+                    <template #trigger>
+                      <n-tag size="small" :bordered="false" type="default" class="panel-car-summary-tag"
+                        title="本组昨日车辆合计，悬浮查看精确车辆数">
+                        <span class="panel-car-summary-inner">
+                          <n-icon :component="Bike" class="panel-car-summary-bike" />
+                          <span class="panel-car-summary-num">{{ formatPanelCarShortLabel(panel.carSum) }}</span>
+                        </span>
+                      </n-tag>
+                    </template>
+                    <div class="panel-stats-tooltip">车辆数：{{ formatPanelCarExact(panel.carSum) }}</div>
+                  </n-tooltip>
+                </div>
+                <div class="panel-header-right">
+                  <n-select v-model:value="panelSortByKey[panel.key]" size="tiny" :options="panelSortOptions"
+                    class="panel-sort-select" :consistent-menu-width="false" @click.stop />
+                  <n-button size="tiny" circle quaternary type="primary" :disabled="panel.items.length === 0"
+                    title="复制本组" @click.stop="copyPanelTenants(panel)">
+                    <n-icon :component="Copy" />
+                  </n-button>
+                </div>
               </div>
-            </div>
 
-            <div class="panel-list">
-              <n-empty v-if="panel.items.length === 0" size="small" description="该组暂无租户" />
-              <div
-                v-for="tenant in panel.items"
-                :key="`${panel.key}-${tenant.tenantId}`"
-                class="tenant-row"
-                @click="openTenantLink(tenant)"
-              >
-                <n-avatar :src="tenant.logo || undefined" :size="20" round />
-                <div class="tenant-main">
-                  <div class="tenant-line">
-                    <span class="tenant-id">
-                      <span class="copyable" title="点击复制租户ID" @click.stop="copyText(tenant.tenantId, '租户ID')">
-                        {{ tenant.tenantId }}
-                      </span>
-                    </span>
-                    <span
-                      class="tenant-name"
-                    >
-                      <span
-                        class="copyable tenant-name-copy"
-                        :title="`点击复制租户名称：${tenant.tenantName || '-'}`"
-                        @click.stop="copyText(tenant.tenantName || '-', '租户名称')"
-                      >
-                        {{ tenant.tenantName || "-" }}
-                      </span>
-                    </span>
-                    <n-tag
-                      size="small"
-                      :bordered="true"
-                      :color="envTagOf(tenant.env).color"
-                      :title="envTagOf(tenant.env).cloud || undefined"
-                    >
-                      {{ envTagDisplayText(tenant.env, panel.key) }}
-                    </n-tag>
+              <div class="panel-body">
+                <div class="panel-list">
+                  <n-empty v-if="panel.items.length === 0" size="small" description="该组暂无租户" />
+                  <div v-for="tenant in panelPageSlice(panel.items, panel.key)" :key="`${panel.key}-${tenant.tenantId}`"
+                    class="tenant-row" @click="openTenantLink(tenant)">
+                    <n-avatar :src="tenant.logo || undefined" :size="20" round />
+                    <div class="tenant-main">
+                      <div class="tenant-line">
+                        <span class="tenant-id">
+                          <span class="copyable" title="点击复制租户ID" @click.stop="copyText(tenant.tenantId, '租户ID')">
+                            {{ tenant.tenantId }}
+                          </span>
+                        </span>
+                        <span class="tenant-name">
+                          <span class="copyable tenant-name-copy"
+                            :title="`点击复制租户名称：${tenant.tenantName || '-'}`"
+                            @click.stop="copyText(tenant.tenantName || '-', '租户名称')">
+                            {{ tenant.tenantName || "-" }}
+                          </span>
+                        </span>
+                        <n-tag size="small" :bordered="true" class="tenant-ebike-tag" title="昨日车辆数"
+                          :color="ebikeCountTagColor">
+                          <span class="tenant-ebike-tag-inner">
+                            <n-icon :component="Bike" class="tenant-ebike-icon" />
+                            <span class="tenant-ebike-num">{{ formatYesterdayCarTotal(tenant.carTotal) }}</span>
+                          </span>
+                        </n-tag>
+                        <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(tenant.env).color"
+                          :title="envTagOf(tenant.env).cloud || undefined">
+                          {{ envTagDisplayText(tenant.env, panel.key) }}
+                        </n-tag>
+                      </div>
+                    </div>
                   </div>
+                </div>
+                <div v-if="panel.items.length > PANEL_PAGE_SIZE" class="panel-pagination">
+                  <n-pagination size="small" :page="panelPageByKey[panel.key]"
+                    :page-count="panelPageCount(panel.items.length)"
+                    @update:page="(p: number) => setPanelPage(panel.key, p)" />
                 </div>
               </div>
             </div>
@@ -97,15 +112,40 @@
         </div>
       </n-spin>
     </n-card>
+
+    <n-modal
+      v-model:show="domainPickShow"
+      preset="card"
+      title="选择要打开的域名"
+      :style="{ width: 'min(440px, 92vw)' }"
+      :header-style="domainPickModalHeaderStyle"
+      :content-style="domainPickModalContentStyle"
+      :mask-closable="true"
+      :closable="true"
+      class="tenant-domain-pick-modal"
+      @after-leave="resetDomainPick">
+      <div v-if="domainPickTenantHint" class="domain-pick-hint">{{ domainPickTenantHint }}</div>
+      <n-space vertical size="small" class="domain-pick-actions">
+        <n-button
+          v-for="(d, idx) in domainPickDomains"
+          :key="`${idx}-${d}`"
+          block
+          secondary
+          strong
+          @click="pickDomainAndOpen(d)">
+          {{ d }}
+        </n-button>
+      </n-space>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 defineOptions({ name: "TenantDashboard" });
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { createDiscreteApi } from "naive-ui";
-import { Copy } from "@vicons/tabler";
+import { Bike, BuildingWarehouse, Copy } from "@vicons/tabler";
 import { tenant_all_api, tenant_gray_api } from "@/api/business";
 import {
   normalizeGrayList,
@@ -117,6 +157,42 @@ import {
 
 const { message } = createDiscreteApi(["message"]);
 
+const ebikeCountTagColor = {
+  color: "#fafafa",
+  textColor: "#52525b",
+  borderColor: "#e4e4e7",
+} as const;
+
+/** 列表改分页后不再依赖固定高度链；保持纵向 flex 便于 Spin 遮罩对齐 */
+const spinContentStyle = {
+  display: "flex",
+  flexDirection: "column" as const,
+  width: "100%",
+  overflow: "visible",
+};
+
+const PANEL_PAGE_SIZE = 100;
+
+const panelPageByKey = reactive<Record<string, number>>({
+  "gray-1": 1,
+  "gray-2": 1,
+  formal: 1,
+});
+
+function panelPageCount(itemCount: number): number {
+  return Math.max(1, Math.ceil(itemCount / PANEL_PAGE_SIZE));
+}
+
+function panelPageSlice(items: TenantItem[], panelKey: string): TenantItem[] {
+  const page = panelPageByKey[panelKey] ?? 1;
+  const start = (page - 1) * PANEL_PAGE_SIZE;
+  return items.slice(start, start + PANEL_PAGE_SIZE);
+}
+
+function setPanelPage(panelKey: string, page: number) {
+  panelPageByKey[panelKey] = page;
+}
+
 const pollOptions = [
   { label: "3 秒", value: 3 },
   { label: "10 秒", value: 10 },
@@ -124,6 +200,17 @@ const pollOptions = [
 ] as const;
 
 const pollSeconds = ref<number>(10);
+const panelSortOptions: Array<{ label: string; value: string }> = [
+  { label: "租户ID ↑", value: "tenantId|asc" },
+  { label: "租户ID ↓", value: "tenantId|desc" },
+  { label: "车辆数 ↑", value: "carTotal|asc" },
+  { label: "车辆数 ↓", value: "carTotal|desc" },
+];
+const panelSortByKey = reactive<Record<string, string>>({
+  "gray-1": "carTotal|desc",
+  "gray-2": "carTotal|desc",
+  formal: "carTotal|desc",
+});
 const grayEnvFilters = ref<Array<"prod" | "prod2">>(["prod", "prod2"]);
 const searchKeyword = ref("");
 const isFullscreen = ref(false);
@@ -134,8 +221,12 @@ const loadingGray = ref(false);
 const initialLoading = ref(true);
 const lastTenantAt = ref<number | null>(null);
 const lastGrayAt = ref<number | null>(null);
+const nextGrayDeadlineMs = ref(0);
+/** 按钮上展示的剩余秒数，由定时器每秒写入以保证界面必定刷新 */
+const refreshCountdownShown = ref(10);
 
 let grayTimer: number | null = null;
+let countdownUiTimer: number | null = null;
 let grayFetching = false;
 
 const keywordTokens = computed(() =>
@@ -166,6 +257,38 @@ const filteredTenants = computed(() => {
   });
 });
 
+function parsePanelSortSpec(spec: string): { key: "tenantId" | "carTotal"; order: "asc" | "desc" } {
+  const [rawKey, rawOrder] = spec.split("|");
+  const key = rawKey === "carTotal" ? "carTotal" : "tenantId";
+  const order = rawOrder === "desc" ? "desc" : "asc";
+  return { key, order };
+}
+
+function compareTenantItemsByCarTotal(a: TenantItem, b: TenantItem, order: "asc" | "desc"): number {
+  const aMiss = a.carTotal == null || !Number.isFinite(Number(a.carTotal));
+  const bMiss = b.carTotal == null || !Number.isFinite(Number(b.carTotal));
+  if (aMiss && bMiss) return 0;
+  if (aMiss) return 1;
+  if (bMiss) return -1;
+  const c = Number(a.carTotal) - Number(b.carTotal);
+  return order === "asc" ? c : -c;
+}
+
+function sortTenantPanelItems(items: TenantItem[], panelKey: string): TenantItem[] {
+  const spec = panelSortByKey[panelKey] ?? "carTotal|desc";
+  const { key, order } = parsePanelSortSpec(spec);
+  const next = [...items];
+  if (key === "tenantId") {
+    next.sort((a, b) => {
+      const c = a.tenantId.localeCompare(b.tenantId, "en", { numeric: true });
+      return order === "asc" ? c : -c;
+    });
+  } else {
+    next.sort((a, b) => compareTenantItemsByCarTotal(a, b, order));
+  }
+  return next;
+}
+
 const panels = computed(() => {
   const gray1: TenantItem[] = [];
   const gray2: TenantItem[] = [];
@@ -188,14 +311,54 @@ const panels = computed(() => {
   });
 
   return [
-    { key: "gray-1", title: "灰度组1", items: gray1 },
-    { key: "gray-2", title: "灰度组2", items: gray2 },
-    { key: "formal", title: "正式", items: formal },
+    {
+      key: "gray-1",
+      title: "灰度组1",
+      items: sortTenantPanelItems(gray1, "gray-1"),
+      carSum: panelCarSum(gray1),
+    },
+    {
+      key: "gray-2",
+      title: "灰度组2",
+      items: sortTenantPanelItems(gray2, "gray-2"),
+      carSum: panelCarSum(gray2),
+    },
+    {
+      key: "formal",
+      title: "正式",
+      items: sortTenantPanelItems(formal, "formal"),
+      carSum: panelCarSum(formal),
+    },
   ];
 });
 
+watch(
+  panels,
+  (list) => {
+    for (const p of list) {
+      const maxPage = panelPageCount(p.items.length);
+      if ((panelPageByKey[p.key] ?? 1) > maxPage) {
+        panelPageByKey[p.key] = maxPage;
+      }
+    }
+  },
+  { deep: true },
+);
+
+function resetAllPanelPages() {
+  panelPageByKey["gray-1"] = 1;
+  panelPageByKey["gray-2"] = 1;
+  panelPageByKey.formal = 1;
+}
+
+watch(keywordTokens, resetAllPanelPages);
+
+watch(grayEnvFilters, resetAllPanelPages, { deep: true });
+
+watch(panelSortByKey, resetAllPanelPages, { deep: true });
+
 const lastGrayAtText = computed(() => (lastGrayAt.value ? new Date(lastGrayAt.value).toLocaleString() : "-"));
-const refreshButtonLabel = computed(() => `刷新（${pollSeconds.value}s）`);
+const refreshButtonLabel = computed(() => `刷新灰度（${refreshCountdownShown.value}s）`);
 const refreshMenuOptions = computed(() => [
   { label: "立即刷新", key: "refresh-now" },
   { type: "divider", key: "divider-1" },
@@ -213,10 +376,56 @@ function envTagDisplayText(env: string | number | undefined, panelKey: string) {
   return base;
 }
 
+function formatYesterdayCarTotal(value: TenantItem["carTotal"]): string {
+  if (value === null || value === undefined) return "-";
+  return String(value);
+}
+
+function panelCarSum(items: TenantItem[]): number {
+  let sum = 0;
+  for (const t of items) {
+    const v = t.carTotal;
+    if (v == null || !Number.isFinite(Number(v))) continue;
+    sum += Number(v);
+  }
+  return sum;
+}
+
+/** 分组车辆合计的简短展示（万/亿）；与行内「昨日车辆」口径一致 */
+function formatPanelCarTotalShort(sum: number): string {
+  if (!Number.isFinite(sum)) return "—";
+  if (sum === 0) return "0";
+  if (sum >= 1e8) {
+    const y = sum / 1e8;
+    const d = y >= 100 ? 0 : y >= 10 ? 1 : 2;
+    return `${parseFloat(y.toFixed(d))}亿`;
+  }
+  if (sum >= 1e4) {
+    const w = sum / 1e4;
+    const d = w >= 100 ? 0 : w >= 10 ? 1 : 2;
+    return `${parseFloat(w.toFixed(d))}万`;
+  }
+  return sum.toLocaleString("zh-CN");
+}
+
+function formatPanelCarExact(sum: number): string {
+  if (!Number.isFinite(sum)) return "—";
+  return sum.toLocaleString("zh-CN");
+}
+
+/** 组内车辆简短标签（带「辆」） */
+function formatPanelCarShortLabel(sum: number): string {
+  const s = formatPanelCarTotalShort(sum);
+  return s === "—" ? "—" : `${s}辆`;
+}
+
 async function copyPanelTenants(panel: { key: string; title: string; items: TenantItem[] }) {
   if (!panel.items || panel.items.length === 0) return;
   const text = panel.items
-    .map((tenant) => `${tenant.tenantId} ${tenant.tenantName || "-"} ${envTagDisplayText(tenant.env, panel.key)}`)
+    .map(
+      (tenant) =>
+        `${tenant.tenantId} ${tenant.tenantName || "-"} 🚲 ${formatYesterdayCarTotal(tenant.carTotal)} ${envTagDisplayText(tenant.env, panel.key)}`,
+    )
     .join("\n");
   try {
     await navigator.clipboard.writeText(text);
@@ -256,6 +465,7 @@ async function refreshAll() {
 async function handleRefreshMenuSelect(key: string) {
   if (key === "refresh-now") {
     await refreshAll();
+    startGrayPolling();
     return;
   }
   if (key.startsWith("interval-")) {
@@ -267,11 +477,60 @@ async function handleRefreshMenuSelect(key: string) {
   }
 }
 
+/** 支持英文逗号、中文逗号分隔的多域名 */
+function parseTenantDomains(raw: unknown): string[] {
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  return [...new Set(s.split(/[,，]/).map((x) => x.trim()).filter(Boolean))];
+}
+
+function hrefFromDomainPiece(domain: string): string {
+  const raw = domain.trim();
+  if (!raw) return "";
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
+/** Card 弹窗强制浅色实底，避免暗色主题下半透明叠在遮罩上看不清 */
+const domainPickModalHeaderStyle = {
+  backgroundColor: "#ffffff",
+  padding: "18px 22px 14px",
+  borderBottom: "1px solid #f1f5f9",
+} as const;
+
+const domainPickModalContentStyle = {
+  backgroundColor: "#ffffff",
+  padding: "14px 22px 22px",
+} as const;
+
+const domainPickShow = ref(false);
+const domainPickDomains = ref<string[]>([]);
+const domainPickTenantHint = ref("");
+
+function resetDomainPick() {
+  domainPickDomains.value = [];
+  domainPickTenantHint.value = "";
+}
+
+function pickDomainAndOpen(d: string) {
+  const href = hrefFromDomainPiece(d);
+  domainPickShow.value = false;
+  if (href) window.open(href, "_blank", "noopener,noreferrer");
+}
+
 function openTenantLink(tenant: TenantItem) {
-  const raw = String(tenant.domainName ?? "").trim();
-  if (!raw) return;
-  const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  window.open(href, "_blank", "noopener,noreferrer");
+  const domains = parseTenantDomains(tenant.domainName);
+  if (domains.length === 0) {
+    message.warning("该租户未配置域名");
+    return;
+  }
+  if (domains.length === 1) {
+    const href = hrefFromDomainPiece(domains[0]);
+    if (href) window.open(href, "_blank", "noopener,noreferrer");
+    return;
+  }
+  domainPickDomains.value = domains;
+  domainPickTenantHint.value = [tenant.tenantId, tenant.tenantName].filter(Boolean).join(" · ");
+  domainPickShow.value = true;
 }
 
 async function fetchTenantList() {
@@ -316,10 +575,39 @@ function clearGrayPolling() {
   }
 }
 
+function syncRefreshCountdown() {
+  const intervalSec = Math.max(1, Number(pollSeconds.value));
+  const deadline = nextGrayDeadlineMs.value;
+  if (!deadline) {
+    refreshCountdownShown.value = intervalSec;
+    return;
+  }
+  refreshCountdownShown.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+}
+
+function startCountdownTicker() {
+  if (countdownUiTimer != null) return;
+  syncRefreshCountdown();
+  countdownUiTimer = window.setInterval(() => {
+    syncRefreshCountdown();
+  }, 1000);
+}
+
+function stopCountdownTicker() {
+  if (countdownUiTimer != null) {
+    window.clearInterval(countdownUiTimer);
+    countdownUiTimer = null;
+  }
+}
+
 function startGrayPolling() {
   clearGrayPolling();
   const ms = Math.max(1, Number(pollSeconds.value)) * 1000;
+  nextGrayDeadlineMs.value = Date.now() + ms;
+  syncRefreshCountdown();
   grayTimer = window.setInterval(() => {
+    nextGrayDeadlineMs.value = Date.now() + ms;
+    syncRefreshCountdown();
     void fetchGrayList();
   }, ms);
 }
@@ -344,8 +632,11 @@ let bootstrapped = false;
 async function bootstrapDashboard() {
   if (bootstrapped) return;
   bootstrapped = true;
+  initialLoading.value = true;
   try {
     await Promise.all([fetchTenantList(), fetchGrayList()]);
+  } catch {
+    /* 错误已在各 fetch 内 toast */
   } finally {
     initialLoading.value = false;
   }
@@ -355,6 +646,7 @@ async function bootstrapDashboard() {
 onMounted(() => {
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   handleFullscreenChange();
+  startCountdownTicker();
   void bootstrapDashboard();
 });
 
@@ -364,50 +656,69 @@ void bootstrapDashboard();
 onBeforeUnmount(() => {
   document.removeEventListener("fullscreenchange", handleFullscreenChange);
   clearGrayPolling();
+  stopCountdownTicker();
 });
 </script>
 
 <style lang="less" scoped>
 .tenant-dashboard {
   width: min(1650px, 100%);
-  height: 760px;
-  min-height: 760px;
-  max-height: 760px;
+  box-sizing: border-box;
+  min-height: 800px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 12px;
 }
 
 .tenant-dashboard.is-fullscreen {
   width: 100%;
   height: 100vh;
-  min-height: 100vh;
   max-height: 100vh;
-  overflow: hidden;
+  min-height: 400px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+@supports (height: 100dvh) {
+  .tenant-dashboard.is-fullscreen {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
 }
 
 .tenant-dashboard :deep(.n-card) {
-  height: 100%;
+  flex: 1 1 auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  overflow: visible;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 12px 40px rgb(15 23 42 / 6%);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
 }
 
 .tenant-dashboard :deep(.n-card__content) {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
+  overflow: visible;
+  flex: 1 1 auto;
+}
+
+/* Spin 根节点带 .board-spin */
+.tenant-dashboard :deep(.board-spin) {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  align-self: stretch;
+  flex: 1 1 auto;
 }
 
 .toolbar {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  flex-shrink: 0;
   margin-bottom: 12px;
   padding: 2px 2px 12px;
   border-bottom: 1px solid #eef2f7;
@@ -427,15 +738,10 @@ onBeforeUnmount(() => {
 .search-input-mac {
   :deep(.n-input-wrapper) {
     border-radius: 10px;
-    border: 1px solid #d9e1ec;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-    box-shadow:
-      0 1px 2px rgb(15 23 42 / 4%),
-      inset 0 1px 0 rgb(255 255 255 / 70%);
-    transition:
-      border-color 0.2s ease,
-      box-shadow 0.2s ease,
-      transform 0.2s ease;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    box-shadow: none;
+    transition: border-color 0.2s ease;
   }
 
   :deep(.n-input__input-el) {
@@ -444,11 +750,9 @@ onBeforeUnmount(() => {
   }
 
   :deep(.n-input-wrapper.n-input-wrapper--focus) {
-    border-color: #5b8def;
-    box-shadow:
-      0 0 0 4px rgb(91 141 239 / 18%),
-      0 8px 20px rgb(15 23 42 / 10%);
-    transform: translateY(-1px);
+    border-color: #a3a3a3;
+    box-shadow: 0 0 0 3px rgb(163 163 163 / 18%);
+    transform: none;
   }
 }
 
@@ -480,11 +784,10 @@ onBeforeUnmount(() => {
   align-items: center;
   height: 34px;
   padding: 0 10px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  background: #fafafa;
   font-size: 13px;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 }
 
 .gray-filter-group :deep(.n-checkbox) {
@@ -495,150 +798,201 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
   margin-bottom: 12px;
   font-size: 12px;
-  color: #6b7280;
+  font-weight: 500;
+  color: #64748b;
   padding: 0 2px;
 }
 
 .panels {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr);
+  align-items: start;
   gap: 10px;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
+  width: 100%;
+  min-width: 0;
 }
 
 .panel {
-  border: 1px solid #e6ebf2;
+  min-width: 0;
+  align-self: stretch;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
   padding: 8px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-  height: 100%;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: visible;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .panel:hover {
-  border-color: #d7e0ee;
-  box-shadow: 0 6px 18px rgb(15 23 42 / 6%);
-}
-
-.panel-gray-1 {
-  border-color: #9ca3af;
-}
-
-.panel-gray-2 {
-  border-color: #9ca3af;
-}
-
-.panel-formal {
-  border-color: #22c55e;
+  border-color: #d4d4d8;
+  box-shadow: 0 6px 16px rgb(15 23 42 / 6%);
 }
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
   margin-bottom: 8px;
-  padding: 4px 2px 8px;
-  border-bottom: 1px solid #edf2f7;
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 1;
+  padding: 8px 4px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
 }
 
-.panel-header-actions {
+.panel-header-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.panel-header-right {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.panel-sort-select {
+  width: 86px;
+  max-width: 86px;
+}
+
+.panel-sort-select:deep(.n-base-selection) {
+  font-size: 12px;
+}
+
+.panel-sort-select:deep(.n-base-selection-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
   color: #0f172a;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.panel-header :deep(.n-tag) {
-  font-size: 13px;
-  font-weight: 700;
-  min-width: 34px;
-  text-align: center;
-  border-radius: 999px;
-  padding: 0 10px;
-  background: #eef2ff;
-  color: #374151;
+.panel-tenant-count-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.panel-tenant-count-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.panel-tenant-count-tag,
+.panel-car-summary-tag {
+  cursor: default;
+  flex-shrink: 0;
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-car-summary-tag {
+  max-width: min(140px, 100%);
+}
+
+.panel-header :deep(.panel-tenant-count-tag),
+.panel-header :deep(.panel-car-summary-tag) {
+  --n-height: auto !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  color: #475569 !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  padding: 0 8px !important;
+  min-height: 22px !important;
+  box-shadow: none !important;
+}
+
+.panel-car-summary-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.panel-car-summary-bike {
+  font-size: 14px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.panel-car-summary-num {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-stats-tooltip {
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
 }
 
 .panel-list {
-  min-height: 0;
-  height: 100%;
-  max-height: 100%;
   padding-right: 2px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-gutter: stable both-edges;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f8fafc;
+  overflow: visible;
 }
 
-.tenant-dashboard.is-fullscreen .panel-list {
-  min-height: 0;
+.panel-pagination {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 4px;
+  flex-shrink: 0;
 }
 
-.board-spin {
-  flex: 1;
-  min-height: 0;
+.board-spin-slot {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.board-spin :deep(.n-spin-container) {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 .board-spin :deep(.n-spin-content) {
-  height: 100%;
-  min-height: 0;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
-  overflow: hidden;
-}
-
-.panel-list::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.panel-list::-webkit-scrollbar-track {
-  background: #f8fafc;
-  border-radius: 999px;
-}
-
-.panel-list::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 999px;
-}
-
-.panel-list::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  overflow: visible;
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 .tenant-row {
@@ -654,7 +1008,7 @@ onBeforeUnmount(() => {
 }
 
 .tenant-row:hover {
-  background-color: #f8fbff;
+  background-color: #f4f4f5;
 }
 
 .tenant-main {
@@ -663,9 +1017,12 @@ onBeforeUnmount(() => {
 }
 
 .tenant-line {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
+  display: grid;
+  /* 第一列固定约 4 位数字宽（ch = 「0」字宽，tabular-nums 下对齐） */
+  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-ebike, 60px)
+    var(--tenant-col-env, 86px);
+  align-items: center;
+  column-gap: 4px;
   font-size: 11px;
   line-height: 1;
   width: 100%;
@@ -676,34 +1033,95 @@ onBeforeUnmount(() => {
 .tenant-id {
   font-weight: 500;
   color: #111827;
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-.tenant-name {
   min-width: 0;
-  flex: 1 1 auto;
-  line-height: 1;
-}
-
-.tenant-name-copy {
-  display: block;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.tenant-id .copyable {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-name {
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
+  line-height: 1;
+}
+
+.tenant-name-copy {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
   color: #334155;
   line-height: 1;
 }
 
-.tenant-line :deep(.n-tag) {
-  margin-left: auto;
+.tenant-line :deep(.tenant-ebike-tag) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  margin-left: 0;
+  height: 18px;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+
+.tenant-line :deep(.tenant-ebike-tag .n-tag__content) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tenant-ebike-tag-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+
+.tenant-ebike-icon {
+  font-size: 12px;
   flex-shrink: 0;
+  opacity: 0.92;
+}
+
+.tenant-ebike-num {
+  flex-shrink: 0;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tenant-line :deep(.tenant-env-tag) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  margin-left: 0;
   height: 18px;
   font-size: 11px;
   line-height: 16px;
   padding: 0 6px;
+}
+
+.tenant-line :deep(.tenant-env-tag .n-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .copyable {
@@ -716,4 +1134,39 @@ onBeforeUnmount(() => {
   text-decoration: underline;
 }
 
+/* 域名选择弹窗：遮罩对比 + card 整体浅色实底（兼容暗色 naive 变量） */
+.tenant-domain-pick-modal {
+  --n-color-modal: #ffffff;
+}
+
+.tenant-domain-pick-modal :deep(.n-modal-mask) {
+  background-color: rgb(15 23 42 / 55%) !important;
+}
+
+.tenant-domain-pick-modal :deep(.n-card) {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgb(226 232 240 / 95%) !important;
+  box-shadow:
+    0 25px 50px -12px rgb(15 23 42 / 28%),
+    0 0 0 1px rgb(15 23 42 / 5%) !important;
+}
+
+.tenant-domain-pick-modal :deep(.n-card-header),
+.tenant-domain-pick-modal :deep(.n-card__content),
+.tenant-domain-pick-modal :deep(.n-card-header__main) {
+  color: #0f172a !important;
+}
+
+.domain-pick-hint {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 12px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.domain-pick-actions {
+  width: 100%;
+}
 </style>

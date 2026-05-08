@@ -1,5 +1,5 @@
-# build stage
-FROM docker.m.daocloud.io/node:18.15.0-alpine AS build-stage
+# build stage（Node 18 无法运行新版 pnpm：dist 内正则用了 /v 等语法，需 Node 20+）
+FROM docker.m.daocloud.io/node:20-alpine AS build-stage
 ENV NODE_OPTIONS="--max_old_space_size=8098"
 
 WORKDIR /app
@@ -17,8 +17,8 @@ ENV VITE_BUILD_TIME=${VITE_BUILD_TIME}
 # 仅复制依赖描述，先安装依赖（未改 package 时该层可复用，节省约 72s）
 COPY package.json ./
 
-# Install pnpm
-RUN npm config set registry https://registry.npmmirror.com/ && npm install -g pnpm
+# 与 package.json 的 packageManager 对齐，避免全局装到不兼容当前 Node 的 pnpm 大版本
+RUN npm config set registry https://registry.npmmirror.com/ && npm install -g pnpm@8.15.3
 
 # 依赖安装：使用缓存挂载，重复构建时复用 pnpm store
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \

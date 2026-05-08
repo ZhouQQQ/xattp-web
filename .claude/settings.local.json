@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(bash \"d:\\\\1-my-code\\\\xattp-web\\\\build.sh\")"
+    ]
+  }
+}
