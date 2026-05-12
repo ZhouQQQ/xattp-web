@@ -6,11 +6,20 @@
           <n-input v-model:value="searchKeyword" clearable size="large" class="search-input search-input-mac"
             placeholder="搜索：租户ID / 租户名称" />
           <div class="toolbar-actions">
-            <n-dropdown trigger="click" :options="refreshMenuOptions" @select="handleRefreshMenuSelect">
-              <n-button size="small" class="refresh-dropdown-btn">
-                {{ refreshButtonLabel }}
-              </n-button>
-            </n-dropdown>
+            <div class="refresh-merged">
+              <n-dropdown trigger="click" :options="refreshMenuOptions" @select="handleRefreshMenuSelect">
+                <n-button size="small" class="refresh-dropdown-btn refresh-merged-trigger" secondary
+                  :loading="grayRefreshButtonLoading">
+                  <span class="refresh-dropdown-btn-inner">
+                    <n-icon v-show="!grayRefreshButtonLoading" :component="Refresh" class="refresh-dropdown-icon" />
+                    <span class="refresh-dropdown-label">刷新灰度</span>
+                  </span>
+                </n-button>
+              </n-dropdown>
+              <span class="refresh-countdown"
+                :title="`距下次自动拉取灰度列表：${grayRefreshCountdownDisplay}s（当前间隔 ${pollSeconds}s）`">{{
+                  grayRefreshCountdownDisplay }}s</span>
+            </div>
             <n-checkbox-group v-model:value="grayEnvFilters" class="gray-filter-group">
               <n-space :size="6">
                 <n-checkbox value="prod">华为云(prod)</n-checkbox>
@@ -23,46 +32,62 @@
 
       <div v-if="!isFullscreen" class="meta">
         <span>租户总数 {{ filteredTenants.length }}</span>
-        <span>灰度租户刷新时间：{{ lastGrayAtText }}</span>
+        <div class="meta-trailing">
+          <span class="meta-gray-at">灰度租户刷新时间：{{ lastGrayAtText }}</span>
+          <!-- <span class="board-sort-label">全局排序</span> -->
+          <n-select v-model:value="globalPanelSortSpec" size="small" :options="panelSortOptions"
+            class="board-sort-select" :consistent-menu-width="false" />
+        </div>
       </div>
 
       <n-spin :show="initialLoading" class="board-spin" :content-style="spinContentStyle"
         description="首次加载所有租户较耗时，请稍候">
         <div class="board-spin-slot">
+          <div v-if="isFullscreen" class="board-sort-row">
+            <span class="board-sort-label">全局排序</span>
+            <n-select v-model:value="globalPanelSortSpec" size="small" :options="panelSortOptions"
+              class="board-sort-select" :consistent-menu-width="false" />
+          </div>
           <div class="panels">
             <div v-for="panel in panels" :key="panel.key" class="panel" :class="`panel-${panel.key}`">
               <div class="panel-header">
                 <div class="panel-header-left">
-                  <span class="panel-title">
-                    {{ panel.title }}
-                  </span>
-                  <n-tag size="small" :bordered="false" type="default" class="panel-tenant-count-tag"
-                    title="本组租户数">
-                    <span class="panel-tenant-count-inner">
-                      <n-icon :component="BuildingWarehouse" class="panel-tenant-count-icon" />
-                      <span>{{ panel.items.length }}</span>
-                    </span>
-                  </n-tag>
-                  <n-tooltip trigger="hover" placement="top">
-                    <template #trigger>
-                      <n-tag size="small" :bordered="false" type="default" class="panel-car-summary-tag"
-                        title="本组昨日车辆合计，悬浮查看精确车辆数">
-                        <span class="panel-car-summary-inner">
-                          <n-icon :component="Bike" class="panel-car-summary-bike" />
-                          <span class="panel-car-summary-num">{{ formatPanelCarShortLabel(panel.carSum) }}</span>
+                  <div class="panel-header-leading">
+                    <div class="panel-title-with-count">
+                      <span class="panel-title">
+                        {{ panel.title }}
+                      </span>
+                      <n-tag size="small" :bordered="false" type="default" class="panel-tenant-count-tag"
+                        title="本组租户数">
+                        <span class="panel-tenant-count-inner">
+                          <n-icon :component="BuildingWarehouse" class="panel-tenant-count-icon" />
+                          <span>{{ panel.items.length }}</span>
                         </span>
                       </n-tag>
-                    </template>
-                    <div class="panel-stats-tooltip">车辆数：{{ formatPanelCarExact(panel.carSum) }}</div>
-                  </n-tooltip>
+                    </div>
+                    <n-tooltip trigger="hover" placement="top">
+                      <template #trigger>
+                        <n-tag size="small" :bordered="false" type="default" class="panel-car-summary-tag"
+                          title="本组昨日车辆合计，悬浮查看精确车辆数">
+                          <span class="panel-car-summary-inner">
+                            <n-icon :component="ScooterElectric" class="panel-car-summary-bike" />
+                            <span class="panel-car-summary-num">{{ formatPanelCarShortLabel(panel.carSum) }}</span>
+                          </span>
+                        </n-tag>
+                      </template>
+                      <div class="panel-stats-tooltip">车辆数：{{ formatPanelCarExact(panel.carSum) }}</div>
+                    </n-tooltip>
+                  </div>
                 </div>
                 <div class="panel-header-right">
-                  <n-select v-model:value="panelSortByKey[panel.key]" size="tiny" :options="panelSortOptions"
-                    class="panel-sort-select" :consistent-menu-width="false" @click.stop />
-                  <n-button size="tiny" circle quaternary type="primary" :disabled="panel.items.length === 0"
-                    title="复制本组" @click.stop="copyPanelTenants(panel)">
-                    <n-icon :component="Copy" />
-                  </n-button>
+                  <n-dropdown trigger="click" :options="copyPanelMenuOptions(panel)"
+                    :disabled="panel.items.length === 0" @select="(key: string) => handleCopyPanelMenuSelect(key, panel)"
+                    @click.stop>
+                    <n-button size="tiny" circle quaternary type="primary" :disabled="panel.items.length === 0"
+                      title="复制本组">
+                      <n-icon :component="Copy" />
+                    </n-button>
+                  </n-dropdown>
                 </div>
               </div>
 
@@ -71,7 +96,7 @@
                   <n-empty v-if="panel.items.length === 0" size="small" description="该组暂无租户" />
                   <div v-for="tenant in panelPageSlice(panel.items, panel.key)" :key="`${panel.key}-${tenant.tenantId}`"
                     class="tenant-row" @click="openTenantLink(tenant)">
-                    <n-avatar :src="tenant.logo || undefined" :size="20" round />
+                    <n-avatar :src="tenant.logo || undefined" :size="18" round />
                     <div class="tenant-main">
                       <div class="tenant-line">
                         <span class="tenant-id">
@@ -89,7 +114,7 @@
                         <n-tag size="small" :bordered="true" class="tenant-ebike-tag" title="昨日车辆数"
                           :color="ebikeCountTagColor">
                           <span class="tenant-ebike-tag-inner">
-                            <n-icon :component="Bike" class="tenant-ebike-icon" />
+                            <n-icon :component="ScooterElectric" class="tenant-ebike-icon" />
                             <span class="tenant-ebike-num">{{ formatYesterdayCarTotal(tenant.carTotal) }}</span>
                           </span>
                         </n-tag>
@@ -143,9 +168,9 @@
 <script setup lang="ts">
 defineOptions({ name: "TenantDashboard" });
 
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, onScopeDispose, reactive, ref, watch } from "vue";
 import { createDiscreteApi } from "naive-ui";
-import { Bike, BuildingWarehouse, Copy } from "@vicons/tabler";
+import { BuildingWarehouse, Copy, Refresh, ScooterElectric } from "@vicons/tabler";
 import { tenant_all_api, tenant_gray_api } from "@/api/business";
 import {
   normalizeGrayList,
@@ -194,11 +219,12 @@ function setPanelPage(panelKey: string, page: number) {
 }
 
 const pollOptions = [
-  { label: "3 秒", value: 3 },
-  { label: "10 秒", value: 10 },
-  { label: "1 分钟", value: 60 },
+  { label: "3s", value: 3 },
+  { label: "10s", value: 10 },
+  { label: "60s", value: 60 },
 ] as const;
 
+/** 用户选择的灰度轮询间隔（秒），仅表示配置，不随每秒变化 */
 const pollSeconds = ref<number>(10);
 const panelSortOptions: Array<{ label: string; value: string }> = [
   { label: "租户ID ↑", value: "tenantId|asc" },
@@ -206,11 +232,8 @@ const panelSortOptions: Array<{ label: string; value: string }> = [
   { label: "车辆数 ↑", value: "carTotal|asc" },
   { label: "车辆数 ↓", value: "carTotal|desc" },
 ];
-const panelSortByKey = reactive<Record<string, string>>({
-  "gray-1": "carTotal|desc",
-  "gray-2": "carTotal|desc",
-  formal: "carTotal|desc",
-});
+/** 灰度组1 / 灰度组2 / 正式 共用同一套排序 */
+const globalPanelSortSpec = ref<string>("carTotal|desc");
 const grayEnvFilters = ref<Array<"prod" | "prod2">>(["prod", "prod2"]);
 const searchKeyword = ref("");
 const isFullscreen = ref(false);
@@ -218,16 +241,23 @@ const tenants = ref<TenantItem[]>([]);
 const grayList = ref<TenantGrayItem[]>([]);
 const loadingTenants = ref(false);
 const loadingGray = ref(false);
+/** 用户触发的灰度拉取：按钮上展示 loading，定时轮询不闪动 */
+const grayRefreshButtonLoading = ref(false);
 const initialLoading = ref(true);
 const lastTenantAt = ref<number | null>(null);
 const lastGrayAt = ref<number | null>(null);
-const nextGrayDeadlineMs = ref(0);
-/** 按钮上展示的剩余秒数，由定时器每秒写入以保证界面必定刷新 */
-const refreshCountdownShown = ref(10);
+/** 仅用于界面：距下次自动拉取还剩几秒（由 grayCountdownDeadlineMs 与 Date.now() 推算，避免后台标签节流导致「不减」） */
+const grayRefreshCountdownDisplay = ref(10);
 
 let grayTimer: number | null = null;
 let countdownUiTimer: number | null = null;
 let grayFetching = false;
+/** 自动轮询 tick 与未结束的请求重叠时置位，结束后补拉一次，避免实际间隔被拉长 */
+let grayPollDeferred = false;
+/** 下一次自动拉取灰度的目标时间戳（ms）；与 setInterval 对齐，用于倒计时显示 */
+let grayCountdownDeadlineMs = 0;
+/** 离开本工具页后为 true：停止 interval，且不再写入灰度数据、不再链式 deferred 拉取 */
+let grayAutoRefreshDisposed = false;
 
 const keywordTokens = computed(() =>
   searchKeyword.value
@@ -274,8 +304,8 @@ function compareTenantItemsByCarTotal(a: TenantItem, b: TenantItem, order: "asc"
   return order === "asc" ? c : -c;
 }
 
-function sortTenantPanelItems(items: TenantItem[], panelKey: string): TenantItem[] {
-  const spec = panelSortByKey[panelKey] ?? "carTotal|desc";
+function sortTenantPanelItems(items: TenantItem[]): TenantItem[] {
+  const spec = globalPanelSortSpec.value || "carTotal|desc";
   const { key, order } = parsePanelSortSpec(spec);
   const next = [...items];
   if (key === "tenantId") {
@@ -314,19 +344,19 @@ const panels = computed(() => {
     {
       key: "gray-1",
       title: "灰度组1",
-      items: sortTenantPanelItems(gray1, "gray-1"),
+      items: sortTenantPanelItems(gray1),
       carSum: panelCarSum(gray1),
     },
     {
       key: "gray-2",
       title: "灰度组2",
-      items: sortTenantPanelItems(gray2, "gray-2"),
+      items: sortTenantPanelItems(gray2),
       carSum: panelCarSum(gray2),
     },
     {
       key: "formal",
       title: "正式",
-      items: sortTenantPanelItems(formal, "formal"),
+      items: sortTenantPanelItems(formal),
       carSum: panelCarSum(formal),
     },
   ];
@@ -355,10 +385,9 @@ watch(keywordTokens, resetAllPanelPages);
 
 watch(grayEnvFilters, resetAllPanelPages, { deep: true });
 
-watch(panelSortByKey, resetAllPanelPages, { deep: true });
+watch(globalPanelSortSpec, resetAllPanelPages);
 
 const lastGrayAtText = computed(() => (lastGrayAt.value ? new Date(lastGrayAt.value).toLocaleString() : "-"));
-const refreshButtonLabel = computed(() => `刷新灰度（${refreshCountdownShown.value}s）`);
 const refreshMenuOptions = computed(() => [
   { label: "立即刷新", key: "refresh-now" },
   { type: "divider", key: "divider-1" },
@@ -419,20 +448,91 @@ function formatPanelCarShortLabel(sum: number): string {
   return s === "—" ? "—" : `${s}辆`;
 }
 
-async function copyPanelTenants(panel: { key: string; title: string; items: TenantItem[] }) {
+type CopyPanelMenuKey = "copy-ids-comma" | "copy-ids-space" | "copy-id-name" | "copy-id-name-car" | "copy-id-name-car-env";
+
+function copyPanelMenuOptions(_panel: { title: string; items: TenantItem[] }) {
+  return [
+    { label: "仅租户ID（逗号）", key: "copy-ids-comma" as CopyPanelMenuKey },
+    { label: "仅租户ID（空格）", key: "copy-ids-space" as CopyPanelMenuKey },
+    { label: "租户ID 名称", key: "copy-id-name" as CopyPanelMenuKey },
+    { label: "租户ID 名称 车辆数", key: "copy-id-name-car" as CopyPanelMenuKey },
+    { label: "租户ID 名称 车辆数 环境", key: "copy-id-name-car-env" as CopyPanelMenuKey },
+  ];
+}
+
+async function copyPanelTenantIdsComma(panel: { title: string; items: TenantItem[] }) {
+  if (!panel.items || panel.items.length === 0) return;
+  const text = panel.items.map((t) => String(t.tenantId ?? "").trim()).join(",");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制${panel.title}（逗号分隔）`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
+async function copyPanelTenantIdsSpace(panel: { title: string; items: TenantItem[] }) {
+  if (!panel.items || panel.items.length === 0) return;
+  const text = panel.items.map((t) => String(t.tenantId ?? "").trim()).join(" ");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制${panel.title}（空格分隔）`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
+async function copyPanelTenantsIdName(panel: { title: string; items: TenantItem[] }) {
+  if (!panel.items || panel.items.length === 0) return;
+  const text = panel.items
+    .map((tenant) => `${tenant.tenantId} ${tenant.tenantName || "-"}`.trim())
+    .join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制${panel.title}（ID、名称）`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
+async function copyPanelTenantsIdNameCar(panel: { key: string; title: string; items: TenantItem[] }) {
   if (!panel.items || panel.items.length === 0) return;
   const text = panel.items
     .map(
       (tenant) =>
-        `${tenant.tenantId} ${tenant.tenantName || "-"} 🚲 ${formatYesterdayCarTotal(tenant.carTotal)} ${envTagDisplayText(tenant.env, panel.key)}`,
+        `${tenant.tenantId} ${tenant.tenantName || "-"} ${formatYesterdayCarTotal(tenant.carTotal)}`,
     )
     .join("\n");
   try {
     await navigator.clipboard.writeText(text);
-    message.success(`已复制${panel.title}全部租户（${panel.items.length}条）`);
+    message.success(`已复制${panel.title}（ID、名称、车辆数）`);
   } catch {
     message.error("复制失败，请手动复制");
   }
+}
+
+async function copyPanelTenantsIdNameCarEnv(panel: { key: string; title: string; items: TenantItem[] }) {
+  if (!panel.items || panel.items.length === 0) return;
+  const text = panel.items
+    .map(
+      (tenant) =>
+        `${tenant.tenantId} ${tenant.tenantName || "-"} ${formatYesterdayCarTotal(tenant.carTotal)} ${envTagDisplayText(tenant.env, panel.key)}`,
+    )
+    .join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制${panel.title}（ID、名称、车辆数、环境）`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
+function handleCopyPanelMenuSelect(key: string, panel: { key: string; title: string; items: TenantItem[] }) {
+  if (key === "copy-ids-comma") void copyPanelTenantIdsComma(panel);
+  else if (key === "copy-ids-space") void copyPanelTenantIdsSpace(panel);
+  else if (key === "copy-id-name") void copyPanelTenantsIdName(panel);
+  else if (key === "copy-id-name-car") void copyPanelTenantsIdNameCar(panel);
+  else if (key === "copy-id-name-car-env") void copyPanelTenantsIdNameCarEnv(panel);
 }
 
 async function copyText(text: string, label: string) {
@@ -459,7 +559,12 @@ async function toggleFullscreen() {
 }
 
 async function refreshAll() {
-  await Promise.all([fetchTenantList(), fetchGrayList()]);
+  grayRefreshButtonLoading.value = true;
+  try {
+    await Promise.all([fetchTenantList(), fetchGrayList()]);
+  } finally {
+    grayRefreshButtonLoading.value = false;
+  }
 }
 
 async function handleRefreshMenuSelect(key: string) {
@@ -472,7 +577,8 @@ async function handleRefreshMenuSelect(key: string) {
     const next = Number(key.replace("interval-", ""));
     if (next === 3 || next === 10 || next === 60) {
       pollSeconds.value = next;
-      await fetchGrayList();
+      await fetchGrayList({ buttonLoading: true });
+      startGrayPolling();
     }
   }
 }
@@ -549,22 +655,42 @@ async function fetchTenantList() {
   }
 }
 
-async function fetchGrayList() {
-  if (grayFetching) return;
+type FetchGrayListOptions = { buttonLoading?: boolean };
+
+async function fetchGrayList(options?: FetchGrayListOptions) {
+  if (grayFetching) {
+    if (!options?.buttonLoading && !grayAutoRefreshDisposed) {
+      grayPollDeferred = true;
+    }
+    return;
+  }
+  const showBtnLoading = options?.buttonLoading === true;
   grayFetching = true;
   loadingGray.value = true;
+  if (showBtnLoading) grayRefreshButtonLoading.value = true;
   try {
     const res: any = await tenant_gray_api();
+    if (grayAutoRefreshDisposed) {
+      return;
+    }
     if (res != null && Number(res.code) !== 0) {
       throw new Error(res?.msg || "获取灰度租户失败");
     }
     grayList.value = normalizeGrayList(res?.data);
     lastGrayAt.value = Date.now();
   } catch (error: any) {
-    message.error(error?.message || String(error) || "获取灰度租户失败");
+    if (!grayAutoRefreshDisposed) {
+      message.error(error?.message || String(error) || "获取灰度租户失败");
+    }
   } finally {
     loadingGray.value = false;
     grayFetching = false;
+    if (showBtnLoading) grayRefreshButtonLoading.value = false;
+    const runDeferred = grayPollDeferred;
+    grayPollDeferred = false;
+    if (runDeferred && !grayAutoRefreshDisposed) {
+      void fetchGrayList();
+    }
   }
 }
 
@@ -575,21 +701,42 @@ function clearGrayPolling() {
   }
 }
 
-function syncRefreshCountdown() {
-  const intervalSec = Math.max(1, Number(pollSeconds.value));
-  const deadline = nextGrayDeadlineMs.value;
-  if (!deadline) {
-    refreshCountdownShown.value = intervalSec;
+/** 离开本工具时注销灰度自动轮询与倒计时（路由离开与卸载都会调用，需幂等） */
+function stopGrayAutoRefreshTimers() {
+  grayAutoRefreshDisposed = true;
+  grayPollDeferred = false;
+  clearGrayPolling();
+  stopCountdownTicker();
+  grayCountdownDeadlineMs = 0;
+}
+
+function armGrayCountdownDeadlineFromIntervalMs(ms: number) {
+  grayCountdownDeadlineMs = Date.now() + ms;
+  syncGrayCountdownDisplayFromDeadline();
+}
+
+/** 根据截止时间推算剩余整秒数（轮询触发时会重新 arm，与灰度 interval 一致） */
+function syncGrayCountdownDisplayFromDeadline() {
+  if (!grayCountdownDeadlineMs) {
+    const sec = Number(pollSeconds.value);
+    grayRefreshCountdownDisplay.value = Number.isFinite(sec) && sec > 0 ? Math.floor(sec) : 10;
     return;
   }
-  refreshCountdownShown.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  grayRefreshCountdownDisplay.value = Math.max(0, Math.ceil((grayCountdownDeadlineMs - Date.now()) / 1000));
 }
 
 function startCountdownTicker() {
-  if (countdownUiTimer != null) return;
-  syncRefreshCountdown();
+  if (grayAutoRefreshDisposed || countdownUiTimer != null) return;
+  if (!grayCountdownDeadlineMs) {
+    armGrayCountdownDeadlineFromIntervalMs(Math.max(1, Number(pollSeconds.value)) * 1000);
+  }
+  syncGrayCountdownDisplayFromDeadline();
   countdownUiTimer = window.setInterval(() => {
-    syncRefreshCountdown();
+    if (grayAutoRefreshDisposed) {
+      stopCountdownTicker();
+      return;
+    }
+    syncGrayCountdownDisplayFromDeadline();
   }, 1000);
 }
 
@@ -601,13 +748,18 @@ function stopCountdownTicker() {
 }
 
 function startGrayPolling() {
+  if (grayAutoRefreshDisposed) {
+    return;
+  }
   clearGrayPolling();
   const ms = Math.max(1, Number(pollSeconds.value)) * 1000;
-  nextGrayDeadlineMs.value = Date.now() + ms;
-  syncRefreshCountdown();
+  armGrayCountdownDeadlineFromIntervalMs(ms);
   grayTimer = window.setInterval(() => {
-    nextGrayDeadlineMs.value = Date.now() + ms;
-    syncRefreshCountdown();
+    if (grayAutoRefreshDisposed) {
+      clearGrayPolling();
+      return;
+    }
+    armGrayCountdownDeadlineFromIntervalMs(ms);
     void fetchGrayList();
   }, ms);
 }
@@ -617,15 +769,30 @@ async function refreshTenantList() {
 }
 
 async function refreshGrayList() {
-  await fetchGrayList();
+  await fetchGrayList({ buttonLoading: true });
 }
 
-watch(pollSeconds, () => {
-  startGrayPolling();
-});
+watch(
+  pollSeconds,
+  () => {
+    if (!grayAutoRefreshDisposed) {
+      startGrayPolling();
+    }
+  },
+  { flush: "sync" },
+);
 
 function handleFullscreenChange() {
   isFullscreen.value = Boolean(document.fullscreenElement);
+}
+
+function handleVisibilityChangeForGrayCountdown() {
+  if (grayAutoRefreshDisposed) {
+    return;
+  }
+  if (document.visibilityState === "visible") {
+    syncGrayCountdownDisplayFromDeadline();
+  }
 }
 
 let bootstrapped = false;
@@ -640,11 +807,21 @@ async function bootstrapDashboard() {
   } finally {
     initialLoading.value = false;
   }
-  startGrayPolling();
+  if (!grayAutoRefreshDisposed) {
+    startGrayPolling();
+  }
+}
+
+function teardownTenantDashboard() {
+  document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  document.removeEventListener("visibilitychange", handleVisibilityChangeForGrayCountdown);
+  stopGrayAutoRefreshTimers();
 }
 
 onMounted(() => {
+  grayAutoRefreshDisposed = false;
   document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("visibilitychange", handleVisibilityChangeForGrayCountdown);
   handleFullscreenChange();
   startCountdownTicker();
   void bootstrapDashboard();
@@ -654,9 +831,11 @@ onMounted(() => {
 void bootstrapDashboard();
 
 onBeforeUnmount(() => {
-  document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  clearGrayPolling();
-  stopCountdownTicker();
+  teardownTenantDashboard();
+});
+
+onScopeDispose(() => {
+  teardownTenantDashboard();
 });
 </script>
 
@@ -768,8 +947,27 @@ onBeforeUnmount(() => {
   width: 140px;
 }
 
+.refresh-merged {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.refresh-merged .refresh-dropdown-btn.refresh-merged-trigger {
+  min-width: 108px;
+  height: 34px;
+  font-size: 13px;
+  border-radius: 0;
+  border: none;
+  box-shadow: none !important;
+}
+
 .refresh-dropdown-btn {
-  min-width: 132px;
+  min-width: 108px;
   height: 34px;
   font-size: 13px;
   border-radius: 8px;
@@ -777,6 +975,41 @@ onBeforeUnmount(() => {
 
 .refresh-dropdown-btn:deep(.n-button__content) {
   font-weight: 600;
+}
+
+.refresh-dropdown-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refresh-dropdown-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.refresh-dropdown-label {
+  white-space: nowrap;
+}
+
+.refresh-countdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2em;
+  padding: 0 10px;
+  border: none;
+  border-left: 1px solid #e5e7eb;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 34px;
+  min-height: 34px;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  background: #f1f5f9;
+  user-select: none;
 }
 
 .gray-filter-group {
@@ -798,12 +1031,28 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   flex-shrink: 0;
   margin-bottom: 12px;
   font-size: 12px;
   font-weight: 500;
   color: #64748b;
   padding: 0 2px;
+}
+
+.meta-trailing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: flex-end;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.meta-gray-at {
+  white-space: nowrap;
 }
 
 .panels {
@@ -833,7 +1082,7 @@ onBeforeUnmount(() => {
 .panel-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -856,11 +1105,35 @@ onBeforeUnmount(() => {
 
 .panel-header-left {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
   min-width: 0;
   flex: 1 1 auto;
+}
+
+.panel-header-leading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.panel-title-with-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* 抵消标题 letter-spacing 在末字后的留白，三组面板一致贴紧数量 */
+.panel .panel-header .panel-title-with-count .panel-title {
+  margin-inline-end: -0.12em;
+}
+
+.panel .panel-header .panel-title-with-count :deep(.panel-tenant-count-tag) {
+  margin-inline-start: 0;
 }
 
 .panel-header-right {
@@ -869,21 +1142,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-
-.panel-sort-select {
-  width: 86px;
-  max-width: 86px;
-}
-
-.panel-sort-select:deep(.n-base-selection) {
-  font-size: 12px;
-}
-
-.panel-sort-select:deep(.n-base-selection-label) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .panel-title {
@@ -938,6 +1196,10 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
+.panel-header :deep(.panel-tenant-count-tag) {
+  padding: 0 6px !important;
+}
+
 .panel-car-summary-inner {
   display: inline-flex;
   align-items: center;
@@ -975,7 +1237,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px;
-  padding-top: 4px;
+  padding-top: 2px;
   flex-shrink: 0;
 }
 
@@ -985,6 +1247,39 @@ onBeforeUnmount(() => {
   overflow: visible;
   flex: 1 1 auto;
   width: 100%;
+}
+
+.board-sort-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.board-sort-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.board-sort-select {
+  width: 120px;
+  max-width: min(120px, 100%);
+}
+
+.board-sort-select:deep(.n-base-selection) {
+  font-size: 12px;
+}
+
+.board-sort-select:deep(.n-base-selection-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-spin :deep(.n-spin-content) {
@@ -998,8 +1293,8 @@ onBeforeUnmount(() => {
 .tenant-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 2px;
+  gap: 3px;
+  padding: 2px 2px;
   border-bottom: 1px dashed #edf2f7;
   cursor: pointer;
   border-radius: 4px;
@@ -1019,10 +1314,10 @@ onBeforeUnmount(() => {
 .tenant-line {
   display: grid;
   /* 第一列固定约 4 位数字宽（ch = 「0」字宽，tabular-nums 下对齐） */
-  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-ebike, 60px)
-    var(--tenant-col-env, 86px);
+  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-ebike, 58px)
+    var(--tenant-col-env, 84px);
   align-items: center;
-  column-gap: 4px;
+  column-gap: 3px;
   font-size: 11px;
   line-height: 1;
   width: 100%;
@@ -1073,10 +1368,10 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   justify-content: flex-start;
   margin-left: 0;
-  height: 18px;
+  height: 17px;
   font-size: 11px;
-  line-height: 16px;
-  padding: 0 4px;
+  line-height: 15px;
+  padding: 0 3px;
 }
 
 .tenant-line :deep(.tenant-ebike-tag .n-tag__content) {
@@ -1113,10 +1408,10 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   justify-content: center;
   margin-left: 0;
-  height: 18px;
+  height: 17px;
   font-size: 11px;
-  line-height: 16px;
-  padding: 0 6px;
+  line-height: 15px;
+  padding: 0 5px;
 }
 
 .tenant-line :deep(.tenant-env-tag .n-tag__content) {

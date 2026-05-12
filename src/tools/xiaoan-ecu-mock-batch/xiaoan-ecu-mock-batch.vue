@@ -208,10 +208,10 @@
                 </n-form-item>
               </n-gi>
 
-              <n-gi :span="12">
+              <n-gi :span="7">
                 <n-form-item label="创建模式" required>
                   <div class="mode-section">
-                    <n-space :size="12" align="center">
+                    <n-space :size="12" align="center" wrap>
                       <n-radio-group v-model:value="formData.create_mode" name="create-mode">
                         <n-space :size="8">
                           <n-radio :value="1">并行创建</n-radio>
@@ -228,6 +228,13 @@
                       {{ createModeTipText }}
                     </div>
                   </div>
+                </n-form-item>
+              </n-gi>
+              <n-gi :span="5">
+                <n-form-item label="响应延迟(秒)">
+                  <n-input-number v-model:value="formData.reply_delay_sec" :min="0" :max="REPLY_DELAY_MAX_SEC"
+                    :precision="0" :show-button="false" size="small" style="width: 100%; max-width: 140px"
+                    placeholder="0" @update:value="onReplyDelaySecUpdate" />
                 </n-form-item>
               </n-gi>
 
@@ -447,6 +454,7 @@ import {
 } from "@/api/device";
 import {
   buildBatchPayload,
+  REPLY_DELAY_MAX_SEC,
   isFifteenDigitImei,
   parseImeiLngLatCsv,
   parseCoordinatesText,
@@ -588,6 +596,7 @@ const defaultFormData: BatchFormData = {
   mode: 1,
   create_mode: 1,
   serial_interval_ms: 10,
+  reply_delay_sec: 0,
   num: 10,
   start_imei: "",
   imeis_text: "",
@@ -642,6 +651,18 @@ function getInitialFormData(): BatchFormData {
       merged.serial_interval_ms = defaultFormData.serial_interval_ms;
     } else {
       merged.serial_interval_ms = Math.trunc(Number(merged.serial_interval_ms));
+    }
+    if (
+      merged.reply_delay_sec == null ||
+      !Number.isFinite(Number(merged.reply_delay_sec)) ||
+      Number(merged.reply_delay_sec) < 0
+    ) {
+      merged.reply_delay_sec = defaultFormData.reply_delay_sec;
+    } else {
+      merged.reply_delay_sec = Math.min(
+        REPLY_DELAY_MAX_SEC,
+        Math.max(0, Math.trunc(Number(merged.reply_delay_sec))),
+      );
     }
     return merged;
   } catch {
@@ -1419,6 +1440,15 @@ function saveFormToStorage() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...formData }));
 }
 
+function onReplyDelaySecUpdate(value: number | null) {
+  if (value == null || !Number.isFinite(Number(value))) {
+    formData.reply_delay_sec = 0;
+  } else {
+    formData.reply_delay_sec = Math.min(REPLY_DELAY_MAX_SEC, Math.max(0, Math.trunc(Number(value))));
+  }
+  saveFormToStorage();
+}
+
 watch(
   () => formData.num,
   () => {
@@ -1818,6 +1848,11 @@ function applyBatchRecordDataToForm(res: unknown) {
   if (Number.isFinite(recLng) && Number.isFinite(recLat)) {
     formData.lng = recLng;
     formData.lat = recLat;
+  }
+
+  const replyDelaySec = Number(record.reply_delay_sec);
+  if (Number.isFinite(replyDelaySec) && replyDelaySec >= 0) {
+    formData.reply_delay_sec = Math.min(REPLY_DELAY_MAX_SEC, Math.max(0, Math.trunc(replyDelaySec)));
   }
 
   const recordCoordinates = Array.isArray(record.coordinates) ? record.coordinates : [];

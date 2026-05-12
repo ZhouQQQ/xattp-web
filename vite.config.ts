@@ -28,7 +28,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/xattp-auth/, '')
       },
       '/xattp-server':{
-        target:'http://localhost:8890',
+        target:'http://10.160.10.51:8890',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/xattp-server/, '')
       }
@@ -80,6 +80,8 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    /** 避免多份 vue / vue-router 导致 inject 取不到、setup 里读 undefined.value */
+    dedupe: ['vue', 'vue-router'],
   },
   define: {
     'import.meta.env.PACKAGE_VERSION': JSON.stringify(process.env.npm_package_version),

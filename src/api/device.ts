@@ -121,6 +121,7 @@ export function xiaoanEcuMockBatchCreateAPI(data: {
   coordinates?: Array<{ lat: number; lng: number }>;
   create_mode?: 1 | 2;
   serial_interval_ms?: number;
+  reply_delay_sec?: number;
   mode: 1 | 2 | 3;
   num?: number;
   start_imei?: string;
@@ -207,6 +208,11 @@ export function rentalBusinessAddEbikeAPI(data: {
   shop_id: string;
 }) {
   return AlovaInstance.Post(`${BASE_PATH}/rental_business_tool/ebike/add`, data);
+}
+
+/** 短租工具：根据美团店铺 ID 查询店铺名称与 access_token */
+export function rentalBusinessGetMeituanTokenAPI(params: { meituan_shop_id: string }) {
+  return AlovaInstance.Get(`${BASE_PATH}/rental_business_tool/get_meituan_token`, { params });
 }
 
 /** 租车中控模拟：添加 mock 连接（接口 /ecu/mock/add，无租户ID/服务区） */

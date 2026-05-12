@@ -1541,38 +1541,18 @@ async function handleCloseTab(name: string) {
   }
 }
 
-/* 连接成功时：整卡绿色追随转圈边框动画 */
+/* 连接成功时：整卡绿色边框（无动画） */
 .card-wrap {
   border-radius: 8px;
 }
 
 .card-wrap-reporting {
   border-radius: 10px;
-  border: 2px solid transparent;
-  background: linear-gradient(var(--card-bg, #fff), var(--card-bg, #fff)) padding-box,
-    conic-gradient(from var(--border-angle, 0deg),
-      #22c55e 0deg,
-      #22c55e 90deg,
-      transparent 90deg) border-box;
-  background-origin: border-box;
-  background-repeat: no-repeat;
-  animation: border-angle-spin 5s linear infinite;
+  border: 2px solid #22c55e;
 }
 
 .card-wrap-reporting :deep(.n-card) {
   border-radius: 6px;
-}
-
-@property --border-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes border-angle-spin {
-  to {
-    --border-angle: 360deg;
-  }
 }
 
 .form-section {

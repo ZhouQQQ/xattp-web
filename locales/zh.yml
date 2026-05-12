@@ -88,6 +88,9 @@ tools:
   rental-ecu-mock:
     title: 短租中控模拟 
     description: 短租中控模拟,用于测试和调试短租中控的通信,暂时只支持共享协议中控
+  rental-get-meituan-shop-token:
+    title: 获取美团店铺token
+    description: 输入美团店铺ID，查询店铺名称与 access_token，支持一键复制（需登录平台）
   quick-set-ecu-voice:
     title: 快捷语音位设置
     description: 使用文本快速快捷设置你的中控语音位

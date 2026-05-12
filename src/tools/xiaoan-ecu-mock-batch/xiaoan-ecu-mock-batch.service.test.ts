@@ -23,6 +23,7 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
     mode: 1,
     create_mode: 1,
     serial_interval_ms: 10,
+    reply_delay_sec: 0,
     num: 3,
     start_imei: "",
     imeis_text: "",
@@ -101,6 +102,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
       mode: 3,
       create_mode: 1,
       serial_interval_ms: 10,
+      reply_delay_sec: 0,
       server: "mock.example.com",
       voltage_min: 50,
       voltage_max: 54,
@@ -164,6 +166,24 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     ]);
   });
 
+  it("会将响应延迟写入 payload", () => {
+    const payload = buildBatchPayload(
+      createForm({
+        reply_delay_sec: 5,
+      }),
+    );
+    expect(payload.reply_delay_sec).toBe(5);
+  });
+
+  it("响应延迟超过 60 秒时在 payload 中钳制为 60", () => {
+    const payload = buildBatchPayload(
+      createForm({
+        reply_delay_sec: 999,
+      }),
+    );
+    expect(payload.reply_delay_sec).toBe(60);
+  });
+
   it("可以按每行经纬度解析 coordinates 文本", () => {
     const points = parseCoordinatesText("114.2,30.1");
     expect(points).toEqual([{ lat: 30.1, lng: 114.2 }]);
@@ -180,6 +200,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     );
     expect(payload.create_mode).toBe(2);
     expect(payload.serial_interval_ms).toBe(25);
+    expect(payload.reply_delay_sec).toBe(0);
   });
 
   it("可以解析 imei,lng,lat 格式 CSV", () => {

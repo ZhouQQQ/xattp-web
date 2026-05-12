@@ -2,6 +2,9 @@ export type BatchCreateMode = 1 | 2 | 3;
 export type CoordMode = "scatter" | "fixed";
 export type CreateMode = 1 | 2;
 
+/** 批量 mock 响应延迟（秒）上限，与表单、接口约定一致 */
+export const REPLY_DELAY_MAX_SEC = 60;
+
 export interface BatchFormData {
   env: string;
   server: string;
@@ -16,6 +19,8 @@ export interface BatchFormData {
   mode: BatchCreateMode;
   create_mode: CreateMode;
   serial_interval_ms: number;
+  /** 中控模拟响应延迟（秒），0 表示不延迟 */
+  reply_delay_sec: number;
   num: number | null;
   start_imei: string;
   imeis_text: string;
@@ -37,6 +42,7 @@ export interface BatchPayload {
   mode: BatchCreateMode;
   create_mode?: CreateMode;
   serial_interval_ms?: number;
+  reply_delay_sec?: number;
   num?: number;
   start_imei?: string;
   imeis?: string[];
@@ -186,6 +192,10 @@ export function validateBatchForm(form: BatchFormData): string | null {
   if (!Number.isInteger(form.serial_interval_ms) || form.serial_interval_ms < 0) {
     return "串行间隔必须是大于等于 0 的整数（ms）";
   }
+  const replyDelaySec = Math.trunc(Number(form.reply_delay_sec));
+  if (!Number.isFinite(replyDelaySec) || replyDelaySec < 0) {
+    return "响应延迟必须是大于等于 0 的整数（秒）";
+  }
 
   return null;
 }
@@ -196,6 +206,10 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
     mode: form.mode,
     create_mode: form.create_mode,
     serial_interval_ms: Math.trunc(form.serial_interval_ms),
+    reply_delay_sec: Math.min(
+      REPLY_DELAY_MAX_SEC,
+      Math.max(0, Math.trunc(Number(form.reply_delay_sec))),
+    ),
   };
 
   const server = form.server.trim();
