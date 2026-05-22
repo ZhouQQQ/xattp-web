@@ -300,6 +300,7 @@ export function cabinetMockCreateAPI(data: {
   door_num: number;
   battery_num: number;
   powermode?: number;
+  power_consumption?: number;
 }) {
   return AlovaInstance.Post(`${BASE_PATH}/cabinet/mock/create`, data);
 }

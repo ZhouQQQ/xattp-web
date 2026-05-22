@@ -28,7 +28,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/xattp-auth/, '')
       },
       '/xattp-server':{
-        target:'http://10.160.10.51:8890',
+        target:'http://localhost:8890',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/xattp-server/, '')
       }

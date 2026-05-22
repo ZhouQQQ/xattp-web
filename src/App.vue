@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { RouterView, useRoute } from 'vue-router';
-import { NGlobalStyle, NMessageProvider, NNotificationProvider, darkTheme } from 'naive-ui';
+import {
+  NGlobalStyle,
+  NMessageProvider,
+  NNotificationProvider,
+  darkTheme,
+  zhCN,
+  dateZhCN,
+  enUS,
+  dateEnUS,
+} from 'naive-ui';
 import { darkThemeOverrides, lightThemeOverrides } from './themes';
 import { layouts } from './layouts';
 import { useStyleStore } from './stores/style.store';
@@ -14,6 +23,13 @@ const themeOverrides = computed(() => (styleStore.isDarkTheme ? darkThemeOverrid
 
 const { locale } = useI18n();
 
+const naiveLocale = computed(() =>
+  String(locale.value).toLowerCase().startsWith('zh') ? zhCN : enUS,
+);
+const naiveDateLocale = computed(() =>
+  String(locale.value).toLowerCase().startsWith('zh') ? dateZhCN : dateEnUS,
+);
+
 syncRef(
   locale,
   useStorage('locale', locale),
@@ -21,7 +37,11 @@ syncRef(
 </script>
 
 <template>
-  <n-config-provider :theme="theme" :theme-overrides="themeOverrides">
+  <n-config-provider
+    :theme="theme"
+    :theme-overrides="themeOverrides"
+    :locale="naiveLocale"
+    :date-locale="naiveDateLocale">
     <NGlobalStyle />
     <NMessageProvider placement="bottom">
       <NNotificationProvider placement="bottom-right">

@@ -5,33 +5,43 @@
         <div class="search-row">
           <n-input v-model:value="searchKeyword" clearable size="large" class="search-input search-input-mac"
             placeholder="搜索：租户ID / 租户名称" />
+          <div class="car-filter-wrap" title="按昨日车辆数筛选（与搜索同时生效）">
+            <span class="car-filter-label">车辆</span>
+            <n-select v-model:value="carFilterOp" size="small" :options="carFilterOpOptions"
+              class="car-filter-op-select" :consistent-menu-width="false" />
+            <n-input-number v-model:value="carFilterThreshold" clearable :show-button="false" placeholder="数量"
+              size="small" :min="0" :precision="0" :update-value-on-input="true"
+              class="car-filter-threshold-input" />
+          </div>
           <div class="toolbar-actions">
-            <div class="refresh-merged">
-              <n-dropdown trigger="click" :options="refreshMenuOptions" @select="handleRefreshMenuSelect">
-                <n-button size="small" class="refresh-dropdown-btn refresh-merged-trigger" secondary
-                  :loading="grayRefreshButtonLoading">
-                  <span class="refresh-dropdown-btn-inner">
-                    <n-icon v-show="!grayRefreshButtonLoading" :component="Refresh" class="refresh-dropdown-icon" />
-                    <span class="refresh-dropdown-label">刷新灰度</span>
-                  </span>
-                </n-button>
-              </n-dropdown>
-              <span class="refresh-countdown"
-                :title="`距下次自动拉取灰度列表：${grayRefreshCountdownDisplay}s（当前间隔 ${pollSeconds}s）`">{{
-                  grayRefreshCountdownDisplay }}s</span>
-            </div>
             <n-checkbox-group v-model:value="grayEnvFilters" class="gray-filter-group">
               <n-space :size="6">
                 <n-checkbox value="prod">华为云(prod)</n-checkbox>
                 <n-checkbox value="prod2">阿里云(prod2)</n-checkbox>
               </n-space>
             </n-checkbox-group>
+            <div class="refresh-merged">
+              <n-dropdown trigger="click" :options="refreshMenuOptions" @select="handleRefreshMenuSelect">
+                <n-button size="small" class="refresh-dropdown-btn refresh-merged-trigger" quaternary
+                  :loading="grayRefreshButtonLoading"
+                  :title="`距下次自动拉取灰度列表：${grayRefreshCountdownDisplay}s（当前间隔 ${pollSeconds}s）`">
+                  <span class="refresh-dropdown-btn-inner">
+                    <n-icon v-show="!grayRefreshButtonLoading" :component="Refresh" class="refresh-dropdown-icon" />
+                    <span class="refresh-dropdown-label">刷新灰度</span>
+                    <span class="refresh-countdown-inline">{{ grayRefreshCountdownDisplay }}s</span>
+                  </span>
+                </n-button>
+              </n-dropdown>
+            </div>
           </div>
         </div>
       </div>
 
       <div v-if="!isFullscreen" class="meta">
-        <span>租户总数 {{ filteredTenants.length }}</span>
+        <span class="meta-total">
+          <n-icon :component="BuildingWarehouse" class="meta-total-icon" />
+          <span>租户总数 {{ filteredTenants.length }}</span>
+        </span>
         <div class="meta-trailing">
           <span class="meta-gray-at">灰度租户刷新时间：{{ lastGrayAtText }}</span>
           <!-- <span class="board-sort-label">全局排序</span> -->
@@ -235,6 +245,12 @@ const panelSortOptions: Array<{ label: string; value: string }> = [
 /** 灰度组1 / 灰度组2 / 正式 共用同一套排序 */
 const globalPanelSortSpec = ref<string>("carTotal|desc");
 const grayEnvFilters = ref<Array<"prod" | "prod2">>(["prod", "prod2"]);
+const carFilterOp = ref<"lt" | "gte">("gte");
+const carFilterOpOptions: Array<{ label: string; value: "lt" | "gte" }> = [
+  { label: "≥", value: "gte" },
+  { label: "<", value: "lt" },
+];
+const carFilterThreshold = ref<number | null>(null);
 const searchKeyword = ref("");
 const isFullscreen = ref(false);
 const tenants = ref<TenantItem[]>([]);
@@ -274,16 +290,30 @@ const grayMap = computed(() => {
 
 const filteredTenants = computed(() => {
   const tokens = keywordTokens.value;
-  if (tokens.length === 0) return tenants.value;
+  const threshold = carFilterThreshold.value;
+  const hasCarFilter = threshold != null && Number.isFinite(threshold);
   return tenants.value.filter((tenant) => {
-    const tenantId = String(tenant.tenantId ?? "").toLowerCase();
-    const tenantName = String(tenant.tenantName ?? "").toLowerCase();
-    return tokens.some((token) => {
-      if (/^\d+$/.test(token)) {
-        return tenantId === token;
-      }
-      return tenantId.includes(token) || tenantName.includes(token);
-    });
+    if (tokens.length > 0) {
+      const tenantId = String(tenant.tenantId ?? "").toLowerCase();
+      const tenantName = String(tenant.tenantName ?? "").toLowerCase();
+      const keywordOk = tokens.some((token) => {
+        if (/^\d+$/.test(token)) {
+          return tenantId === token;
+        }
+        return tenantId.includes(token) || tenantName.includes(token);
+      });
+      if (!keywordOk) return false;
+    }
+    if (hasCarFilter) {
+      const raw = tenant.carTotal;
+      const n =
+        raw == null || !Number.isFinite(Number(raw)) ? Number.NaN : Number(raw);
+      if (Number.isNaN(n)) return false;
+      if (carFilterOp.value === "lt") {
+        if (!(n < threshold)) return false;
+      } else if (!(n >= threshold)) return false;
+    }
+    return true;
   });
 });
 
@@ -382,6 +412,10 @@ function resetAllPanelPages() {
 }
 
 watch(keywordTokens, resetAllPanelPages);
+
+watch(carFilterOp, resetAllPanelPages);
+
+watch(carFilterThreshold, resetAllPanelPages);
 
 watch(grayEnvFilters, resetAllPanelPages, { deep: true });
 
@@ -912,6 +946,38 @@ onScopeDispose(() => {
 
 .search-input {
   flex: 1;
+  min-width: 0;
+}
+
+.car-filter-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.car-filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.car-filter-op-select {
+  width: 52px;
+}
+
+.car-filter-threshold-input {
+  width: 96px;
+}
+
+.car-filter-threshold-input :deep(.n-input) {
+  border-radius: 8px;
 }
 
 .search-input-mac {
@@ -951,30 +1017,43 @@ onScopeDispose(() => {
   display: inline-flex;
   align-items: stretch;
   flex-shrink: 0;
-  border-radius: 8px;
-  overflow: hidden;
   border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background: #ffffff;
+  overflow: hidden;
 }
 
 .refresh-merged .refresh-dropdown-btn.refresh-merged-trigger {
-  min-width: 108px;
+  min-width: 0;
   height: 34px;
+  padding: 0 10px;
   font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
   border-radius: 0;
-  border: none;
+  border: none !important;
   box-shadow: none !important;
+  background: transparent !important;
+}
+
+.refresh-merged .refresh-dropdown-btn.refresh-merged-trigger:hover {
+  color: #0f172a;
+  background: #f8fafc !important;
+}
+
+.refresh-merged .refresh-dropdown-btn.refresh-merged-trigger:deep(.n-button__content) {
+  color: inherit;
 }
 
 .refresh-dropdown-btn {
-  min-width: 108px;
+  min-width: 0;
   height: 34px;
   font-size: 13px;
   border-radius: 8px;
 }
 
 .refresh-dropdown-btn:deep(.n-button__content) {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .refresh-dropdown-btn-inner {
@@ -984,31 +1063,25 @@ onScopeDispose(() => {
 }
 
 .refresh-dropdown-icon {
-  font-size: 16px;
+  font-size: 15px;
   flex-shrink: 0;
-  opacity: 0.9;
+  opacity: 0.88;
+  color: inherit;
 }
 
 .refresh-dropdown-label {
   white-space: nowrap;
+  font-weight: 500;
 }
 
-.refresh-countdown {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2em;
-  padding: 0 10px;
-  border: none;
-  border-left: 1px solid #e5e7eb;
-  border-radius: 0;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 34px;
-  min-height: 34px;
+.refresh-countdown-inline {
+  margin-left: 2px;
+  padding-left: 8px;
+  border-left: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: #0f172a;
-  background: #f1f5f9;
+  color: #64748b;
   user-select: none;
 }
 
@@ -1039,6 +1112,19 @@ onScopeDispose(() => {
   font-weight: 500;
   color: #64748b;
   padding: 0 2px;
+}
+
+.meta-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.meta-total-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.92;
 }
 
 .meta-trailing {

@@ -23,3 +23,7 @@ export function tenant_all_api(env?: string) {
 export function tenant_gray_api() {
     return AlovaInstance.Get(`${BASE_PATH}${MODULE_PATH}/tenant/gray`);
 }
+
+export function tenant_gray_ai_api(data: { gray_tenant_list: string }) {
+    return AlovaInstance.Post(`${BASE_PATH}${MODULE_PATH}/tenant/gray/ai`, data);
+}

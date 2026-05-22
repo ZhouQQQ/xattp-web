@@ -57,7 +57,7 @@
                   size="small" :disabled="simulating" style="width: 100%" />
               </n-form-item>
             </n-gi>
-            <!-- 第三行：供电模式 -->
+            <!-- 第三行：供电模式、耗电量 -->
             <n-gi :span="4">
               <n-form-item label="供电模式" path="powerMode">
                 <n-radio-group v-model:value="formData.powerMode" name="powerMode" size="small">
@@ -67,6 +67,12 @@
                     </n-radio>
                   </n-space>
                 </n-radio-group>
+              </n-form-item>
+            </n-gi>
+            <n-gi :span="4">
+              <n-form-item label="耗电量(kw·h)" path="power_consumption">
+                <n-input-number v-model:value="formData.power_consumption" :min="0" :step="0.1" size="small"
+                  style="width: 100%" />
               </n-form-item>
             </n-gi>
           </n-grid>
@@ -291,6 +297,7 @@ function loadCabinetMockFormFromStorage(): Partial<{
   imei: string;
   cabinetType: number;
   powerMode: number;
+  power_consumption: number;
   doorCount: number;
   batteryCount: number;
 }> {
@@ -315,11 +322,16 @@ function loadCabinetMockFormFromStorage(): Partial<{
         parsed.batteryCount >= 0
         ? parsed.batteryCount
         : undefined;
+    const power_consumption =
+      typeof parsed.power_consumption === "number" && parsed.power_consumption >= 0
+        ? parsed.power_consumption
+        : undefined;
     return {
       ...(env != null && { env }),
       ...(imei != null && { imei }),
       ...(cabinetType != null && { cabinetType }),
       ...(powerMode != null && { powerMode }),
+      ...(power_consumption != null && { power_consumption }),
       ...(doorCount != null && { doorCount }),
       ...(batteryCount != null && { batteryCount }),
     };
@@ -337,6 +349,7 @@ function saveCabinetMockFormToStorage() {
         imei: formData.imei,
         cabinetType: formData.cabinetType,
         powerMode: formData.powerMode,
+        power_consumption: formData.power_consumption,
         doorCount: formData.doorCount,
         batteryCount: formData.batteryCount,
       })
@@ -351,6 +364,7 @@ const formData = reactive({
   imei: generateRandomImei(),
   cabinetType: 1,
   powerMode: 1,
+  power_consumption: 0,
   doorCount: 4,
   batteryCount: 2,
   ...loadCabinetMockFormFromStorage(),
@@ -454,12 +468,17 @@ async function fetchAndApplyConn() {
       doors.value = [];
       return;
     }
-    const data = (res as { data?: { door_status?: unknown[]; powermode?: number } })?.data;
+    const data = (res as {
+      data?: { door_status?: unknown[]; powermode?: number; power_consumption?: number };
+    })?.data;
     if (data?.door_status && Array.isArray(data.door_status)) {
       doors.value = mapBackendDoorsToFrontend(data.door_status);
     }
     if (data?.powermode != null) {
       formData.powerMode = Number(data.powermode);
+    }
+    if (data?.power_consumption != null) {
+      formData.power_consumption = Number(data.power_consumption);
     }
   } catch (e) {
     console.error("电柜模拟轮询失败", e);
@@ -491,13 +510,20 @@ async function startSimulation() {
       door_num: formData.doorCount,
       battery_num: formData.batteryCount,
       powermode: formData.powerMode,
+      power_consumption: formData.power_consumption ?? 0,
     });
     if ((res as { code?: number })?.code !== 0) {
       message.error("创建连接失败：接口未返回成功");
       return;
     }
-    const data = (res as { data?: { connect_id?: string; door_status?: unknown[]; powermode?: number } })
-      ?.data;
+    const data = (res as {
+      data?: {
+        connect_id?: string;
+        door_status?: unknown[];
+        powermode?: number;
+        power_consumption?: number;
+      };
+    })?.data;
     const cid = data?.connect_id;
     if (!cid) {
       message.error("创建连接失败：未返回 connect_id");
@@ -511,6 +537,9 @@ async function startSimulation() {
     }
     if (data?.powermode != null) {
       formData.powerMode = Number(data.powermode);
+    }
+    if (data?.power_consumption != null) {
+      formData.power_consumption = Number(data.power_consumption);
     }
     simulating.value = true;
     message.success("电柜模拟已启动");
@@ -583,6 +612,7 @@ async function updateData() {
     await cabinetMockUpdateAPI({
       connect_id: connectId.value,
       powermode: formData.powerMode,
+      power_consumption: formData.power_consumption ?? 0,
     });
     message.success("数据已更新");
   } catch (e: unknown) {
