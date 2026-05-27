@@ -34,6 +34,12 @@ const router = createRouter({
       meta: { layout: 'blank' },
     },
     {
+      path: '/api-keys',
+      name: 'api-keys',
+      component: () => import('./pages/ApiKey.page.vue'),
+      meta: { layout: layouts.base },
+    },
+    {
       path: '/oauth/callback',
       name: 'oauth-callback',
       component: OauthCallback,

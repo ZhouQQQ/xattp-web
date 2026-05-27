@@ -50,6 +50,10 @@ const menuOptions = computed(() =>
 );
 
 const themeVars = useThemeVars();
+
+const menuThemeOverrides = {
+  itemHeight: '30px',
+};
 </script>
 
 <template>
@@ -75,7 +79,9 @@ const themeVars = useThemeVars();
           :collapsed-icon-size="22"
           :options="tools"
           :indent="8"
+          :icon-size="18"
           :default-expand-all="true"
+          :theme-overrides="menuThemeOverrides"
         />
       </div>
     </n-collapse-transition>
@@ -89,6 +95,15 @@ const themeVars = useThemeVars();
   .menu {
     flex: 1;
     margin-bottom: 5px;
+
+    ::v-deep(.n-menu-item) {
+      margin-top: 0;
+    }
+
+    ::v-deep(.n-menu-item-content) {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
 
     ::v-deep(.n-menu-item-content::before) {
       left: 0;

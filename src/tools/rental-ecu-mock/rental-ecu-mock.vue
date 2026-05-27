@@ -206,6 +206,9 @@
                   <n-button type="default" @click="openTrackModal">
                     模拟轨迹
                   </n-button>
+                  <n-button type="default" @click="openBin5Modal">
+                    Bin5上报
+                  </n-button>
                   </n-space>
                   <n-button
                     v-if="formData.target_mode === 'env'"
@@ -337,6 +340,33 @@
         </ul>
         <div v-else class="move-record-empty">暂无移动记录</div>
       </div>
+    </n-modal>
+
+    <!-- Bin5 告警上报弹窗 -->
+    <n-modal v-model:show="showBin5Modal" preset="dialog" title="Bin5 告警上报" :mask-closable="false" style="width: 640px">
+      <template #action>
+        <n-button type="primary" :loading="bin5Loading" @click="handleBin5Submit">
+          上报
+        </n-button>
+      </template>
+      <n-form label-placement="top" label-width="auto">
+        <n-form-item label="告警类型 (alarm_type)">
+          <n-select
+            v-model:value="bin5Form.alarm_type"
+            :options="bin5AlarmTypeOptions"
+            filterable
+            tag
+            clearable
+            placeholder="选择或输入告警值"
+            size="small"
+            :consistent-menu-width="false"
+            style="width: 100%"
+          />
+        </n-form-item>
+        <n-button text type="primary" size="small" @click="openBin5ProtocolDoc">
+          参考文档：CMD_5 上报通知
+        </n-button>
+      </n-form>
     </n-modal>
 
     <!-- 模拟轨迹弹窗 -->
@@ -478,7 +508,13 @@ import {
   xiaoanEcuMockUpdateAPI,
   xiaoanEcuMockMoveAPI,
   xiaoanEcuMockTrajectoryAPI,
+  xiaoanEcuMockBin5API,
 } from "@/api/device";
+import {
+  bin5AlarmTypeOptions,
+  BIN5_PROTOCOL_DOC_URL,
+  parseBin5AlarmType,
+} from "@/tools/ecu-mock/bin5-alarm-types";
 
 const { message } = createDiscreteApi(["message"]);
 const DEFAULT_COORD_LNG = 114.434888;
@@ -1331,6 +1367,45 @@ async function handleMoveSubmit(): Promise<boolean> {
     moveLoading.value = false;
   }
   return false;
+}
+
+/* ========== Bin5 告警上报 ========== */
+const showBin5Modal = ref(false);
+const bin5Form = reactive<{ alarm_type: number | string | null }>({ alarm_type: null });
+const bin5Loading = ref(false);
+
+function openBin5ProtocolDoc() {
+  window.open(BIN5_PROTOCOL_DOC_URL, "_blank", "noopener,noreferrer");
+}
+
+function openBin5Modal() {
+  showBin5Modal.value = true;
+}
+
+/** Bin5 上报：调用接口后 toast，不关闭弹窗 */
+async function handleBin5Submit() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  const alarmType = parseBin5AlarmType(bin5Form.alarm_type);
+  if (alarmType == null) {
+    message.error("请选择或输入有效的告警类型数字");
+    return;
+  }
+  bin5Loading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockBin5API({
+      connect_id: connectId.value,
+      alarm_type: alarmType,
+    });
+    if (!checkResCode(res)) return;
+    message.success(res?.data || "上报 bin5 alarm 成功");
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "Bin5 上报失败");
+  } finally {
+    bin5Loading.value = false;
+  }
 }
 
 /* ========== 模拟轨迹 ========== */

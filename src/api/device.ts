@@ -291,6 +291,14 @@ export function xiaoanEcuMockTrajectoryAPI(data: {
   return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/trajectory`, data);
 }
 
+/** 小安中控模拟：上报 Bin5 告警（CMD: 5） */
+export function xiaoanEcuMockBin5API(data: {
+  connect_id: string;
+  alarm_type: number;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/bin/5`, data);
+}
+
 // ---------- 电柜模拟 (cabinet mock) ----------
 
 /** 电柜模拟：创建 mock 连接，返回 connect_id 及连接信息；powermode 1=市电 2=电池 */

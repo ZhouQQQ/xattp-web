@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(bash \"d:\\\\1-my-code\\\\xattp-web\\\\build.sh\")"
+      "PowerShell(bash \"d:\\\\1-my-code\\\\xattp-web\\\\build.sh\")",
+      "PowerShell($line = \\(Get-Content \"D:\\\\1-my-code\\\\xattp-web\\\\src\\\\tools\\\\json-beautify\\\\json-beautify.service.ts\" -Encoding UTF8\\)[267]; $line.Substring\\(47, 10\\) | Format-Hex)",
+      "PowerShell(git checkout *)"
     ]
   }
 }

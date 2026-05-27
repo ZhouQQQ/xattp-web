@@ -9,8 +9,8 @@ const theme = useThemeVars();
 </script>
 
 <template>
-  <router-link :to="tool.path" class="decoration-none block min-h-[220px]">
-    <c-card class="h-full min-h-[220px] transition transition-duration-0.5s !border-2px !hover:border-primary">
+  <router-link :to="tool.path" class="tool-card-link decoration-none block h-full">
+    <c-card class="tool-card h-full transition transition-duration-0.5s !border-2px !hover:border-primary">
       <div flex items-center justify-between>
         <n-icon class="text-neutral-400 dark:text-neutral-600" size="40" :component="tool.icon" />
 
@@ -36,9 +36,30 @@ const theme = useThemeVars();
         </n-tag>
       </div>
 
-      <div class="line-clamp-2 text-neutral-500 dark:text-neutral-400">
+      <div class="tool-card-desc line-clamp-2 text-neutral-500 dark:text-neutral-400">
         {{ tool.description }}
       </div>
     </c-card>
   </router-link>
 </template>
+
+<style lang="less" scoped>
+.tool-card-link {
+  height: 100%;
+}
+
+:deep(.tool-card.c-card) {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 150px;
+  padding: 16px 20px;
+}
+
+.tool-card-desc {
+  flex: 1;
+  min-height: calc(1.5em * 2);
+  line-height: 1.5;
+  overflow: hidden;
+}
+</style>

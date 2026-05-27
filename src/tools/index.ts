@@ -1,6 +1,7 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as jsonBeautify } from './json-beautify';
 import { tool as tenantGrayPlan } from './tenant-gray-plan';
 import { tool as rentalGetMeituanShopToken } from './rental-get-meituan-shop-token';
 import { tool as tenantDashboard } from './tenant-dashboard';
@@ -152,6 +153,7 @@ export const toolsByCategory: ToolCategory[] = [
             // colorConverter,
             urlEncoder,
             jwtParser,
+            jsonBeautify,
             // keycodeInfo,
             // userAgentParser,
             // jsonDiff,

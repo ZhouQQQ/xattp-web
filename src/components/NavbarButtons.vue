@@ -20,6 +20,10 @@ const userOptions = [
         key: 'copyToken',
     },
     {
+        label: 'API-Key管理',
+        key: 'apiKeys',
+    },
+    {
         label: '退出',
         key: 'logout',
     },
@@ -80,6 +84,8 @@ function handleSelect(key) {
         } else {
             message.warning('请刷新页面');
         }
+    } else if (key == 'apiKeys') {
+        router.push('/api-keys');
     }
 }
 
