@@ -80,12 +80,6 @@ function parseExpiresAtToMs(value?: string | null): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-/** 禁用当前时间之前的日期（仅允许选择“现在及以后”） */
-function disablePastDate(ts: number): boolean {
-  const now = Date.now();
-  return ts < now;
-}
-
 /** 快捷设置：在当前时间基础上增加若干个月 */
 function setExpiresInMonths(months: number) {
   const base = new Date();
@@ -101,15 +95,8 @@ function setExpiresInMonths(months: number) {
   form.expiresAt = d.getTime();
 }
 
-function maskApiKey(key: string): string {
-  if (!key) return "";
-  if (key.length <= 16) return key;
-  return `${key.slice(0, 10)}...${key.slice(-6)}`;
-}
-
 function formatExpiresDisplay(row: ApiKeyRow): string {
   if (!row.expires_at) return "永久有效";
-  if (row.expired) return `${row.expires_at}（已过期）`;
   return row.expires_at;
 }
 
@@ -247,13 +234,13 @@ const columns = computed<DataTableColumns<ApiKeyRow>>(() => [
   {
     title: "API Key",
     key: "api_key",
-    minWidth: 190,
+    minWidth: 150,
     render: (row) =>
       h(NSpace, { size: 8, align: "center" }, () => [
-        h("code", { class: "api-key-code" }, maskApiKey(row.api_key)),
+        h("code", { class: "api-key-code" }, row.api_key),
         h(
           NButton,
-          { size: "tiny", quaternary: true, type: "primary", onClick: () => copyKey(row.api_key) },
+          { size: "tiny", quaternary: true, onClick: () => copyKey(row.api_key) },
           { default: () => "复制" },
         ),
       ]),
@@ -261,8 +248,13 @@ const columns = computed<DataTableColumns<ApiKeyRow>>(() => [
   {
     title: "过期时间",
     key: "expires_at",
-    width: 200,
-    render: (row) => formatExpiresDisplay(row),
+    width: 240,
+    render: (row) => {
+      if (row.expired) {
+        return h("span", { class: "expired-text" }, `${row.expires_at}（已过期）`);
+      }
+      return formatExpiresDisplay(row);
+    },
   },
   {
     title: "状态",
@@ -276,7 +268,7 @@ const columns = computed<DataTableColumns<ApiKeyRow>>(() => [
         tags.push(h(NTag, { size: "small", type: "success" }, { default: () => "启用" }));
       }
       if (row.expired) {
-        tags.push(h(NTag, { size: "small", type: "warning" }, { default: () => "已过期" }));
+        tags.push(h(NTag, { size: "small", type: "error" }, { default: () => "已过期" }));
       }
       return h(NSpace, { size: 4 }, () => tags);
     },
@@ -305,7 +297,7 @@ const columns = computed<DataTableColumns<ApiKeyRow>>(() => [
           },
           {
             trigger: () =>
-              h(NButton, { size: "small", type: "warning" }, { default: () => "轮换" }),
+              h(NButton, { size: "small" }, { default: () => "轮换" }),
             default: () => "重新生成后旧密钥立即失效，是否继续？",
           },
         ),
@@ -340,11 +332,14 @@ onMounted(() => {
             <n-radio-button value="disabled">禁用</n-radio-button>
           </n-radio-group>
           <n-button size="small" :loading="loading" @click="fetchList">刷新</n-button>
-          <n-button type="primary" size="small" @click="openCreateModal">创建 API Key</n-button>
+          <n-button type="success" size="small" @click="openCreateModal">创建 API Key</n-button>
         </n-space>
       </template>
 
-      <n-alert type="info" :bordered="false" class="api-key-tip">
+      <n-alert :bordered="false" class="api-key-tip">
+        <template #icon>
+          <span class="api-key-tip-icon">ℹ</span>
+        </template>
         用于通过 API Key 调用平台开放接口。请妥善保管密钥，勿提交到代码仓库或公开渠道。
       </n-alert>
 
@@ -363,16 +358,17 @@ onMounted(() => {
     <n-modal
       v-model:show="showFormModal"
       preset="card"
+      class="api-key-form-modal"
       :title="isEdit ? '编辑 API Key' : '创建 API Key'"
-      style="width: min(500px, 92vw)"
+      style="width: min(560px, 92vw)"
       :mask-closable="!formSubmitting"
     >
-      <n-form label-placement="left" label-width="88px" size="small" class="api-key-form">
+      <n-form label-placement="left" label-width="76px" size="small" class="api-key-form">
         <n-form-item label="名称">
           <n-input v-model:value="form.name" placeholder="选填，便于识别用途" clearable />
         </n-form-item>
         <n-form-item label="过期时间">
-          <n-space vertical :size="8" style="width: 100%">
+          <n-space vertical :size="8" class="expires-panel">
             <n-radio-group v-model:value="expireMode" size="small">
               <n-radio-button value="permanent">永久有效</n-radio-button>
               <n-radio-button value="custom">指定时间</n-radio-button>
@@ -391,7 +387,7 @@ onMounted(() => {
               v-model:value="form.expiresAt"
               type="datetime"
               clearable
-              :is-date-disabled="disablePastDate"
+              :actions="['clear', 'confirm']"
               style="width: 100%"
               format="yyyy-MM-dd HH:mm:ss"
               placeholder="请选择过期时间"
@@ -405,7 +401,7 @@ onMounted(() => {
       <template #action>
         <n-space justify="end">
           <n-button :disabled="formSubmitting" @click="showFormModal = false">取消</n-button>
-          <n-button type="primary" :loading="formSubmitting" @click="handleFormSubmit">
+          <n-button :loading="formSubmitting" @click="handleFormSubmit">
             {{ isEdit ? "保存" : "创建" }}
           </n-button>
         </n-space>
@@ -425,7 +421,7 @@ onMounted(() => {
       </n-alert>
       <InputCopyable v-model:value="createdKeyValue" readonly monospace />
       <template #action>
-        <n-button type="primary" @click="showCreatedKeyModal = false">我已保存</n-button>
+        <n-button @click="showCreatedKeyModal = false">我已保存</n-button>
       </template>
     </n-modal>
   </div>
@@ -440,6 +436,23 @@ onMounted(() => {
 
 .api-key-tip {
   margin-bottom: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.api-key-tip-icon {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1;
+}
+
+:deep(.api-key-tip .n-alert-body) {
+  background: transparent;
+}
+
+:deep(.api-key-tip .n-alert-content) {
+  color: #374151;
 }
 
 .api-key-table {
@@ -447,11 +460,11 @@ onMounted(() => {
 }
 
 .api-key-form {
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 :deep(.api-key-form .n-form-item) {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 :deep(.api-key-code) {
@@ -463,6 +476,36 @@ onMounted(() => {
   display: inline-block;
   font-size: 12px;
   color: #6b7280;
+}
+
+.expired-text {
+  color: #d03050;
+}
+
+.expires-panel {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+:deep(.api-key-form-modal .n-card) {
+  border-radius: 12px;
+}
+
+:deep(.api-key-form-modal .n-card-header) {
+  padding: 14px 18px 8px;
+}
+
+:deep(.api-key-form-modal .n-card__content) {
+  padding: 8px 18px 6px;
+}
+
+:deep(.api-key-form-modal .n-card__action) {
+  padding: 10px 18px 14px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
 }
 
 /* 防止表格容器产生横向滚动条 */
