@@ -1,7 +1,6 @@
 import { createAlova } from 'alova';
 import adapterFetch from 'alova/fetch';
-import { useUserStore } from '@/stores/user.store';
-import { useRoute } from 'vue-router';
+import { config } from '@/config';
 
 // 定义不需要处理401的白名单路径
 const AUTH_WHITELIST = [
@@ -18,6 +17,11 @@ export const AlovaInstance = createAlova({
         if (method.config.timeout == null) {
             method.config.timeout = GLOBAL_REQUEST_TIMEOUT_MS;
         }
+        method.config.headers = {
+            ...(method.config.headers ?? {}),
+            'xa-source': 'xattp',
+            'xa-version': config.app.version,
+        };
         const token = localStorage.getItem('token');
         // 添加 token 到请求头
         if (!method.meta?.ignoreToken && token) {

@@ -179,18 +179,35 @@
 
         <!-- 筛选器 -->
         <div class="filter-section">
-          <n-space justify="end">
-            <n-select
-              v-model:value="mrStatusFilter"
-              :options="mrStatusOptions"
-              placeholder="选择MR状态"
-              style="width: 150px"
-            />
+          <n-space justify="space-between" align="center" wrap :size="8">
+            <n-radio-group v-model:value="viewMode" size="small" @update:value="saveToLocalStorage">
+              <n-radio-button value="flat">MR视图</n-radio-button>
+              <n-radio-button value="grouped">TAPD单视图</n-radio-button>
+            </n-radio-group>
+            <n-space align="center" :size="8">
+              <n-space v-if="viewMode === 'grouped'" align="center" :size="6">
+                <n-button size="tiny" quaternary @click="expandOnlyNotAllMergedTapdItems">
+                  只展开未全部合并
+                </n-button>
+                <n-button size="tiny" quaternary @click="expandAllTapdItems">
+                  全部展开
+                </n-button>
+                <n-button size="tiny" quaternary @click="collapseAllTapdItems">
+                  全部折叠
+                </n-button>
+              </n-space>
+              <n-select
+                v-model:value="mrStatusFilter"
+                :options="mrStatusOptions"
+                placeholder="选择MR状态"
+                style="width: 150px"
+              />
+            </n-space>
           </n-space>
         </div>
 
-        <!-- 数据表格 -->
-        <div class="table-section">
+        <!-- MR视图 -->
+        <div v-if="viewMode === 'flat'" class="table-section">
           <n-data-table
             :columns="columns"
             :data="filteredRows"
@@ -200,6 +217,84 @@
             :row-class-name="() => 'compact-row'"
             :striped="true"
             class="mr-table"
+          />
+        </div>
+
+        <!-- TAPD单视图 -->
+        <div v-else class="grouped-section">
+          <div
+            v-for="item in filteredItems"
+            :key="item.id"
+            class="item-group"
+            :class="{
+              'item-group--all-merged': isItemAllMerged(item),
+              'item-group--collapsed': !isTapdItemExpanded(item),
+            }"
+          >
+            <div
+              class="item-group-header item-group-header--collapsible"
+              :class="`item-group-header--${item.type || 'other'}`"
+              @click="onTapdHeaderClick(item, $event)"
+            >
+              <span
+                class="item-group-expand-icon"
+                :class="{ 'item-group-expand-icon--expanded': isTapdItemExpanded(item) }"
+                aria-hidden="true"
+              />
+              <n-tag
+                v-if="item.type === 'story'"
+                type="info"
+                size="tiny"
+                class="item-group-type-tag"
+              >
+                需求
+              </n-tag>
+              <n-tag
+                v-else-if="item.type === 'bug'"
+                type="error"
+                size="tiny"
+                class="item-group-type-tag"
+              >
+                缺陷
+              </n-tag>
+              <n-tag v-else size="tiny" class="item-group-type-tag">
+                {{ item.type }}
+              </n-tag>
+              <a
+                :href="normalizeUrl(item.url)"
+                target="_blank"
+                class="item-group-title"
+                :title="item.title"
+              >
+                {{ item.title }}
+              </a>
+              <span
+                class="item-group-meta"
+                :class="getItemMrMeta(item).class"
+              >
+                <span v-if="getItemMrMeta(item).icon" class="item-group-meta-icon">
+                  {{ getItemMrMeta(item).icon }}
+                </span>
+                <span class="item-group-meta-text">{{ getItemMrMeta(item).text }}</span>
+              </span>
+            </div>
+            <n-collapse-transition :show="isTapdItemExpanded(item)">
+              <n-data-table
+                :columns="mrColumns"
+                :data="getItemMrRows(item)"
+                :pagination="false"
+                :bordered="true"
+                size="small"
+                :row-class-name="() => 'compact-row'"
+                :striped="true"
+                class="mr-table item-group-table"
+              />
+            </n-collapse-transition>
+          </div>
+          <n-empty
+            v-if="filteredItems.length === 0"
+            description="当前筛选条件下暂无数据"
+            class="grouped-empty"
           />
         </div>
       </div>
@@ -235,10 +330,13 @@ const error = ref('');
 const result = ref(null);
 const mrStatusFilter = ref('');
 const typeFilter = ref('');
+const viewMode = ref('flat');
 const lastRefreshTime = ref('');
 const sortKey = ref('');
 const sortOrder = ref('asc');
 const historyList = ref([]);
+/** TAPD单视图：已折叠的 TAPD 单 id */
+const collapsedTapdItemIds = ref(new Set());
 
 // 表格高度计算
 const tableHeight = computed(() => {
@@ -274,6 +372,9 @@ if (typeof window !== 'undefined' && window.localStorage) {
         const parsed = JSON.parse(filterData);
         if (parsed.mrStatusFilter !== undefined) mrStatusFilter.value = parsed.mrStatusFilter;
         if (parsed.typeFilter !== undefined) typeFilter.value = parsed.typeFilter;
+        if (parsed.viewMode === 'flat' || parsed.viewMode === 'grouped') {
+          viewMode.value = parsed.viewMode;
+        }
       } catch (e) {
         console.error('Failed to parse filter state on init:', e);
       }
@@ -292,6 +393,7 @@ const saveToLocalStorage = () => {
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
         mrStatusFilter: mrStatusFilter.value,
         typeFilter: typeFilter.value,
+        viewMode: viewMode.value,
       }));
     }
   } catch (e) {
@@ -417,22 +519,21 @@ const filteredRows = computed(() => {
   }
   
   // 默认排序：异常 > 无MR/未合并 > 已合并
-  rows = rows.slice().sort((a, b) => {
-    const getStatusPriority = (row) => {
-      if (row.mr && (row.mr.status === 'error' || row.mr.status === 'closed')) return 1;
-      if (row.noMr) return 2;
-      if (row.mr && row.mr.status === 'open') return 2;
-      if (row.mr && row.mr.status === 'merged') return 3;
-      return 4;
-    };
-    const priorityA = getStatusPriority(a);
-    const priorityB = getStatusPriority(b);
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB;
-    }
-    return a.title.localeCompare(b.title);
-  });
-  
+  if (!sortKey.value) {
+    rows = rows.slice().sort((a, b) => {
+      const priorityA = getRowStatusPriority(a);
+      const priorityB = getRowStatusPriority(b);
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      const titleCmp = a.title.localeCompare(b.title);
+      if (titleCmp !== 0) return titleCmp;
+      const urlA = a.mr?.url || '';
+      const urlB = b.mr?.url || '';
+      return urlA.localeCompare(urlB);
+    });
+  }
+
   // 支持表格点击排序
   if (sortKey.value) {
     rows = rows.slice().sort((a, b) => {
@@ -454,6 +555,10 @@ const filteredRows = computed(() => {
           va = a.mr ? a.mr.target_branch : '';
           vb = b.mr ? b.mr.target_branch : '';
           break;
+        case 'author':
+          va = a.mr ? a.mr.author : '';
+          vb = b.mr ? b.mr.author : '';
+          break;
         case 'mr_status':
           va = a.mr ? a.mr.status : '';
           vb = b.mr ? b.mr.status : '';
@@ -473,6 +578,245 @@ const filteredRows = computed(() => {
   }
   return rows;
 });
+
+const normalizeUrl = (url) => {
+  if (!url) return '#';
+  return url.startsWith('@') ? url.slice(1) : url;
+};
+
+const getMrStatusPriority = (status) => {
+  if (status === 'error' || status === 'closed') return 1;
+  if (status === 'open') return 2;
+  if (status === 'merged') return 3;
+  return 4;
+};
+
+const getRowStatusPriority = (row) => {
+  if (row.mr && (row.mr.status === 'error' || row.mr.status === 'closed')) return 1;
+  if (row.noMr) return 2;
+  if (row.mr && row.mr.status === 'open') return 2;
+  if (row.mr && row.mr.status === 'merged') return 3;
+  return 4;
+};
+
+const sortMrRows = (rows) => {
+  return rows.slice().sort((a, b) => {
+    const priorityA = getRowStatusPriority(a);
+    const priorityB = getRowStatusPriority(b);
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    const urlA = a.mr?.url || '';
+    const urlB = b.mr?.url || '';
+    return urlA.localeCompare(urlB);
+  });
+};
+
+const itemMatchesFilters = (item) => {
+  if (typeFilter.value && item.type !== typeFilter.value) {
+    return false;
+  }
+  if (!mrStatusFilter.value) {
+    return true;
+  }
+  if (mrStatusFilter.value === 'no_mr') {
+    return !item.mr_links || item.mr_links.length === 0;
+  }
+  return item.mr_links?.some(mr => mr.status === mrStatusFilter.value);
+};
+
+const getItemPriority = (item) => {
+  if (!item.mr_links || item.mr_links.length === 0) return 2;
+  let min = 4;
+  item.mr_links.forEach(mr => {
+    min = Math.min(min, getMrStatusPriority(mr.status));
+  });
+  return min;
+};
+
+/** 有 MR 且全部已合并 */
+const isItemAllMerged = (item) => {
+  const links = item.mr_links;
+  if (!links || links.length === 0) return false;
+  return links.every(mr => mr.status === 'merged');
+};
+
+const initTapdCollapseState = () => {
+  if (!result.value?.items) {
+    collapsedTapdItemIds.value = new Set();
+    return;
+  }
+  expandOnlyNotAllMergedTapdItems();
+};
+
+const isTapdItemExpanded = (item) => {
+  return !collapsedTapdItemIds.value.has(item.id);
+};
+
+const toggleTapdItemExpand = (item) => {
+  const next = new Set(collapsedTapdItemIds.value);
+  if (next.has(item.id)) {
+    next.delete(item.id);
+  } else {
+    next.add(item.id);
+  }
+  collapsedTapdItemIds.value = next;
+};
+
+const expandAllTapdItems = () => {
+  collapsedTapdItemIds.value = new Set();
+};
+
+/** 仅展开未全部合并的单子，全部已合并的折叠 */
+const expandOnlyNotAllMergedTapdItems = () => {
+  const collapsed = new Set();
+  filteredItems.value.forEach(item => {
+    if (isItemAllMerged(item)) {
+      collapsed.add(item.id);
+    }
+  });
+  collapsedTapdItemIds.value = collapsed;
+};
+
+const collapseAllTapdItems = () => {
+  collapsedTapdItemIds.value = new Set(
+    filteredItems.value.map(item => item.id)
+  );
+};
+
+const onTapdHeaderClick = (item, event) => {
+  if (event.target.closest('a')) return;
+  toggleTapdItemExpand(item);
+};
+
+const filteredItems = computed(() => {
+  if (!result.value?.items) return [];
+  let items = result.value.items.filter(itemMatchesFilters);
+  items = items.slice().sort((a, b) => {
+    const allMergedA = isItemAllMerged(a);
+    const allMergedB = isItemAllMerged(b);
+    if (allMergedA !== allMergedB) {
+      return allMergedA ? 1 : -1;
+    }
+    const priorityA = getItemPriority(a);
+    const priorityB = getItemPriority(b);
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    return a.title.localeCompare(b.title);
+  });
+  return items;
+});
+
+const getItemMrRows = (item) => {
+  let rows = [];
+  if (item.mr_links && item.mr_links.length > 0) {
+    rows = item.mr_links.map(mr => ({ mr, noMr: false }));
+  } else {
+    rows = [{ mr: null, noMr: true }];
+  }
+  if (mrStatusFilter.value && mrStatusFilter.value !== 'no_mr') {
+    rows = rows.filter(row => !row.noMr && row.mr.status === mrStatusFilter.value);
+  }
+  return sortMrRows(rows);
+};
+
+const getItemMrMeta = (item) => {
+  const links = item.mr_links || [];
+  if (links.length === 0) {
+    return { icon: '', text: '无 MR', class: 'item-group-meta--empty' };
+  }
+
+  const merged = links.filter(mr => mr.status === 'merged').length;
+  const open = links.filter(mr => mr.status === 'open').length;
+  const abnormal = links.filter(mr =>
+    mr.status === 'error' || mr.status === 'closed'
+  ).length;
+
+  const parts = [`共 ${links.length} 个 MR`];
+  if (merged) parts.push(`已合并 ${merged}`);
+  if (open) parts.push(`未合并 ${open}`);
+  if (abnormal) parts.push(`异常 ${abnormal}`);
+  const text = parts.join(' · ');
+
+  if (abnormal > 0) {
+    return { icon: '⚠️', text, class: 'item-group-meta--warning' };
+  }
+  if (open > 0) {
+    return { icon: '❌', text, class: 'item-group-meta--error' };
+  }
+  if (merged === links.length) {
+    return { icon: '✅', text, class: 'item-group-meta--success' };
+  }
+
+  return { icon: '⚠️', text, class: 'item-group-meta--warning' };
+};
+
+const renderMrStatusCell = (row) => {
+  if (!row.noMr) {
+    if (row.mr.status === 'error') {
+      return h(NTag, { type: 'warning', size: 'small' }, { default: () => '异常' });
+    }
+    if (row.mr.status === 'merged') {
+      return h(NTag, { type: 'success', size: 'small' }, { default: () => '已合并' });
+    }
+    if (row.mr.status === 'open') {
+      return h(NTag, { type: 'error', size: 'small' }, { default: () => '未合并' });
+    }
+    if (row.mr.status === 'closed') {
+      return h(NTag, { type: 'warning', size: 'small' }, { default: () => '已关闭' });
+    }
+    return h(NTag, { type: 'default', size: 'small' }, { default: () => row.mr.status });
+  }
+  return h(NTag, { type: 'default', size: 'small' }, { default: () => '无MR' });
+};
+
+// 分组视图：仅 MR 相关列
+const mrColumns = computed(() => [
+  {
+    title: 'MR链接',
+    key: 'mr_url',
+    minWidth: 280,
+    render: (row) => {
+      if (!row.noMr) {
+        return h('a', {
+          href: row.mr.url,
+          target: '_blank',
+          class: 'mr-link',
+        }, row.mr.url);
+      }
+      return '';
+    },
+  },
+  {
+    title: '目标分支',
+    key: 'target_branch',
+    width: 120,
+    render: (row) => {
+      if (!row.noMr) {
+        return row.mr.target_branch || '-';
+      }
+      return '';
+    },
+  },
+  {
+    title: '提交人',
+    key: 'author',
+    width: 90,
+    render: (row) => {
+      if (!row.noMr) {
+        return row.mr.author || '-';
+      }
+      return '';
+    },
+  },
+  {
+    title: 'MR状态',
+    key: 'mr_status',
+    width: 100,
+    render: renderMrStatusCell,
+  },
+]);
 
 // 表格列定义
 const columns = computed(() => [
@@ -506,12 +850,12 @@ const columns = computed(() => [
     width: 250,
     render: (row) => {
       return h('a', {
-        href: row.url && row.url.startsWith('@') ? row.url.slice(1) : row.url,
+        href: normalizeUrl(row.url),
         target: '_blank',
         class: 'title-link',
         title: row.title,
       }, row.title);
-      },
+    },
     sorter: true,
     sortOrder: sortKey.value === 'title' ? sortOrder.value : false,
     onUpdateSortOrder: (order) => {
@@ -573,26 +917,32 @@ const columns = computed(() => [
     },
   },
   {
+    title: '提交人',
+    key: 'author',
+    width: 90,
+    render: (row) => {
+      if (!row.noMr) {
+        return row.mr.author || '-';
+      }
+      return '';
+    },
+    sorter: true,
+    sortOrder: sortKey.value === 'author' ? sortOrder.value : false,
+    onUpdateSortOrder: (order) => {
+      if (order === false) {
+        sortKey.value = '';
+        sortOrder.value = 'asc';
+      } else {
+        sortKey.value = 'author';
+        sortOrder.value = order;
+      }
+    },
+  },
+  {
     title: 'MR状态',
     key: 'mr_status',
     width: 100,
-    render: (row) => {
-      if (!row.noMr) {
-        if (row.mr.status === 'error') {
-          return h(NTag, { type: 'warning', size: 'small' }, { default: () => '异常' });
-        } else if (row.mr.status === 'merged') {
-          return h(NTag, { type: 'success', size: 'small' }, { default: () => '已合并' });
-        } else if (row.mr.status === 'open') {
-          return h(NTag, { type: 'error', size: 'small' }, { default: () => '未合并' });
-        } else if (row.mr.status === 'closed') {
-          return h(NTag, { type: 'warning', size: 'small' }, { default: () => '已关闭' });
-        } else {
-          return h(NTag, { type: 'default', size: 'small' }, { default: () => row.mr.status });
-        }
-      } else {
-        return h(NTag, { type: 'default', size: 'small' }, { default: () => '无MR' });
-      }
-    },
+    render: renderMrStatusCell,
     sorter: true,
     sortOrder: sortKey.value === 'mr_status' ? sortOrder.value : false,
     onUpdateSortOrder: (order) => {
@@ -625,6 +975,7 @@ const fetchReport = async () => {
     }
     
     result.value = response.data;
+    initTapdCollapseState();
     lastRefreshTime.value = new Date().toLocaleString();
     // 确保历史记录保存成功
     try {
@@ -819,6 +1170,7 @@ const clearData = () => {
   typeFilter.value = '';
   sortKey.value = '';
   sortOrder.value = 'asc';
+  collapsedTapdItemIds.value = new Set();
   // 移除地址栏中的分享参数
   try {
     const query = { ...route.query };
@@ -844,6 +1196,12 @@ function getTapdUrlFromQuery() {
     return str.trim();
   }
 }
+
+watch(viewMode, (mode) => {
+  if (mode === 'grouped' && result.value?.items) {
+    expandOnlyNotAllMergedTapdItems();
+  }
+});
 
 // 打开带 tapd_release_url 的分享链接时，填充输入框并自动检查
 watch(
@@ -1001,40 +1359,54 @@ watch(
 
 .stat-card {
   cursor: pointer;
-  transition: all 0.2s;
-  height: 60px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 10px;
   
   :deep(.n-card__content) {
-    padding: 4px;
+    padding: 12px 8px;
+    width: 100%;
   }
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(22, 119, 255, 0.1);
+    box-shadow: 0 6px 20px rgba(22, 119, 255, 0.12);
   }
   
   &.active {
     outline: 2px solid #1677ff;
     background: #e6f7ff;
+    box-shadow: 0 4px 14px rgba(22, 119, 255, 0.15);
   }
 }
 
 .stat-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   text-align: center;
+  width: 100%;
 }
 
 .stat-number {
-  font-size: 1.2em;
-  font-weight: bold;
-  margin-bottom: 4px;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
-  font-size: 0.8em;
-  color: #666;
+  font-size: 13px;
+  font-weight: 500;
+  color: #595959;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .story-card {
@@ -1081,6 +1453,171 @@ watch(
 
 .filter-section {
   margin-bottom: 8px;
+}
+
+.grouped-section {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.item-group {
+  border: 1px solid #e8ecf0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+
+  &--collapsed {
+    .item-group-header {
+      border-bottom: none;
+    }
+  }
+
+  &--all-merged.item-group--collapsed {
+    border-color: #e6f4ea;
+  }
+}
+
+.item-group-expand-icon {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  margin-right: -2px;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid #8c8c8c;
+  transition: transform 0.2s ease;
+
+  &--expanded {
+    transform: rotate(90deg);
+  }
+}
+
+.item-group-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px 4px 10px;
+  border-bottom: 1px solid #e8ecf0;
+  border-left: 3px solid #d9d9d9;
+  background: #f8fafc;
+  min-width: 0;
+
+  &--story {
+    border-left-color: #1677ff;
+    background: #f5f9ff;
+  }
+
+  &--bug {
+    border-left-color: #e74c3c;
+    background: #fff8f8;
+  }
+
+  &--other {
+    border-left-color: #8c8c8c;
+  }
+
+  &--collapsible {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      filter: brightness(0.98);
+    }
+  }
+}
+
+.item-group-type-tag {
+  flex-shrink: 0;
+  transform: scale(0.92);
+  transform-origin: left center;
+}
+
+.item-group-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #262626;
+  text-decoration: none;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: #1677ff;
+    text-decoration: underline;
+  }
+}
+
+.item-group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  max-width: 48%;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #8c8c8c;
+
+  &--success {
+    color: #389e0d;
+
+    .item-group-meta-text {
+      color: #52c41a;
+    }
+  }
+
+  &--error {
+    color: #cf1322;
+
+    .item-group-meta-text {
+      color: #ff4d4f;
+    }
+  }
+
+  &--warning {
+    color: #d48806;
+
+    .item-group-meta-text {
+      color: #faad14;
+    }
+  }
+
+  &--empty {
+    color: #bfbfbf;
+  }
+}
+
+.item-group-meta-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.item-group-meta-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-group-table {
+  :deep(.n-data-table-th) {
+    background: #fafbfc;
+  }
+}
+
+.grouped-empty {
+  padding: 40px 0;
 }
 
 .table-section {
@@ -1259,15 +1796,19 @@ watch(
   }
   
   .stat-card {
-    height: 50px;
+    height: 68px;
+
+    :deep(.n-card__content) {
+      padding: 10px 6px;
+    }
   }
   
   .stat-number {
-    font-size: 1.0em;
+    font-size: 26px;
   }
   
   .stat-label {
-    font-size: 0.65em;
+    font-size: 12px;
   }
 }
 </style>

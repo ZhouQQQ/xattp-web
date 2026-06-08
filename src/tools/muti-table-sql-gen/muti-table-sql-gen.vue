@@ -82,6 +82,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useMessage } from 'naive-ui';
 import { sqlExecuteApi } from '@/api/db_tool';
+import { config } from '@/config';
 const message = useMessage();
 
 // 响应式数据
@@ -171,7 +172,9 @@ async function fetchTenants() {
     const response = await fetch('https://tenant-test2.xiaoantech.com/tenant/list', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'xa-source': 'xattp',
+        'xa-version': config.app.version,
       },
       body: JSON.stringify({
         pageNum: 1,

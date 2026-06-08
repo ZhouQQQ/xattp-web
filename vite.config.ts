@@ -31,7 +31,17 @@ export default defineConfig({
         target:'http://localhost:8890',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/xattp-server/, '')
-      }
+      },
+      '/ws': {
+        target: 'http://localhost:9876',
+        ws: true,
+        changeOrigin: true,
+      },
+      '/traffic-inspector': {
+        target: 'http://localhost:9876',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/traffic-inspector/, ''),
+      },
     }
   },
   plugins: [
