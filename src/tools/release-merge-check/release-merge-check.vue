@@ -1,7 +1,6 @@
 <template>
   <div class="release-merge-check">
-    <n-card>
-      <!-- 输入区域 -->
+    <n-card class="search-card">
       <div class="input-section">
         <div class="input-group">
           <n-input
@@ -32,9 +31,7 @@
             上次：{{ lastRefreshTime }}
           </span>
         </div>
-        <!-- 历史记录 -->
         <div v-if="historyList.length > 0" class="history-section">
-          <!-- <div class="history-label">历史记录：</div> -->
           <div class="history-tags">
             <n-tag
               v-for="(item, index) in historyList"
@@ -49,7 +46,9 @@
           </div>
         </div>
       </div>
+    </n-card>
 
+    <n-card class="content-card">
       <!-- 加载状态 -->
       <div v-if="loading" class="loading">
         <n-spin size="medium" />
@@ -71,15 +70,15 @@
         <!-- 发布计划信息 -->
         <div class="release-info">
           <div v-if="result.release_info" class="release-details">
-            <n-space>
+            <n-space justify="center" :size="16">
               <span>
-                <n-text strong>ID：</n-text>
+                <n-text strong>发布计划ID：</n-text>
                 <c-link :href="releaseUrl" target="_blank">
                   {{ result.release_info.id }}
                 </c-link>
               </span>
               <span>
-                <n-text strong>名称：</n-text>
+                <n-text strong>发布计划名称：</n-text>
                 <c-link :href="releaseUrl" target="_blank">
                   {{ result.release_info.name }}
                 </c-link>
@@ -90,7 +89,7 @@
 
         <!-- 统计卡片 -->
         <div class="stat-cards">
-          <n-grid :cols="7" :x-gap="8" :y-gap="8">
+          <n-grid :cols="7" :x-gap="4" :y-gap="4">
             <n-grid-item>
               <n-card
                 class="stat-card story-card"
@@ -197,10 +196,20 @@
                 </n-button>
               </n-space>
               <n-select
+                v-model:value="itemStatusFilter"
+                :options="itemStatusOptions"
+                placeholder="选择TAPD状态"
+                clearable
+                style="width: 150px"
+                @update:value="saveToLocalStorage"
+              />
+              <n-select
                 v-model:value="mrStatusFilter"
                 :options="mrStatusOptions"
-                placeholder="选择MR状态"
+                placeholder="选择MR实际状态"
+                clearable
                 style="width: 150px"
+                @update:value="saveToLocalStorage"
               />
             </n-space>
           </n-space>
@@ -214,9 +223,13 @@
             :pagination="false"
             :bordered="false"
             size="small"
+            table-layout="fixed"
+            :scroll-x="mrTableScrollX"
             :row-class-name="() => 'compact-row'"
             :striped="true"
             class="mr-table"
+            :on-unstable-column-resize="handleMrColumnResize"
+            @update:sorter="handleTableSorterUpdate"
           />
         </div>
 
@@ -260,14 +273,24 @@
               <n-tag v-else size="tiny" class="item-group-type-tag">
                 {{ item.type }}
               </n-tag>
-              <a
-                :href="normalizeUrl(item.url)"
-                target="_blank"
-                class="item-group-title"
-                :title="item.title"
-              >
-                {{ item.title }}
-              </a>
+              <div class="item-group-title-wrap">
+                <a
+                  :href="normalizeUrl(item.url)"
+                  target="_blank"
+                  class="item-group-title"
+                  :title="item.title"
+                >
+                  {{ item.title }}
+                </a>
+                <n-tag
+                  v-if="item.status"
+                  size="tiny"
+                  class="item-group-status-tag tapd-status-tag tag-fixed-center"
+                  :title="item.status"
+                >
+                  {{ item.status }}
+                </n-tag>
+              </div>
               <span
                 class="item-group-meta"
                 :class="getItemMrMeta(item).class"
@@ -329,11 +352,12 @@ const loading = ref(false);
 const error = ref('');
 const result = ref(null);
 const mrStatusFilter = ref('');
+const itemStatusFilter = ref('');
 const typeFilter = ref('');
 const viewMode = ref('flat');
 const lastRefreshTime = ref('');
 const sortKey = ref('');
-const sortOrder = ref('asc');
+const sortOrder = ref('ascend');
 const historyList = ref([]);
 /** TAPD单视图：已折叠的 TAPD 单 id */
 const collapsedTapdItemIds = ref(new Set());
@@ -351,6 +375,35 @@ const { message } = createDiscreteApi(['message']);
 // 常量
 const HISTORY_STORAGE_KEY = 'tapdReleaseHistory';
 const FILTER_STORAGE_KEY = 'tapdReleaseFilterState';
+const MR_COLUMN_WIDTH_STORAGE_KEY = 'tapdReleaseMrColumnWidths';
+
+const DEFAULT_MR_COLUMN_WIDTHS = {
+  type: 46,
+  title: 250,
+  item_status: 88,
+  mr_url: 250,
+  target_branch: 96,
+  author: 56,
+  merge_status: 116,
+  mr_status: 88,
+};
+
+const loadMrColumnWidths = () => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = localStorage.getItem(MR_COLUMN_WIDTH_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...DEFAULT_MR_COLUMN_WIDTHS, ...parsed };
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load MR column widths:', e);
+  }
+  return { ...DEFAULT_MR_COLUMN_WIDTHS };
+};
+
+const mrColumnWidths = ref(loadMrColumnWidths());
 
 // 在组件初始化时立即加载历史记录
 if (typeof window !== 'undefined' && window.localStorage) {
@@ -371,6 +424,7 @@ if (typeof window !== 'undefined' && window.localStorage) {
       try {
         const parsed = JSON.parse(filterData);
         if (parsed.mrStatusFilter !== undefined) mrStatusFilter.value = parsed.mrStatusFilter;
+        if (parsed.itemStatusFilter !== undefined) itemStatusFilter.value = parsed.itemStatusFilter;
         if (parsed.typeFilter !== undefined) typeFilter.value = parsed.typeFilter;
         if (parsed.viewMode === 'flat' || parsed.viewMode === 'grouped') {
           viewMode.value = parsed.viewMode;
@@ -392,6 +446,7 @@ const saveToLocalStorage = () => {
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
         mrStatusFilter: mrStatusFilter.value,
+        itemStatusFilter: itemStatusFilter.value,
         typeFilter: typeFilter.value,
         viewMode: viewMode.value,
       }));
@@ -408,6 +463,37 @@ const mrStatusOptions = [
   { label: '异常', value: 'error' },
   { label: '无MR', value: 'no_mr' },
 ];
+
+const itemStatusOptions = computed(() => {
+  if (!result.value?.items) return [{ label: '全部', value: '' }];
+  const statuses = [...new Set(
+    result.value.items
+      .map(item => item.status)
+      .filter(status => status != null && status !== '')
+  )];
+  return [
+    { label: '全部', value: '' },
+    ...statuses.sort((a, b) => a.localeCompare(b, 'zh-CN')).map(status => ({
+      label: status,
+      value: status,
+    })),
+  ];
+});
+
+const MERGE_STATUS_LABELS = {
+  unchecked: '未检查',
+  checking: '检查中',
+  can_be_merged: '可合并',
+  cannot_be_merged: '不可合并',
+  cannot_be_merged_recheck: '不可合并(需重检)',
+};
+
+const getMergeStatusTagType = (mergeStatus) => {
+  if (mergeStatus === 'unchecked' || mergeStatus === 'checking') return 'warning';
+  if (mergeStatus === 'can_be_merged') return 'success';
+  if (mergeStatus === 'cannot_be_merged' || mergeStatus === 'cannot_be_merged_recheck') return 'error';
+  return 'default';
+};
 
 // 计算属性
 const storyCount = computed(() => {
@@ -480,6 +566,7 @@ const processedRows = computed(() => {
           type: item.type,
           title: item.title,
           url: item.url,
+          itemStatus: item.status,
           mr,
           noMr: false,
         });
@@ -489,6 +576,7 @@ const processedRows = computed(() => {
         type: item.type,
         title: item.title,
         url: item.url,
+        itemStatus: item.status,
         mr: null,
         noMr: true,
       });
@@ -504,6 +592,11 @@ const filteredRows = computed(() => {
   // 类型过滤
   if (typeFilter.value) {
     rows = rows.filter(row => row.type === typeFilter.value);
+  }
+
+  // TAPD状态过滤
+  if (itemStatusFilter.value) {
+    rows = rows.filter(row => row.itemStatus === itemStatusFilter.value);
   }
   
   // MR状态过滤
@@ -534,54 +627,100 @@ const filteredRows = computed(() => {
     });
   }
 
-  // 支持表格点击排序
-  if (sortKey.value) {
-    rows = rows.slice().sort((a, b) => {
-      let va, vb;
-      switch (sortKey.value) {
-        case 'type':
-          va = a.type;
-          vb = b.type;
-          break;
-        case 'title':
-          va = a.title;
-          vb = b.title;
-          break;
-        case 'mr_url':
-          va = a.mr ? a.mr.url : '';
-          vb = b.mr ? b.mr.url : '';
-          break;
-        case 'target_branch':
-          va = a.mr ? a.mr.target_branch : '';
-          vb = b.mr ? b.mr.target_branch : '';
-          break;
-        case 'author':
-          va = a.mr ? a.mr.author : '';
-          vb = b.mr ? b.mr.author : '';
-          break;
-        case 'mr_status':
-          va = a.mr ? a.mr.status : '';
-          vb = b.mr ? b.mr.status : '';
-          break;
-        default:
-          va = '';
-          vb = '';
-      }
-      if (va === undefined || va === null) va = '';
-      if (vb === undefined || vb === null) vb = '';
-      if (sortOrder.value === 'asc') {
-        return va > vb ? 1 : va < vb ? -1 : 0;
-      } else {
-        return va < vb ? 1 : va > vb ? -1 : 0;
-      }
-    });
-  }
   return rows;
+});
+
+const compareRowField = (a, b, getValue) => {
+  const va = getValue(a);
+  const vb = getValue(b);
+  const sa = va === undefined || va === null ? '' : String(va);
+  const sb = vb === undefined || vb === null ? '' : String(vb);
+  return sa.localeCompare(sb, 'zh-CN');
+};
+
+/** Naive DataTable 通过 @update:sorter 通知受控排序 */
+const handleTableSorterUpdate = (sortState) => {
+  if (sortState == null) {
+    sortKey.value = '';
+    sortOrder.value = 'ascend';
+    return;
+  }
+  const s = Array.isArray(sortState) ? sortState[0] : sortState;
+  if (!s?.columnKey || s.order === false) {
+    sortKey.value = '';
+    sortOrder.value = 'ascend';
+    return;
+  }
+  sortKey.value = s.columnKey;
+  sortOrder.value = s.order;
+};
+
+const getColumnSortOrder = (key) => {
+  return sortKey.value === key ? sortOrder.value : false;
+};
+
+const getMrColumnWidth = (key) => {
+  return mrColumnWidths.value[key] ?? DEFAULT_MR_COLUMN_WIDTHS[key];
+};
+
+const mrTableScrollX = computed(() => {
+  return Object.values(mrColumnWidths.value).reduce(
+    (sum, width) => sum + (Number(width) || 0),
+    0
+  );
+});
+
+const saveMrColumnWidths = () => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(
+        MR_COLUMN_WIDTH_STORAGE_KEY,
+        JSON.stringify(mrColumnWidths.value)
+      );
+    }
+  } catch (e) {
+    console.error('Failed to save MR column widths:', e);
+  }
+};
+
+const handleMrColumnResize = (resizedWidth, _limitedWidth, column) => {
+  const key = column?.key;
+  if (key == null || key === '') return;
+  mrColumnWidths.value = {
+    ...mrColumnWidths.value,
+    [key]: Math.round(resizedWidth),
+  };
+  saveMrColumnWidths();
+};
+
+const mrResizableColumn = (key, minWidth = 40) => ({
+  width: getMrColumnWidth(key),
+  minWidth,
+  resizable: true,
 });
 
 const normalizeUrl = (url) => {
   if (!url) return '#';
   return url.startsWith('@') ? url.slice(1) : url;
+};
+
+const renderTitleCell = (row) => {
+  return h('a', {
+    href: normalizeUrl(row.url),
+    target: '_blank',
+    class: 'title-link',
+    title: row.title,
+  }, row.title);
+};
+
+const renderMrUrlCell = (row) => {
+  if (row.noMr) return '';
+  return h('a', {
+    href: row.mr.url,
+    target: '_blank',
+    class: 'mr-link',
+    title: row.mr.url,
+  }, row.mr.url);
 };
 
 const getMrStatusPriority = (status) => {
@@ -614,6 +753,9 @@ const sortMrRows = (rows) => {
 
 const itemMatchesFilters = (item) => {
   if (typeFilter.value && item.type !== typeFilter.value) {
+    return false;
+  }
+  if (itemStatusFilter.value && item.status !== itemStatusFilter.value) {
     return false;
   }
   if (!mrStatusFilter.value) {
@@ -752,23 +894,59 @@ const getItemMrMeta = (item) => {
   return { icon: '⚠️', text, class: 'item-group-meta--warning' };
 };
 
+const renderFixedCenterTag = (label, options = {}) => {
+  const { type, class: extraClass = '', title = label } = options;
+  return h(
+    NTag,
+    {
+      type,
+      size: 'small',
+      class: `tag-fixed-center ${extraClass}`.trim(),
+      title,
+    },
+    { default: () => label }
+  );
+};
+
+const renderItemStatusTag = (status) => {
+  return renderFixedCenterTag(status, { class: 'tapd-status-tag', title: status });
+};
+
+const renderMergeStatusCell = (row) => {
+  if (row.noMr || !row.mr?.merge_status) {
+    return '';
+  }
+  const mergeStatus = row.mr.merge_status;
+  const label = MERGE_STATUS_LABELS[mergeStatus] || mergeStatus;
+  return h(
+    NTag,
+    {
+      type: getMergeStatusTagType(mergeStatus),
+      size: 'small',
+      class: 'merge-status-tag',
+      title: mergeStatus,
+    },
+    { default: () => label }
+  );
+};
+
 const renderMrStatusCell = (row) => {
   if (!row.noMr) {
     if (row.mr.status === 'error') {
-      return h(NTag, { type: 'warning', size: 'small' }, { default: () => '异常' });
+      return renderFixedCenterTag('异常', { type: 'warning', class: 'mr-status-tag' });
     }
     if (row.mr.status === 'merged') {
-      return h(NTag, { type: 'success', size: 'small' }, { default: () => '已合并' });
+      return renderFixedCenterTag('已合并', { type: 'success', class: 'mr-status-tag' });
     }
     if (row.mr.status === 'open') {
-      return h(NTag, { type: 'error', size: 'small' }, { default: () => '未合并' });
+      return renderFixedCenterTag('未合并', { type: 'error', class: 'mr-status-tag' });
     }
     if (row.mr.status === 'closed') {
-      return h(NTag, { type: 'warning', size: 'small' }, { default: () => '已关闭' });
+      return renderFixedCenterTag('已关闭', { type: 'warning', class: 'mr-status-tag' });
     }
-    return h(NTag, { type: 'default', size: 'small' }, { default: () => row.mr.status });
+    return renderFixedCenterTag(row.mr.status, { type: 'default', class: 'mr-status-tag' });
   }
-  return h(NTag, { type: 'default', size: 'small' }, { default: () => '无MR' });
+  return renderFixedCenterTag('无MR', { type: 'default', class: 'mr-status-tag' });
 };
 
 // 分组视图：仅 MR 相关列
@@ -791,7 +969,7 @@ const mrColumns = computed(() => [
   {
     title: '目标分支',
     key: 'target_branch',
-    width: 120,
+    width: 96,
     render: (row) => {
       if (!row.noMr) {
         return row.mr.target_branch || '-';
@@ -802,7 +980,8 @@ const mrColumns = computed(() => [
   {
     title: '提交人',
     key: 'author',
-    width: 90,
+    width: 56,
+    ellipsis: { tooltip: true },
     render: (row) => {
       if (!row.noMr) {
         return row.mr.author || '-';
@@ -811,9 +990,17 @@ const mrColumns = computed(() => [
     },
   },
   {
-    title: 'MR状态',
+    title: '可合并状态',
+    key: 'merge_status',
+    width: 116,
+    align: 'center',
+    render: renderMergeStatusCell,
+  },
+  {
+    title: 'MR实际状态',
     key: 'mr_status',
-    width: 100,
+    width: 76,
+    align: 'center',
     render: renderMrStatusCell,
   },
 ]);
@@ -823,137 +1010,91 @@ const columns = computed(() => [
   {
     title: '类型',
     key: 'type',
-    width: 55,
+    ...mrResizableColumn('type', 40),
+    align: 'center',
     render: (row) => {
       if (row.type === 'story') {
-        return h(NTag, { type: 'info', size: 'small' }, { default: () => '需求' });
+        return renderFixedCenterTag('需求', { type: 'info', class: 'type-tag' });
       } else if (row.type === 'bug') {
-        return h(NTag, { type: 'error', size: 'small' }, { default: () => '缺陷' });
+        return renderFixedCenterTag('缺陷', { type: 'error', class: 'type-tag' });
       }
-      return h(NTag, { type: 'default', size: 'small' }, { default: () => row.type });
+      return renderFixedCenterTag(row.type, { type: 'default', class: 'type-tag' });
     },
-    sorter: true,
-    sortOrder: sortKey.value === 'type' ? sortOrder.value : false,
-    onUpdateSortOrder: (order) => {
-      if (order === false) {
-        sortKey.value = '';
-        sortOrder.value = 'asc';
-      } else {
-        sortKey.value = 'type';
-        sortOrder.value = order;
-      }
-    },
+    sorter: (a, b) => compareRowField(a, b, r => r.type),
+    sortOrder: getColumnSortOrder('type'),
   },
   {
     title: '标题',
     key: 'title',
-    width: 250,
+    ...mrResizableColumn('title', 120),
+    render: renderTitleCell,
+    sorter: (a, b) => compareRowField(a, b, r => r.title),
+    sortOrder: getColumnSortOrder('title'),
+  },
+  {
+    title: '状态',
+    key: 'item_status',
+    ...mrResizableColumn('item_status', 60),
+    align: 'center',
     render: (row) => {
-      return h('a', {
-        href: normalizeUrl(row.url),
-        target: '_blank',
-        class: 'title-link',
-        title: row.title,
-      }, row.title);
+      if (!row.itemStatus) return '-';
+      return renderItemStatusTag(row.itemStatus);
     },
-    sorter: true,
-    sortOrder: sortKey.value === 'title' ? sortOrder.value : false,
-    onUpdateSortOrder: (order) => {
-      if (order === false) {
-        sortKey.value = '';
-        sortOrder.value = 'asc';
-      } else {
-        sortKey.value = 'title';
-        sortOrder.value = order;
-      }
-    },
+    sorter: (a, b) => compareRowField(a, b, r => r.itemStatus),
+    sortOrder: getColumnSortOrder('item_status'),
   },
   {
     title: 'MR链接',
     key: 'mr_url',
-    width: 250,
-    render: (row) => {
-      if (!row.noMr) {
-        return h('a', {
-          href: row.mr.url,
-          target: '_blank',
-          class: 'mr-link',
-        }, row.mr.url);
-      }
-      return '';
-    },
-    sorter: true,
-    sortOrder: sortKey.value === 'mr_url' ? sortOrder.value : false,
-    onUpdateSortOrder: (order) => {
-      if (order === false) {
-        sortKey.value = '';
-        sortOrder.value = 'asc';
-      } else {
-        sortKey.value = 'mr_url';
-        sortOrder.value = order;
-      }
-    },
+    ...mrResizableColumn('mr_url', 120),
+    render: renderMrUrlCell,
+    sorter: (a, b) => compareRowField(a, b, r => r.mr?.url),
+    sortOrder: getColumnSortOrder('mr_url'),
   },
   {
     title: '目标分支',
     key: 'target_branch',
-    width: 120,
+    ...mrResizableColumn('target_branch', 72),
     render: (row) => {
       if (!row.noMr) {
         return row.mr.target_branch || '-';
       }
       return '';
     },
-    sorter: true,
-    sortOrder: sortKey.value === 'target_branch' ? sortOrder.value : false,
-    onUpdateSortOrder: (order) => {
-      if (order === false) {
-        sortKey.value = '';
-        sortOrder.value = 'asc';
-      } else {
-        sortKey.value = 'target_branch';
-        sortOrder.value = order;
-      }
-    },
+    sorter: (a, b) => compareRowField(a, b, r => r.mr?.target_branch),
+    sortOrder: getColumnSortOrder('target_branch'),
   },
   {
     title: '提交人',
     key: 'author',
-    width: 90,
+    ...mrResizableColumn('author', 48),
+    ellipsis: { tooltip: true },
     render: (row) => {
       if (!row.noMr) {
         return row.mr.author || '-';
       }
       return '';
     },
-    sorter: true,
-    sortOrder: sortKey.value === 'author' ? sortOrder.value : false,
-    onUpdateSortOrder: (order) => {
-      if (order === false) {
-        sortKey.value = '';
-        sortOrder.value = 'asc';
-      } else {
-        sortKey.value = 'author';
-        sortOrder.value = order;
-      }
-    },
+    sorter: (a, b) => compareRowField(a, b, r => r.mr?.author),
+    sortOrder: getColumnSortOrder('author'),
   },
   {
-    title: 'MR状态',
+    title: '可合并状态',
+    key: 'merge_status',
+    ...mrResizableColumn('merge_status', 80),
+    align: 'center',
+    render: renderMergeStatusCell,
+    sorter: (a, b) => compareRowField(a, b, r => r.mr?.merge_status),
+    sortOrder: getColumnSortOrder('merge_status'),
+  },
+  {
+    title: 'MR实际状态',
     key: 'mr_status',
-    width: 100,
+    ...mrResizableColumn('mr_status', 72),
+    align: 'center',
     render: renderMrStatusCell,
-    sorter: true,
-    sortOrder: sortKey.value === 'mr_status' ? sortOrder.value : false,
-    onUpdateSortOrder: (order) => {
-      if (order === false) {
-        sortKey.value = '';
-        sortOrder.value = 'asc';
-      } else {
-        sortKey.value = 'mr_status';
-        sortOrder.value = order;
-      }
-    },
+    sorter: (a, b) => compareRowField(a, b, r => r.mr?.status),
+    sortOrder: getColumnSortOrder('mr_status'),
   },
 ]);
 
@@ -1017,6 +1158,7 @@ const toggleTypeFilter = (type) => {
 
 const clearAllFilters = () => {
   mrStatusFilter.value = '';
+  itemStatusFilter.value = '';
   typeFilter.value = '';
   saveToLocalStorage();
 };
@@ -1167,9 +1309,10 @@ const clearData = () => {
   error.value = '';
   lastRefreshTime.value = '';
   mrStatusFilter.value = '';
+  itemStatusFilter.value = '';
   typeFilter.value = '';
   sortKey.value = '';
-  sortOrder.value = 'asc';
+  sortOrder.value = 'ascend';
   collapsedTapdItemIds.value = new Set();
   // 移除地址栏中的分享参数
   try {
@@ -1226,24 +1369,40 @@ watch(
   width: 100% !important;
   max-width: 100% !important;
   flex: 1 1 100% !important;
-  // height: 100vh;
   margin: 0;
   padding: 2px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
   box-sizing: border-box;
-  
+
   :deep(.n-card) {
     padding: 10px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
     box-sizing: border-box;
   }
 }
 
+.search-card {
+  flex-shrink: 0;
+}
+
+.content-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  :deep(.n-card__content) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding-top: 8px;
+  }
+}
+
 .input-section {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .history-section {
@@ -1326,7 +1485,7 @@ watch(
 }
 
 .result-section {
-  margin-top: 12px;
+  margin-top: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1335,7 +1494,7 @@ watch(
 }
 
 .release-info {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .section-title {
@@ -1348,38 +1507,39 @@ watch(
 .release-details {
   background: #f4f7fb;
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 6px 12px;
   font-size: 0.9em;
   color: #444;
+  text-align: center;
 }
 
 .stat-cards {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .stat-card {
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  height: 80px;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 6px;
   
   :deep(.n-card__content) {
-    padding: 12px 8px;
+    padding: 0 2px;
     width: 100%;
   }
   
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(22, 119, 255, 0.12);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22, 119, 255, 0.1);
   }
   
   &.active {
     outline: 2px solid #1677ff;
     background: #e6f7ff;
-    box-shadow: 0 4px 14px rgba(22, 119, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(22, 119, 255, 0.12);
   }
 }
 
@@ -1388,7 +1548,7 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 2px;
   text-align: center;
   width: 100%;
 }
@@ -1405,7 +1565,7 @@ watch(
   font-size: 13px;
   font-weight: 500;
   color: #595959;
-  line-height: 1.2;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -1461,7 +1621,7 @@ watch(
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   padding-right: 4px;
 }
 
@@ -1501,26 +1661,19 @@ watch(
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 4px 8px 4px 10px;
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 6px 2px 8px;
   border-bottom: 1px solid #e8ecf0;
   border-left: 3px solid #d9d9d9;
   background: #f8fafc;
   min-width: 0;
 
-  &--story {
-    border-left-color: #1677ff;
-    background: #f5f9ff;
-  }
-
-  &--bug {
-    border-left-color: #e74c3c;
-    background: #fff8f8;
-  }
-
+  &--story,
+  &--bug,
   &--other {
-    border-left-color: #8c8c8c;
+    border-left-color: #d9d9d9;
+    background: #f8fafc;
   }
 
   &--collapsible {
@@ -1535,19 +1688,78 @@ watch(
 
 .item-group-type-tag {
   flex-shrink: 0;
-  transform: scale(0.92);
+  transform: scale(0.82);
+  transform-origin: left center;
+}
+
+.item-group-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.tag-fixed-center,
+:deep(.n-tag.tag-fixed-center) {
+  display: inline-flex !important;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+
+  :deep(.n-tag__content) {
+    display: block;
+    width: 100%;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.tapd-status-tag,
+:deep(.n-tag.tapd-status-tag) {
+  width: 80px;
+  background-color: #f9f0ff !important;
+  color: #722ed1 !important;
+  border-color: #d3adf7 !important;
+}
+
+.merge-status-tag,
+:deep(.n-tag.merge-status-tag) {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.mr-status-tag,
+:deep(.n-tag.mr-status-tag) {
+  width: 56px;
+}
+
+.type-tag,
+:deep(.n-tag.type-tag) {
+  width: 40px;
+}
+
+.item-group-status-tag {
+  flex-shrink: 0;
+  transform: scale(0.82);
   transform-origin: left center;
 }
 
 .item-group-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 1.15;
   color: #262626;
   text-decoration: none;
   transition: color 0.15s ease;
@@ -1565,8 +1777,8 @@ watch(
   flex-shrink: 0;
   max-width: 48%;
   overflow: hidden;
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: 10px;
+  line-height: 1.15;
   color: #8c8c8c;
 
   &--success {
@@ -1600,7 +1812,7 @@ watch(
 
 .item-group-meta-icon {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1;
 }
 
@@ -1613,6 +1825,7 @@ watch(
 .item-group-table {
   :deep(.n-data-table-th) {
     background: #fafbfc;
+    white-space: nowrap;
   }
 }
 
@@ -1623,19 +1836,11 @@ watch(
 .table-section {
   display: flex;
   flex-direction: column;
-  
+  min-width: 0;
+
   :deep(.n-data-table) {
     .n-data-table-base-table {
       border-radius: 6px;
-    }
-    
-    // 移除表格滚动条
-    .n-data-table-wrapper {
-      overflow: visible !important;
-    }
-    
-    .n-scrollbar {
-      overflow: visible !important;
     }
   }
 }
@@ -1646,8 +1851,10 @@ watch(
     color: #333;
     font-weight: 600;
     cursor: pointer;
-    font-size: 12px;
-    padding: 4px 6px;
+    font-size: 11px;
+    line-height: 1.15;
+    padding: 2px 4px;
+    white-space: nowrap;
     
     &:hover {
       background: #e6f7ff;
@@ -1655,13 +1862,14 @@ watch(
   }
   
   :deep(.n-data-table-td) {
-    padding: 3px 5px;
-    font-size: 12px;
+    padding: 1px 4px;
+    font-size: 11px;
+    line-height: 1.15;
     overflow: hidden;
     
     // 确保标题和MR链接列不换行
     &:nth-child(2),
-    &:nth-child(3) {
+    &:nth-child(4) {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -1673,14 +1881,14 @@ watch(
   }
   
   :deep(.compact-row) {
-    height: 28px;
+    height: 22px;
   }
   
   :deep(.n-tag) {
-    font-size: 11px;
-    padding: 0 4px;
-    height: 20px;
-    line-height: 18px;
+    font-size: 10px;
+    padding: 0 3px;
+    height: 16px;
+    line-height: 14px;
   }
   
   // 确保tag颜色正确显示 - 使用多种选择器确保匹配
@@ -1723,6 +1931,46 @@ watch(
     color: #666 !important;
     border-color: #d9d9d9 !important;
   }
+
+  :deep(.n-tag.tag-fixed-center) {
+    display: inline-flex !important;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  :deep(.n-tag.tag-fixed-center .n-tag__content) {
+    display: block;
+    width: 100%;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :deep(.n-tag.tapd-status-tag),
+  :deep(.n-tag--default-type.tapd-status-tag) {
+    width: 80px;
+    background-color: #f9f0ff !important;
+    color: #722ed1 !important;
+    border-color: #d3adf7 !important;
+  }
+
+  :deep(.n-tag.merge-status-tag) {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  :deep(.n-tag.mr-status-tag) {
+    width: 56px;
+  }
+
+  :deep(.n-tag.type-tag) {
+    width: 40px;
+  }
   
   :deep(.n-data-table-tr:nth-child(even)) {
     background: #fafbfc;
@@ -1733,19 +1981,17 @@ watch(
   }
 }
 
-
-
 .title-link {
   color: #1677ff;
   text-decoration: underline;
-  font-size: 12px;
+  font-size: 11px;
   display: inline-block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
-  width: 100%;
-  
+  vertical-align: bottom;
+
   &:hover {
     color: #1456c2;
   }
@@ -1754,14 +2000,14 @@ watch(
 .mr-link {
   color: #1677ff;
   text-decoration: underline;
-  font-size: 12px;
+  font-size: 11px;
   display: inline-block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
-  width: 100%;
-  
+  vertical-align: bottom;
+
   &:hover {
     color: #1456c2;
   }
@@ -1796,10 +2042,8 @@ watch(
   }
   
   .stat-card {
-    height: 68px;
-
     :deep(.n-card__content) {
-      padding: 10px 6px;
+      padding: 0 2px;
     }
   }
   
