@@ -149,6 +149,7 @@ declare module 'vue' {
     MergeRequestCheck: typeof import('./src/tools/merge-request-check/merge-request-check.vue')['default']
     MetaTagGenerator: typeof import('./src/tools/meta-tag-generator/meta-tag-generator.vue')['default']
     MimeTypes: typeof import('./src/tools/mime-types/mime-types.vue')['default']
+    MrDeployCheck: typeof import('./src/tools/mr-deploy-check/mr-deploy-check.vue')['default']
     MutiTableSqlGen: typeof import('./src/tools/muti-table-sql-gen/muti-table-sql-gen.vue')['default']
     NAlert: typeof import('naive-ui')['NAlert']
     NAvatar: typeof import('naive-ui')['NAvatar']

@@ -113,12 +113,16 @@ tools:
     description: 用于共享Saas切车,会自动在test2,uat,prod,prod2,dev,硬件生产环境寻找设备并切换到目标环境
 
   release-merge-check:
-    title: 发布计划MR检查
+    title: 发布计划MR检测
     description: TAPD发布计划MR统计工具，用于检查发布计划中需求和缺陷的MR合并状态
 
   merge-request-check:
-    title: MR合并检查
-    description: MR合并检查工具，用于检查MR合并状态，是否合并到指定分支
+    title: MR合并检测
+    description: MR合并检测工具，用于检查MR合并状态，是否合并到指定分支
+
+  mr-deploy-check:
+    title: MR部署检测
+    description: 检测某个 MR 是否在指定环境（test/uat）部署过，使用镜像时间作为参考依据，有可能不准，仅供参考
 
   ecu-mock:
     title: ECU模拟

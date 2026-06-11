@@ -1,6 +1,7 @@
 import { tool as base64FileConverter } from './base64-file-converter';
 import { tool as base64StringConverter } from './base64-string-converter';
 import { tool as basicAuthGenerator } from './basic-auth-generator';
+import { tool as mrDeployCheck } from './mr-deploy-check';
 import { tool as jsonBeautify } from './json-beautify';
 import { tool as tenantGrayPlan } from './tenant-gray-plan';
 import { tool as rentalGetMeituanShopToken } from './rental-get-meituan-shop-token';
@@ -120,6 +121,7 @@ export const toolsByCategory: ToolCategory[] = [
             xiaoanEcuMock,
             tenantDashboard,
             tenantGrayPlan,
+            mrDeployCheck,
         ],
     },
     {
@@ -146,6 +148,7 @@ export const toolsByCategory: ToolCategory[] = [
         components: [
             xiaoanEcuMockBatch,
             mergeRequestCheck,
+
             // hashText,
             dateTimeConverter,
             qrCodeGenerator,

@@ -54,7 +54,7 @@ const showInternalBetaNotice = computed<boolean>(() => toolTag.value === '内测
           {{ toolDescription }}
         </div>
         <n-alert v-if="showInternalBetaNotice" class="internal-beta-notice" type="warning" :show-icon="true">
-          当前处于内测，可能会出现连接中断/不存在/数据异常等问题
+          内测中，可能会出现连接中断/不存在/数据异常等问题，不保证长期在线可用
         </n-alert>
       </div>
     </div>
