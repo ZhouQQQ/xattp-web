@@ -192,6 +192,22 @@
                 </n-form-item>
               </n-gi>
 
+              <n-gi :span="4">
+                <n-form-item label="随机移动(m)">
+                  <template #label>
+                    <span>随机移动(m)</span>
+                    <n-tooltip trigger="hover" style="margin-left: 8px;">
+                      <template #trigger>
+                        <span class="tip-text">?</span>
+                      </template>
+                      每次 bin68 定时上报时，相对上一次坐标在 0～该距离（米）内随机移动一步；首包不移动，0 表示始终固定
+                    </n-tooltip>
+                  </template>
+                  <n-input-number v-model:value="formData.random_move_m" :min="0" placeholder="0"
+                    :show-button="false" size="small" style="width: 100%" @update:value="saveFormToStorage" />
+                </n-form-item>
+              </n-gi>
+
               <n-gi :span="12">
                 <n-form-item label="电压范围（V）">
                   <div class="voltage-range">
@@ -592,6 +608,7 @@ const defaultFormData: BatchFormData = {
   lat: DEFAULT_COORD_LAT,
   lng: DEFAULT_COORD_LNG,
   radius_m: 10000,
+  random_move_m: 0,
   coord_mode: "scatter",
   mode: 1,
   create_mode: 1,
@@ -636,6 +653,13 @@ function getInitialFormData(): BatchFormData {
     // 随机半径默认 10000（m）；缓存缺省或非法时回退，0 表示不随机仍保留
     if (merged.radius_m == null || !Number.isFinite(Number(merged.radius_m)) || Number(merged.radius_m) < 0) {
       merged.radius_m = defaultFormData.radius_m;
+    }
+    if (
+      merged.random_move_m == null ||
+      !Number.isFinite(Number(merged.random_move_m)) ||
+      Number(merged.random_move_m) < 0
+    ) {
+      merged.random_move_m = defaultFormData.random_move_m;
     }
     if (merged.coord_mode !== "scatter" && merged.coord_mode !== "fixed") {
       merged.coord_mode = defaultFormData.coord_mode;
@@ -1843,6 +1867,11 @@ function applyBatchRecordDataToForm(res: unknown) {
     formData.radius_m = radius;
   }
 
+  const randomMoveM = Number(record.random_move_m);
+  if (Number.isFinite(randomMoveM) && randomMoveM >= 0) {
+    formData.random_move_m = randomMoveM;
+  }
+
   const recLng = Number(record.lng);
   const recLat = Number(record.lat);
   if (Number.isFinite(recLng) && Number.isFinite(recLat)) {
@@ -2311,6 +2340,10 @@ async function handleCreate() {
 
     const list = parseBatchMockListFromResponse(res);
     batchMockListRows.value = list;
+    const resRandomMoveM = Number(res?.data?.random_move_m);
+    if (Number.isFinite(resRandomMoveM) && resRandomMoveM >= 0) {
+      formData.random_move_m = resRandomMoveM;
+    }
     const successRows = list.filter((row) => row.is_mock_success && !!row.connect_id);
     const failRows = list.filter((row) => !row.is_mock_success);
     checkedRowKeys.value = list.map((row) => row.row_key);

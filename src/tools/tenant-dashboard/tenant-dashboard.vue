@@ -38,10 +38,21 @@
       </div>
 
       <div v-if="!isFullscreen" class="meta">
-        <span class="meta-total">
-          <n-icon :component="BuildingWarehouse" class="meta-total-icon" />
-          <span>租户总数 {{ filteredTenants.length }}</span>
-        </span>
+        <div class="meta-totals">
+          <span class="meta-total">
+            <n-icon :component="BuildingWarehouse" class="meta-total-icon" />
+            <span>租户总数 {{ envFilteredTenants.length }}</span>
+          </span>
+          <n-tooltip trigger="hover" placement="top">
+            <template #trigger>
+              <span class="meta-total meta-car-total" title="昨日车辆合计">
+                <n-icon :component="ScooterElectric" class="meta-total-icon" />
+                <span>车辆总数 {{ formatPanelCarShortLabel(metaCarTotal) }}</span>
+              </span>
+            </template>
+            <div class="panel-stats-tooltip">车辆数：{{ formatPanelCarExact(metaCarTotal) }}</div>
+          </n-tooltip>
+        </div>
         <div class="meta-trailing">
           <span class="meta-gray-at">灰度租户刷新时间：{{ lastGrayAtText }}</span>
           <!-- <span class="board-sort-label">全局排序</span> -->
@@ -317,6 +328,18 @@ const filteredTenants = computed(() => {
   });
 });
 
+function tenantMatchesEnvFilter(tenant: TenantItem): boolean {
+  const envTag = envTagOf(tenant.env).text as "prod" | "prod2" | "独立";
+  return grayEnvFilters.value.includes(envTag as "prod" | "prod2");
+}
+
+/** 搜索/车辆筛选后，再按华为云、阿里云勾选过滤 */
+const envFilteredTenants = computed(() =>
+  filteredTenants.value.filter(tenantMatchesEnvFilter),
+);
+
+const metaCarTotal = computed(() => panelCarSum(envFilteredTenants.value));
+
 function parsePanelSortSpec(spec: string): { key: "tenantId" | "carTotal"; order: "asc" | "desc" } {
   const [rawKey, rawOrder] = spec.split("|");
   const key = rawKey === "carTotal" ? "carTotal" : "tenantId";
@@ -354,11 +377,8 @@ const panels = computed(() => {
   const gray2: TenantItem[] = [];
   const formal: TenantItem[] = [];
 
-  filteredTenants.value.forEach((tenant) => {
+  envFilteredTenants.value.forEach((tenant) => {
     const gray = grayMap.value.get(tenant.tenantId);
-    const envTag = envTagOf(tenant.env).text as "prod" | "prod2" | "独立";
-    const allowInGray = grayEnvFilters.value.includes(envTag as "prod" | "prod2");
-    if (!allowInGray) return;
     if (gray?.grayGroup === 1) {
       gray1.push(tenant);
       return;
@@ -592,18 +612,9 @@ async function toggleFullscreen() {
   }
 }
 
-async function refreshAll() {
-  grayRefreshButtonLoading.value = true;
-  try {
-    await Promise.all([fetchTenantList(), fetchGrayList()]);
-  } finally {
-    grayRefreshButtonLoading.value = false;
-  }
-}
-
 async function handleRefreshMenuSelect(key: string) {
   if (key === "refresh-now") {
-    await refreshAll();
+    await fetchGrayList({ buttonLoading: true });
     startGrayPolling();
     return;
   }
@@ -1114,10 +1125,21 @@ onScopeDispose(() => {
   padding: 0 2px;
 }
 
+.meta-totals {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
 .meta-total {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+.meta-car-total {
+  cursor: default;
 }
 
 .meta-total-icon {

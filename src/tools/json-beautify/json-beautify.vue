@@ -389,7 +389,7 @@ function collapseAll() {
 
 .panel-body {
   flex: 1;
-  min-height: 240px;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -408,10 +408,13 @@ function collapseAll() {
 .tree-block {
   flex: 1;
   min-height: 0;
+  height: 100%;
   padding: 6px 8px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 4px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .panel-empty {
@@ -436,6 +439,12 @@ function collapseAll() {
 
   .panel-body {
     min-height: 320px;
+    overflow: hidden;
+  }
+
+  .tree-block {
+    max-height: 60vh;
+    overflow-y: auto;
   }
 }
 </style>

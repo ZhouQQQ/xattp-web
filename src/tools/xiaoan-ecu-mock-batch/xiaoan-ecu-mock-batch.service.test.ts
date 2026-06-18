@@ -19,6 +19,7 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
     lat: 30.500136,
     lng: 114.434888,
     radius_m: 10000,
+    random_move_m: 0,
     coord_mode: "scatter",
     mode: 1,
     create_mode: 1,
@@ -110,6 +111,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
       lng: 114.434888,
       coord_mode: "scatter",
       radius_m: 10000,
+      random_move_m: 0,
       num: 2,
       imeis: ["861234567890123", "861234567890124"],
     });
@@ -166,7 +168,16 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     ]);
   });
 
-  it("会将响应延迟写入 payload", () => {
+  it("会将随机移动距离写入 payload", () => {
+    const payload = buildBatchPayload(
+      createForm({
+        random_move_m: 15,
+      }),
+    );
+    expect(payload.random_move_m).toBe(15);
+  });
+
+  it("可以将响应延迟写入 payload", () => {
     const payload = buildBatchPayload(
       createForm({
         reply_delay_sec: 5,

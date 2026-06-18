@@ -285,6 +285,7 @@
                 <n-tag
                   v-if="item.status"
                   size="tiny"
+                  bordered
                   class="item-group-status-tag tapd-status-tag tag-fixed-center"
                   :title="item.status"
                 >
@@ -336,8 +337,8 @@
 <script setup>
 import { ref, computed, h, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { createDiscreteApi } from 'naive-ui';
-import { NTag } from 'naive-ui';
+import { createDiscreteApi, NTag, NTooltip, NIcon } from 'naive-ui';
+import { Help } from '@vicons/tabler';
 import { getTapdReleaseInfo } from './release-merge-check.service.js';
 
 const route = useRoute();
@@ -488,11 +489,55 @@ const MERGE_STATUS_LABELS = {
   cannot_be_merged_recheck: '不可合并(需重检)',
 };
 
+/** GitLab MR API merge_status 字段含义（参考 GitLab 9.4+） */
+const MERGE_STATUS_DESCRIPTIONS = {
+  unchecked: '该 MR 尚未进行可合并性检查',
+  checking: '正在检查该 MR 是否可以合并',
+  can_be_merged: '该 MR 可无冲突合并',
+  cannot_be_merged: '源分支与目标分支存在合并冲突',
+  cannot_be_merged_recheck: '当前尚未检查；在此前的变更中曾存在冲突',
+};
+
 const getMergeStatusTagType = (mergeStatus) => {
-  if (mergeStatus === 'unchecked' || mergeStatus === 'checking') return 'warning';
   if (mergeStatus === 'can_be_merged') return 'success';
   if (mergeStatus === 'cannot_be_merged' || mergeStatus === 'cannot_be_merged_recheck') return 'error';
   return 'default';
+};
+
+const isMergeStatusOutlineStyle = (mergeStatus) => (
+  mergeStatus === 'unchecked' || mergeStatus === 'checking'
+);
+
+const renderMergeStatusColumnTitle = () => {
+  const helpLines = Object.entries(MERGE_STATUS_LABELS).map(([key, label]) => (
+    h('div', { class: 'merge-status-help-line' }, [
+      h('span', { class: 'merge-status-help-label' }, `${label}`),
+      h('span', { class: 'merge-status-help-key' }, `（${key}）`),
+      `：${MERGE_STATUS_DESCRIPTIONS[key]}`,
+    ])
+  ));
+
+  return h('span', { class: 'column-title-with-help' }, [
+    '可合并状态',
+    h(
+      NTooltip,
+      { trigger: 'hover', style: { maxWidth: '380px' } },
+      {
+        trigger: () => h(
+          NIcon,
+          {
+            size: 14,
+            class: 'column-title-help-icon',
+          },
+          { default: () => h(Help) }
+        ),
+        default: () => h('div', { class: 'merge-status-help' }, [
+          h('div', { class: 'merge-status-help-title' }, 'GitLab MR API merge_status 说明'),
+          ...helpLines,
+        ]),
+      }
+    ),
+  ]);
 };
 
 // 计算属性
@@ -909,7 +954,16 @@ const renderFixedCenterTag = (label, options = {}) => {
 };
 
 const renderItemStatusTag = (status) => {
-  return renderFixedCenterTag(status, { class: 'tapd-status-tag', title: status });
+  return h(
+    NTag,
+    {
+      size: 'small',
+      bordered: true,
+      class: 'tag-fixed-center tapd-status-tag',
+      title: status,
+    },
+    { default: () => status }
+  );
 };
 
 const renderMergeStatusCell = (row) => {
@@ -918,16 +972,22 @@ const renderMergeStatusCell = (row) => {
   }
   const mergeStatus = row.mr.merge_status;
   const label = MERGE_STATUS_LABELS[mergeStatus] || mergeStatus;
-  return h(
+  const description = MERGE_STATUS_DESCRIPTIONS[mergeStatus] || mergeStatus;
+  const isOutlineStyle = isMergeStatusOutlineStyle(mergeStatus);
+  const tag = h(
     NTag,
     {
-      type: getMergeStatusTagType(mergeStatus),
+      ...(isOutlineStyle
+        ? { bordered: true, class: 'merge-status-tag merge-status-tag--outline' }
+        : { type: getMergeStatusTagType(mergeStatus), class: 'merge-status-tag' }),
       size: 'small',
-      class: 'merge-status-tag',
-      title: mergeStatus,
     },
     { default: () => label }
   );
+  return h(NTooltip, { trigger: 'hover' }, {
+    trigger: () => tag,
+    default: () => description,
+  });
 };
 
 const renderMrStatusCell = (row) => {
@@ -990,7 +1050,7 @@ const mrColumns = computed(() => [
     },
   },
   {
-    title: '可合并状态',
+    title: renderMergeStatusColumnTitle,
     key: 'merge_status',
     width: 116,
     align: 'center',
@@ -1079,7 +1139,7 @@ const columns = computed(() => [
     sortOrder: getColumnSortOrder('author'),
   },
   {
-    title: '可合并状态',
+    title: renderMergeStatusColumnTitle,
     key: 'merge_status',
     ...mrResizableColumn('merge_status', 80),
     align: 'center',
@@ -1723,16 +1783,61 @@ watch(
 
 .tapd-status-tag,
 :deep(.n-tag.tapd-status-tag) {
-  width: 80px;
-  background-color: #f9f0ff !important;
-  color: #722ed1 !important;
-  border-color: #d3adf7 !important;
+  max-width: 80px;
+  min-width: 0;
+  background-color: #fff !important;
+  color: #1677ff !important;
+  border: 1px solid #1677ff !important;
+  border-radius: 9999px !important;
+  padding: 0 8px !important;
+  font-weight: 400;
 }
 
 .merge-status-tag,
 :deep(.n-tag.merge-status-tag) {
   padding-left: 8px !important;
   padding-right: 8px !important;
+}
+
+.merge-status-tag--outline,
+:deep(.n-tag.merge-status-tag--outline) {
+  background-color: #fff !important;
+  color: #595959 !important;
+  border: 1px solid #d9d9d9 !important;
+}
+
+.column-title-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.column-title-help-icon {
+  cursor: help;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.merge-status-help-title {
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.merge-status-help-line {
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.merge-status-help-label {
+  font-weight: 500;
+}
+
+.merge-status-help-key {
+  color: #8c8c8c;
+  font-size: 11px;
 }
 
 .mr-status-tag,
@@ -1953,15 +2058,25 @@ watch(
 
   :deep(.n-tag.tapd-status-tag),
   :deep(.n-tag--default-type.tapd-status-tag) {
-    width: 80px;
-    background-color: #f9f0ff !important;
-    color: #722ed1 !important;
-    border-color: #d3adf7 !important;
+    max-width: 80px;
+    min-width: 0;
+    background-color: #fff !important;
+    color: #1677ff !important;
+    border: 1px solid #1677ff !important;
+    border-radius: 9999px !important;
+    padding: 0 8px !important;
+    font-weight: 400;
   }
 
   :deep(.n-tag.merge-status-tag) {
     padding-left: 8px !important;
     padding-right: 8px !important;
+  }
+
+  :deep(.n-tag.merge-status-tag--outline) {
+    background-color: #fff !important;
+    color: #595959 !important;
+    border: 1px solid #d9d9d9 !important;
   }
 
   :deep(.n-tag.mr-status-tag) {

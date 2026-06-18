@@ -15,6 +15,8 @@ export interface BatchFormData {
   lat: number | null;
   lng: number | null;
   radius_m: number | null;
+  /** 每次 bin68 上报相对上一坐标随机移动的最大距离（米），0 表示固定 */
+  random_move_m: number | null;
   coord_mode: CoordMode;
   mode: BatchCreateMode;
   create_mode: CreateMode;
@@ -37,6 +39,7 @@ export interface BatchPayload {
   lat?: number;
   lng?: number;
   radius_m?: number;
+  random_move_m?: number;
   coord_mode?: CoordMode;
   coordinates?: Array<{ lat: number; lng: number }>;
   mode: BatchCreateMode;
@@ -148,6 +151,13 @@ export function validateBatchForm(form: BatchFormData): string | null {
     return "最小电压不能大于最大电压";
   }
 
+  if (
+    form.random_move_m != null &&
+    (!Number.isFinite(Number(form.random_move_m)) || Number(form.random_move_m) < 0)
+  ) {
+    return "随机移动距离必须是大于等于 0 的数字（米）";
+  }
+
   if (form.coord_mode === "scatter" && (!Number.isFinite(Number(form.lat)) || !Number.isFinite(Number(form.lng)))) {
     return "经纬度必须是有效数字";
   }
@@ -252,6 +262,11 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
     payload.coord_mode = "fixed";
     payload.radius_m = 0;
     payload.coordinates = points;
+  }
+
+  const randomMoveM = Number(form.random_move_m);
+  if (Number.isFinite(randomMoveM) && randomMoveM >= 0) {
+    payload.random_move_m = randomMoveM;
   }
 
   return payload;

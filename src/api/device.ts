@@ -117,6 +117,7 @@ export function xiaoanEcuMockBatchCreateAPI(data: {
   lat?: number;
   lng?: number;
   radius_m?: number;
+  random_move_m?: number;
   coord_mode?: "scatter" | "fixed";
   coordinates?: Array<{ lat: number; lng: number }>;
   create_mode?: 1 | 2;
@@ -297,6 +298,27 @@ export function xiaoanEcuMockBin5API(data: {
   alarm_type: number;
 }) {
   return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/bin/5`, data);
+}
+
+/** 小安中控模拟：CMD82 各 protocolVer 字段定义 */
+export function xiaoanEcuMockBin82SchemasAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/bin/82/schemas`);
+}
+
+/** 小安中控模拟：上报 Bin82 氢协议 BMS（CMD: 82） */
+export function xiaoanEcuMockBin82API(data: {
+  connect_id: string;
+  data: Record<string, unknown>;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/bin/82`, data);
+}
+
+/** 小安中控模拟：解析十六进制为 Bin82 表单字段 */
+export function xiaoanEcuMockBin82ParseAPI(data: {
+  hex: string;
+  protocolVer?: number;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/bin/82/parse`, data);
 }
 
 // ---------- 电柜模拟 (cabinet mock) ----------

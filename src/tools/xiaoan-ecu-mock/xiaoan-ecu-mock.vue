@@ -266,6 +266,9 @@
                   <n-button type="default" @click="openBin5Modal">
                     Bin5上报
                   </n-button>
+                  <n-button type="default" @click="openBin82Modal">
+                    Bin82上报
+                  </n-button>
                 </n-space>
               </template>
             </n-form-item>
@@ -422,6 +425,144 @@
       </n-form>
     </n-modal>
 
+    <!-- Bin82 氢协议上报弹窗 -->
+    <n-modal
+      v-model:show="showBin82Modal"
+      preset="card"
+      title="CMD_BMS_INFO_V4 通用BMS信息上报{cmd:82}"
+      :mask-closable="false"
+      class="bin82-modal"
+      :style="{ width: 'min(1520px, 94vw)' }"
+    >
+      <template #footer>
+        <n-space justify="end">
+          <n-button type="primary" :loading="bin82Loading" @click="handleBin82Submit">
+            上报
+          </n-button>
+        </n-space>
+      </template>
+      <n-spin :show="false">
+        <div class="bin82-toolbar">
+          <span class="bin82-toolbar-label">协议版本</span>
+          <n-select
+            v-model:value="bin82Form.protocolVer"
+            :options="bin82ProtocolOptions"
+            size="small"
+            :consistent-menu-width="false"
+            class="bin82-protocol-select"
+            @update:value="onBin82ProtocolChange"
+          />
+          <n-button size="small" @click="openBin82HexModal">原始十六进制解析</n-button>
+          <n-button text type="primary" size="small" @click="openBin82ProtocolDoc">
+            参考文档
+          </n-button>
+        </div>
+        <n-alert type="info" :show-icon="false" class="bin82-unit-tip" :bordered="false">
+          {{ BIN82_FORM_UNIT_TIP }}
+        </n-alert>
+        <div v-if="bin82ActiveFields.length" class="bin82-fields">
+          <div
+            v-for="field in bin82ActiveFields"
+            :key="field.key"
+            class="bin82-field-cell"
+            :class="{ 'bin82-field-cell--bits': isBin82BitField(field) }"
+          >
+            <div class="bin82-field-head" :title="field.description || field.label">
+              <span class="bin82-field-name">{{ field.label }}</span>
+              <span v-if="formatBin82FieldSummary(field)" class="bin82-field-summary">
+                {{ formatBin82FieldSummary(field) }}
+              </span>
+            </div>
+            <template v-if="isBin82BitField(field)">
+              <div class="bin82-bit-toolbar">
+                <n-input-number
+                  v-model:value="bin82Form.data[field.key]"
+                  size="small"
+                  class="bin82-bit-num"
+                  :show-button="false"
+                  :min="0"
+                  :max="getBin82BitMax(field)"
+                />
+                <span class="bin82-bit-meta">
+                  {{ Number(bin82Form.data[field.key] ?? 0) }} · 0x{{
+                    formatBin82BitHex(bin82Form.data[field.key], field)
+                  }}
+                </span>
+              </div>
+              <n-checkbox-group
+                class="bin82-bit-group"
+                :value="getBin82SelectedBits(field)"
+                @update:value="(bits) => setBin82SelectedBits(field, bits as number[])"
+              >
+                <div class="bin82-bit-grid">
+                  <n-checkbox
+                    v-for="bit in getBin82BitDefs(field)"
+                    :key="`${field.key}-${bit.bit}`"
+                    :value="bit.bit"
+                    :label="`BIT${bit.bit}: ${bit.label}`"
+                  />
+                </div>
+              </n-checkbox-group>
+            </template>
+            <n-select
+              v-else-if="isBin82EnumField(field)"
+              v-model:value="bin82Form.data[field.key]"
+              :options="getBin82EnumOptions(field)"
+              size="small"
+              clearable
+              class="bin82-field-input"
+            />
+            <template v-else>
+              <n-input
+                v-if="isBin82StringField(field.type)"
+                :value="String(bin82Form.data[field.key] ?? '')"
+                size="small"
+                :placeholder="field.key"
+                @update:value="(v) => (bin82Form.data[field.key] = v)"
+              />
+              <n-input-number
+                v-else
+                v-model:value="bin82Form.data[field.key]"
+                size="small"
+                class="bin82-field-input"
+                :show-button="false"
+              />
+              <span v-if="formatBin82UnitFillHint(field)" class="bin82-field-unit-hint">
+                {{ formatBin82UnitFillHint(field) }}
+              </span>
+            </template>
+          </div>
+        </div>
+      </n-spin>
+    </n-modal>
+
+    <!-- Bin82 原始十六进制解析弹窗 -->
+    <n-modal
+      v-model:show="showBin82HexModal"
+      preset="dialog"
+      title="原始十六进制解析"
+      :mask-closable="false"
+      style="width: 720px"
+    >
+      <template #action>
+        <n-space :size="8">
+          <n-button @click="bin82HexInput = ''">清空</n-button>
+          <n-button type="primary" :loading="bin82ParseLoading" @click="handleBin82ParseHex">
+            解析并填充表单
+          </n-button>
+        </n-space>
+      </template>
+      <p class="bin82-hex-hint">支持 CMD82 消息体或完整报文（AA55 52 …），解析后写入上报表单</p>
+      <n-input
+        v-model:value="bin82HexInput"
+        type="textarea"
+        :rows="12"
+        size="small"
+        placeholder="例如：02 53 4E … 或 AA55 52 01 6B 02 …"
+        class="bin82-hex-input"
+      />
+    </n-modal>
+
     <!-- 模拟轨迹弹窗 -->
     <n-modal v-model:show="showTrackModal" preset="dialog" title="模拟轨迹" :mask-closable="false" style="width: 600px">
       <template #action>
@@ -471,7 +612,7 @@
 <script setup lang="ts">
 defineOptions({ name: "XiaoanEcuMock" });
 
-import { ref, reactive, nextTick } from "vue";
+import { ref, reactive, nextTick, computed } from "vue";
 import { createDiscreteApi } from "naive-ui";
 import { Help, Gps, Trash, Dice } from "@vicons/tabler";
 import {
@@ -484,12 +625,35 @@ import {
   xiaoanEcuMockMoveAPI,
   xiaoanEcuMockTrajectoryAPI,
   xiaoanEcuMockBin5API,
+  xiaoanEcuMockBin82API,
+  xiaoanEcuMockBin82ParseAPI,
 } from "@/api/device";
 import {
   bin5AlarmTypeOptions,
   BIN5_PROTOCOL_DOC_URL,
   parseBin5AlarmType,
 } from "@/tools/ecu-mock/bin5-alarm-types";
+import {
+  applyBin82ParsedData,
+  BIN82_PROTOCOL_DOC_URL,
+  BIN82_FORM_UNIT_TIP,
+  buildBin82FormData,
+  formatBin82FieldSummary,
+  formatBin82UnitFillHint,
+  getBin82BitDefs,
+  getBin82BitWidth,
+  getBin82EnumOptions,
+  isBin82BitField,
+  isBin82EnumField,
+  isBin82StringField,
+  packBin82Bits,
+  packBin82SubmitData,
+  unpackBin82Bits,
+  type Bin82FieldSchema,
+  type Bin82FormContext,
+  type Bin82ProtocolSchema,
+} from "@/tools/ecu-mock/bin82-protocol";
+import { BIN82_PROTOCOL_SCHEMAS } from "@/tools/ecu-mock/bin82-schemas";
 
 const { message } = createDiscreteApi(["message"]);
 const BASE_PATH = "/xattp-server";
@@ -1440,6 +1604,144 @@ async function handleBin5Submit() {
   }
 }
 
+/* ========== Bin82 氢协议上报 ========== */
+const showBin82Modal = ref(false);
+const showBin82HexModal = ref(false);
+const bin82Loading = ref(false);
+const bin82ParseLoading = ref(false);
+const bin82HexInput = ref("");
+/** 协议字段定义（注释、单位、BIT）前端写死，见 bin82-schemas.ts */
+const bin82Schemas: Bin82ProtocolSchema[] = BIN82_PROTOCOL_SCHEMAS;
+const bin82Form = reactive<{
+  protocolVer: number;
+  data: Record<string, string | number | null>;
+}>({
+  protocolVer: 2,
+  data: {},
+});
+
+const bin82ProtocolOptions = computed(() =>
+  bin82Schemas.map((s) => ({ label: s.title, value: s.protocolVer })),
+);
+
+const bin82ActiveFields = computed(() => {
+  const schema = bin82Schemas.find((s) => s.protocolVer === bin82Form.protocolVer);
+  return schema?.fields ?? [];
+});
+
+function getBin82FormContext(): Bin82FormContext {
+  return {
+    imei: formData.imei,
+    battery_sn: formData.battery_sn,
+    battery_soc: formData.battery_soc,
+    voltage: formData.voltage,
+  };
+}
+
+function resetBin82FieldValues() {
+  bin82Form.data = buildBin82FormData(bin82ActiveFields.value, getBin82FormContext());
+}
+
+function openBin82Modal() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  if (
+    bin82Schemas.length &&
+    !bin82Schemas.some((s) => s.protocolVer === bin82Form.protocolVer)
+  ) {
+    bin82Form.protocolVer = bin82Schemas[0].protocolVer;
+  }
+  // 仅首次打开时初始化默认值；再次打开保留上次填写
+  if (Object.keys(bin82Form.data).length === 0) {
+    resetBin82FieldValues();
+  }
+  showBin82Modal.value = true;
+}
+
+function onBin82ProtocolChange() {
+  resetBin82FieldValues();
+}
+
+function openBin82HexModal() {
+  showBin82HexModal.value = true;
+}
+
+function openBin82ProtocolDoc() {
+  window.open(BIN82_PROTOCOL_DOC_URL, "_blank", "noopener,noreferrer");
+}
+
+function getBin82BitMax(field: Bin82FieldSchema): number {
+  return getBin82BitWidth(field) === 32 ? 0xffffffff : 0xffff;
+}
+
+function formatBin82BitHex(value: string | number | null | undefined, field: Bin82FieldSchema): string {
+  const width = getBin82BitWidth(field) / 4;
+  const num = Number(value) || 0;
+  return num.toString(16).toUpperCase().padStart(width, "0");
+}
+
+function getBin82SelectedBits(field: Bin82FieldSchema): number[] {
+  return unpackBin82Bits(bin82Form.data[field.key], getBin82BitWidth(field));
+}
+
+function setBin82SelectedBits(field: Bin82FieldSchema, bits: number[]) {
+  bin82Form.data[field.key] = packBin82Bits(bits);
+}
+
+async function handleBin82ParseHex() {
+  const hex = bin82HexInput.value.trim();
+  if (!hex) {
+    message.error("请输入十六进制数据");
+    return;
+  }
+  bin82ParseLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockBin82ParseAPI({ hex });
+    if (!checkResCode(res)) return;
+    const parsed = (res?.data && typeof res.data === "object" ? res.data : {}) as Record<string, unknown>;
+    const ver = Number(parsed.protocolVer);
+    if (Number.isFinite(ver) && ver >= 1 && ver !== bin82Form.protocolVer) {
+      bin82Form.protocolVer = ver;
+      await nextTick();
+    }
+    applyBin82ParsedData(bin82ActiveFields.value, bin82Form.data, parsed);
+    showBin82HexModal.value = false;
+    message.success("解析成功，已填充表单");
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "十六进制解析失败");
+  } finally {
+    bin82ParseLoading.value = false;
+  }
+}
+
+async function handleBin82Submit() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  const fields = bin82ActiveFields.value;
+  if (!fields.length) {
+    message.error("请选择有效的协议版本");
+    return;
+  }
+  bin82Loading.value = true;
+  try {
+    const payload = packBin82SubmitData(bin82Form.protocolVer, fields, bin82Form.data);
+    const res: any = await xiaoanEcuMockBin82API({
+      connect_id: connectId.value,
+      data: payload,
+    });
+    if (!checkResCode(res)) return;
+    message.success(res?.data || "上报 bin82 成功");
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "Bin82 上报失败");
+  } finally {
+    bin82Loading.value = false;
+  }
+}
+
 /* ========== 模拟轨迹 ========== */
 const showTrackModal = ref(false);
 const trackText = ref("");
@@ -1617,6 +1919,160 @@ async function handleCloseTab(name: string) {
 
 .form-section {
   max-width: 960px;
+}
+
+/* Bin82 弹窗：大卡片 + 自适应网格，宽高给足 */
+:deep(.bin82-modal) {
+  .n-card {
+    min-height: min(880px, 90vh);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .n-card-header {
+    padding: 18px 24px 14px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .n-card__content {
+    flex: 1;
+    min-height: 0;
+    padding: 0 24px 12px;
+    overflow: auto;
+  }
+
+  .n-card__footer {
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--n-divider-color);
+  }
+}
+
+.bin82-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--n-divider-color);
+}
+
+.bin82-toolbar-label {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--n-text-color);
+}
+
+.bin82-protocol-select {
+  width: min(520px, 100%);
+}
+
+.bin82-unit-tip {
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+
+  :deep(.n-alert-body) {
+    padding: 6px 10px;
+  }
+}
+
+.bin82-field-unit-hint {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--n-warning-color);
+}
+
+.bin82-hex-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--n-text-color-3);
+}
+
+.bin82-hex-input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bin82-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px 16px;
+  align-content: start;
+  padding-bottom: 8px;
+}
+
+.bin82-field-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bin82-field-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+.bin82-field-name {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--n-text-color);
+}
+
+.bin82-field-summary {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bin82-field-input {
+  width: 100%;
+}
+
+.bin82-field-cell--bits {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border: 1px dashed var(--n-border-color);
+  border-radius: 6px;
+  background: var(--n-color-modal);
+  gap: 6px;
+}
+
+.bin82-bit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
+
+.bin82-bit-num {
+  width: 120px;
+}
+
+.bin82-bit-meta {
+  font-size: 11px;
+  color: var(--n-text-color-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bin82-bit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px 12px;
 }
 
 .existing-tabs-wrap {
