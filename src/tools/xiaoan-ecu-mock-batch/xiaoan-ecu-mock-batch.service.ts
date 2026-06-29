@@ -14,6 +14,8 @@ export interface BatchFormData {
   voltage_max: number | null;
   lat: number | null;
   lng: number | null;
+  /** 中心点分散时的文本，格式 lng,lat */
+  coord_combined_text: string;
   radius_m: number | null;
   /** 每次 bin68 上报相对上一坐标随机移动的最大距离（米），0 表示固定 */
   random_move_m: number | null;
@@ -23,6 +25,8 @@ export interface BatchFormData {
   serial_interval_ms: number;
   /** 中控模拟响应延迟（秒），0 表示不延迟 */
   reply_delay_sec: number;
+  /** 是否开启周期上报（心跳 + GPS），默认开启；关闭时仍会初始化上报一次 */
+  enable_scheduled_report: boolean;
   num: number | null;
   start_imei: string;
   imeis_text: string;
@@ -46,6 +50,7 @@ export interface BatchPayload {
   create_mode?: CreateMode;
   serial_interval_ms?: number;
   reply_delay_sec?: number;
+  enable_scheduled_report?: boolean;
   num?: number;
   start_imei?: string;
   imeis?: string[];
@@ -60,6 +65,26 @@ export function parseImeisText(input: string): string[] {
 
 export function isFifteenDigitImei(input: string): boolean {
   return /^\d{15}$/.test(String(input ?? "").trim());
+}
+
+export function parseCombinedCoordText(input: string): { lng: number; lat: number } | null {
+  const trimmed = String(input ?? "").trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(/[\s,，]+/).filter(Boolean);
+  if (parts.length !== 2) return null;
+  const lng = Number(parts[0]);
+  const lat = Number(parts[1]);
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+  return { lng, lat };
+}
+
+export function formatCombinedCoordText(lng: number | null, lat: number | null): string {
+  if (!Number.isFinite(Number(lng)) || !Number.isFinite(Number(lat))) return "";
+  return `${lng},${lat}`;
+}
+
+function resolveScatterCoords(form: BatchFormData): { lng: number; lat: number } | null {
+  return parseCombinedCoordText(form.coord_combined_text);
 }
 
 export function parseCoordinatesText(input: string): Array<{ lat: number; lng: number }> {
@@ -158,8 +183,9 @@ export function validateBatchForm(form: BatchFormData): string | null {
     return "随机移动距离必须是大于等于 0 的数字（米）";
   }
 
-  if (form.coord_mode === "scatter" && (!Number.isFinite(Number(form.lat)) || !Number.isFinite(Number(form.lng)))) {
-    return "经纬度必须是有效数字";
+  if (form.coord_mode === "scatter") {
+    const coords = resolveScatterCoords(form);
+    if (!coords) return "请填写有效经纬度，格式：lng,lat（经度在前、纬度在后）";
   }
 
   if (form.mode === 1) {
@@ -220,6 +246,7 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
       REPLY_DELAY_MAX_SEC,
       Math.max(0, Math.trunc(Number(form.reply_delay_sec))),
     ),
+    enable_scheduled_report: form.enable_scheduled_report !== false,
   };
 
   const server = form.server.trim();
@@ -251,8 +278,11 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
   }
 
   if (form.coord_mode === "scatter") {
-    if (typeof form.lat === "number" && !Number.isNaN(form.lat)) payload.lat = form.lat;
-    if (typeof form.lng === "number" && !Number.isNaN(form.lng)) payload.lng = form.lng;
+    const coords = resolveScatterCoords(form);
+    if (coords) {
+      payload.lat = coords.lat;
+      payload.lng = coords.lng;
+    }
     payload.coord_mode = "scatter";
     if (typeof form.radius_m === "number" && !Number.isNaN(form.radius_m)) payload.radius_m = form.radius_m;
   } else {

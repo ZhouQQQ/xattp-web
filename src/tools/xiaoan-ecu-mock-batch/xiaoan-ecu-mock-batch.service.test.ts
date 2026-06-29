@@ -18,6 +18,7 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
     voltage_max: 54,
     lat: 30.500136,
     lng: 114.434888,
+    coord_combined_text: "114.434888,30.500136",
     radius_m: 10000,
     random_move_m: 0,
     coord_mode: "scatter",
@@ -25,6 +26,7 @@ function createForm(overrides: Partial<BatchFormData> = {}): BatchFormData {
     create_mode: 1,
     serial_interval_ms: 10,
     reply_delay_sec: 0,
+    enable_scheduled_report: true,
     num: 3,
     start_imei: "",
     imeis_text: "",
@@ -104,6 +106,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
       create_mode: 1,
       serial_interval_ms: 10,
       reply_delay_sec: 0,
+      enable_scheduled_report: true,
       server: "mock.example.com",
       voltage_min: 50,
       voltage_max: 54,
@@ -200,6 +203,14 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     expect(points).toEqual([{ lat: 30.1, lng: 114.2 }]);
   });
 
+  it("可以将周期上报开关写入 payload", () => {
+    const payloadOn = buildBatchPayload(createForm({ enable_scheduled_report: true }));
+    expect(payloadOn.enable_scheduled_report).toBe(true);
+
+    const payloadOff = buildBatchPayload(createForm({ enable_scheduled_report: false }));
+    expect(payloadOff.enable_scheduled_report).toBe(false);
+  });
+
   it("串行模式会写入 create_mode 与串行间隔", () => {
     const payload = buildBatchPayload(
       createForm({
@@ -212,6 +223,7 @@ describe("xiaoan-ecu-mock-batch.service", () => {
     expect(payload.create_mode).toBe(2);
     expect(payload.serial_interval_ms).toBe(25);
     expect(payload.reply_delay_sec).toBe(0);
+    expect(payload.enable_scheduled_report).toBe(true);
   });
 
   it("可以解析 imei,lng,lat 格式 CSV", () => {

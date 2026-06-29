@@ -86,10 +86,10 @@
                     :maxlength="15" show-count />
                 </n-form-item>
               </n-gi>
-              <!-- 第三行：经度、纬度、重置（11:11:2） -->
+              <!-- 第三行：经度、纬度、操作按钮同一行 -->
               <n-gi :span="12">
                 <n-grid :cols="24" :x-gap="8">
-                  <n-gi :span="11">
+                  <n-gi :span="8">
                     <n-form-item path="lng">
                       <template #label>
                         <span>经度(GCJ02)</span>
@@ -98,7 +98,7 @@
                         :show-button="false" style="width: 100%" />
                     </n-form-item>
                   </n-gi>
-                  <n-gi :span="11">
+                  <n-gi :span="8">
                     <n-form-item path="lat">
                       <template #label>
                         <span>纬度(GCJ02)</span>
@@ -107,9 +107,12 @@
                         :show-button="false" style="width: 100%" />
                     </n-form-item>
                   </n-gi>
-                  <n-gi :span="2">
-                    <n-form-item label="" :label-width="0" class="coord-reset-item">
-                      <div class="coord-reset-row">
+                  <n-gi :span="8">
+                    <n-form-item label=" ">
+                      <div class="coord-actions-row">
+                        <n-button size="small" type="default" @click="showCoordPicker = true">
+                          坐标选取
+                        </n-button>
                         <n-button size="small" type="default" title="重置经纬度到武汉留学生创业园" @click="resetDefaultCoords">
                           重置经纬度
                         </n-button>
@@ -606,6 +609,13 @@
         </n-form-item>
       </n-form>
     </n-modal>
+
+    <amap-coord-picker
+      v-model:show="showCoordPicker"
+      :lng="formData.lng"
+      :lat="formData.lat"
+      @confirm="handleCoordPickerConfirm"
+    />
   </div>
 </template>
 
@@ -1255,6 +1265,13 @@ function resetDefaultCoords() {
   saveFormToStorage();
 }
 
+function handleCoordPickerConfirm(payload: { lng: number; lat: number }) {
+  formData.lng = payload.lng;
+  formData.lat = payload.lat;
+  saveFormToStorage();
+  message.success("坐标已设置");
+}
+
 /** 「模拟头盔」开关变化时：打开则下面两项默认打开，关闭则下面两项也关闭 */
 function onHasHelmetChange(val: boolean) {
   if (val) {
@@ -1453,6 +1470,7 @@ const showAddModal = ref(false);
 const addForm = reactive({ cmd: "", value: "" });
 
 const showMoveModal = ref(false);
+const showCoordPicker = ref(false);
 const moveForm = reactive({ bearing: 0, distance: 100 });
 const moveLoading = ref(false);
 /** 连续向北移动次数，用于彩蛋 */
@@ -2142,12 +2160,19 @@ async function handleCloseTab(name: string) {
   color: #999;
 }
 
-.coord-reset-row {
+.coord-actions-row {
   display: flex;
   justify-content: flex-start;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
   width: 100%;
   min-height: 28px;
+}
+
+.coord-actions-row :deep(.n-button) {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .battery-soc-row {

@@ -123,6 +123,7 @@ export function xiaoanEcuMockBatchCreateAPI(data: {
   create_mode?: 1 | 2;
   serial_interval_ms?: number;
   reply_delay_sec?: number;
+  enable_scheduled_report?: boolean;
   mode: 1 | 2 | 3;
   num?: number;
   start_imei?: string;

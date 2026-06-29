@@ -129,14 +129,20 @@
                   </n-radio-group>
                 </n-form-item>
               </n-gi>
-              <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
-                <n-form-item label="经度(GCJ02)">
-                  <n-input-number v-model:value="formData.lng" :show-button="false" size="small" style="width: 100%" />
-                </n-form-item>
-              </n-gi>
-              <n-gi :span="3" v-if="formData.coord_mode === 'scatter'">
-                <n-form-item label="纬度(GCJ02)">
-                  <n-input-number v-model:value="formData.lat" :show-button="false" size="small" style="width: 100%" />
+              <n-gi :span="6" v-if="formData.coord_mode === 'scatter'">
+                <n-form-item required>
+                  <template #label>
+                    <div class="coord-label-wrap">
+                      <span>经纬度(GCJ02)</span>
+                      <c-link href="https://lbs.amap.com/tools/picker" target="_blank" rel="noopener"
+                        class="coord-picker-link">
+                        高德坐标拾取器
+                      </c-link>
+                    </div>
+                  </template>
+                  <n-input v-model:value="formData.coord_combined_text"
+                    placeholder="114.399113,30.506147（经度,纬度）" clearable size="small"
+                    @update:value="onCoordCombinedTextUpdate" />
                 </n-form-item>
               </n-gi>
               <n-gi :span="4" v-if="formData.coord_mode === 'scatter'">
@@ -155,7 +161,16 @@
                 </n-form-item>
               </n-gi>
               <n-gi :span="10" v-if="formData.coord_mode === 'fixed'">
-                <n-form-item label="经纬度列表" required>
+                <n-form-item required>
+                  <template #label>
+                    <div class="coord-label-wrap">
+                      <span>经纬度列表</span>
+                      <c-link href="https://lbs.amap.com/tools/picker" target="_blank" rel="noopener"
+                        class="coord-picker-link">
+                        高德坐标拾取器
+                      </c-link>
+                    </div>
+                  </template>
                   <div class="imeis-textarea-wrap">
                     <n-input v-model:value="formData.coordinates_text" type="textarea"
                       :autosize="{ minRows: 5, maxRows: 10 }" placeholder="请输入一行一个经纬度，格式：lng,lat（经度在前、纬度在后）" clearable
@@ -248,9 +263,16 @@
               </n-gi>
               <n-gi :span="5">
                 <n-form-item label="响应延迟(秒)">
-                  <n-input-number v-model:value="formData.reply_delay_sec" :min="0" :max="REPLY_DELAY_MAX_SEC"
-                    :precision="0" :show-button="false" size="small" style="width: 100%; max-width: 140px"
-                    placeholder="0" @update:value="onReplyDelaySecUpdate" />
+                  <div class="reply-delay-row">
+                    <n-input-number v-model:value="formData.reply_delay_sec" :min="0" :max="REPLY_DELAY_MAX_SEC"
+                      :precision="0" :show-button="false" size="small" class="reply-delay-input" placeholder="0"
+                      @update:value="onReplyDelaySecUpdate" />
+                    <div class="scheduled-report-inline">
+                      <span class="scheduled-report-label">周期上报</span>
+                      <n-switch :value="formData.enable_scheduled_report"
+                        @update:value="onEnableScheduledReportUpdate" />
+                    </div>
+                  </div>
                 </n-form-item>
               </n-gi>
 
@@ -471,7 +493,9 @@ import {
 import {
   buildBatchPayload,
   REPLY_DELAY_MAX_SEC,
+  formatCombinedCoordText,
   isFifteenDigitImei,
+  parseCombinedCoordText,
   parseImeiLngLatCsv,
   parseCoordinatesText,
   parseImeisText,
@@ -479,7 +503,7 @@ import {
   type BatchFormData,
 } from "./xiaoan-ecu-mock-batch.service";
 
-const { message } = createDiscreteApi(["message"]);
+const { message, dialog } = createDiscreteApi(["message", "dialog"]);
 
 const DEFAULT_COORD_LNG = 114.434888;
 const DEFAULT_COORD_LAT = 30.500136;
@@ -607,6 +631,7 @@ const defaultFormData: BatchFormData = {
   voltage_max: 54,
   lat: DEFAULT_COORD_LAT,
   lng: DEFAULT_COORD_LNG,
+  coord_combined_text: `${DEFAULT_COORD_LNG},${DEFAULT_COORD_LAT}`,
   radius_m: 10000,
   random_move_m: 0,
   coord_mode: "scatter",
@@ -614,6 +639,7 @@ const defaultFormData: BatchFormData = {
   create_mode: 1,
   serial_interval_ms: 10,
   reply_delay_sec: 0,
+  enable_scheduled_report: true,
   num: 10,
   start_imei: "",
   imeis_text: "",
@@ -664,6 +690,9 @@ function getInitialFormData(): BatchFormData {
     if (merged.coord_mode !== "scatter" && merged.coord_mode !== "fixed") {
       merged.coord_mode = defaultFormData.coord_mode;
     }
+    if (typeof merged.coord_combined_text !== "string" || !merged.coord_combined_text.trim()) {
+      merged.coord_combined_text = formatCombinedCoordText(merged.lng, merged.lat) || defaultFormData.coord_combined_text;
+    }
     if (merged.create_mode !== 1 && merged.create_mode !== 2) {
       merged.create_mode = defaultFormData.create_mode;
     }
@@ -687,6 +716,9 @@ function getInitialFormData(): BatchFormData {
         REPLY_DELAY_MAX_SEC,
         Math.max(0, Math.trunc(Number(merged.reply_delay_sec))),
       );
+    }
+    if (typeof merged.enable_scheduled_report !== "boolean") {
+      merged.enable_scheduled_report = defaultFormData.enable_scheduled_report;
     }
     return merged;
   } catch {
@@ -1464,6 +1496,20 @@ function saveFormToStorage() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...formData }));
 }
 
+function applyParsedScatterCoords(lng: number, lat: number) {
+  formData.lng = lng;
+  formData.lat = lat;
+}
+
+function onCoordCombinedTextUpdate(value: string) {
+  formData.coord_combined_text = value;
+  const parsed = parseCombinedCoordText(value);
+  if (parsed) {
+    applyParsedScatterCoords(parsed.lng, parsed.lat);
+  }
+  saveFormToStorage();
+}
+
 function onReplyDelaySecUpdate(value: number | null) {
   if (value == null || !Number.isFinite(Number(value))) {
     formData.reply_delay_sec = 0;
@@ -1471,6 +1517,24 @@ function onReplyDelaySecUpdate(value: number | null) {
     formData.reply_delay_sec = Math.min(REPLY_DELAY_MAX_SEC, Math.max(0, Math.trunc(Number(value))));
   }
   saveFormToStorage();
+}
+
+function onEnableScheduledReportUpdate(value: boolean) {
+  if (value) {
+    formData.enable_scheduled_report = true;
+    saveFormToStorage();
+    return;
+  }
+  dialog.warning({
+    title: "关闭周期上报",
+    content: "关闭后将不再周期性上报心跳与 GPS，创建时仍会完成一次初始化上报。确认关闭？",
+    positiveText: "确认关闭",
+    negativeText: "取消",
+    onPositiveClick: () => {
+      formData.enable_scheduled_report = false;
+      saveFormToStorage();
+    },
+  });
 }
 
 watch(
@@ -1753,6 +1817,7 @@ function resetDefaultCoords() {
   }
   formData.lng = DEFAULT_COORD_LNG;
   formData.lat = DEFAULT_COORD_LAT;
+  formData.coord_combined_text = formatCombinedCoordText(DEFAULT_COORD_LNG, DEFAULT_COORD_LAT);
   saveFormToStorage();
 }
 
@@ -1877,11 +1942,16 @@ function applyBatchRecordDataToForm(res: unknown) {
   if (Number.isFinite(recLng) && Number.isFinite(recLat)) {
     formData.lng = recLng;
     formData.lat = recLat;
+    formData.coord_combined_text = formatCombinedCoordText(recLng, recLat);
   }
 
   const replyDelaySec = Number(record.reply_delay_sec);
   if (Number.isFinite(replyDelaySec) && replyDelaySec >= 0) {
     formData.reply_delay_sec = Math.min(REPLY_DELAY_MAX_SEC, Math.max(0, Math.trunc(replyDelaySec)));
+  }
+
+  if (typeof record.enable_scheduled_report === "boolean") {
+    formData.enable_scheduled_report = record.enable_scheduled_report;
   }
 
   const recordCoordinates = Array.isArray(record.coordinates) ? record.coordinates : [];
@@ -1902,6 +1972,7 @@ function applyBatchRecordDataToForm(res: unknown) {
   if (firstPos) {
     formData.lng = Number(firstPos.lng);
     formData.lat = Number(firstPos.lat);
+    formData.coord_combined_text = formatCombinedCoordText(formData.lng, formData.lat);
   }
   if (formData.coord_mode === "fixed") {
     const fallbackPoint =
@@ -2412,6 +2483,32 @@ async function handleCreate() {
   color: #9ca3af;
 }
 
+.reply-delay-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.reply-delay-input {
+  width: 88px;
+  flex-shrink: 0;
+}
+
+.scheduled-report-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.scheduled-report-label {
+  font-size: 13px;
+  color: #374151;
+  white-space: nowrap;
+}
+
 .num-field {
   width: 100%;
 }
@@ -2657,6 +2754,18 @@ async function handleCreate() {
   margin-top: 6px;
   font-size: 12px;
   color: #6b7280;
+}
+
+.coord-label-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.coord-picker-link {
+  font-size: 12px;
 }
 
 .csv-actions-row {
