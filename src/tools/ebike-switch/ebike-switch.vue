@@ -228,11 +228,11 @@ const envs = [
   //   value: "yinchuan",
   //   tenantID: 1752,
   // },
-  {
-    label: "独立部署-城发悠出行",
-    value: "chengfayou",
-    tenantID: 2233,
-  },
+  // {
+  //   label: "独立部署-城发悠出行",
+  //   value: "chengfayou",
+  //   tenantID: 2233,
+  // },
   {
     label: "独立部署-圣庄出行",
     value: "shengzhuang",
