@@ -115,33 +115,46 @@
               <div class="panel-body">
                 <div class="panel-list">
                   <n-empty v-if="panel.items.length === 0" size="small" description="该组暂无租户" />
-                  <div v-for="tenant in panelPageSlice(panel.items, panel.key)" :key="`${panel.key}-${tenant.tenantId}`"
-                    class="tenant-row" @click="openTenantLink(tenant)">
-                    <n-avatar :src="tenant.logo || undefined" :size="18" round />
+                  <div v-for="row in panelPageRows(panel.items, panel.key)" :key="`${panel.key}-${row.tenant.tenantId}`"
+                    class="tenant-row" @click="openTenantLink(row.tenant)">
+                    <n-avatar :src="row.tenant.logo || undefined" :size="18" round />
                     <div class="tenant-main">
                       <div class="tenant-line">
                         <span class="tenant-id">
-                          <span class="copyable" title="点击复制租户ID" @click.stop="copyText(tenant.tenantId, '租户ID')">
-                            {{ tenant.tenantId }}
+                          <span class="copyable" title="点击复制租户ID" @click.stop="copyText(row.tenant.tenantId, '租户ID')">
+                            {{ row.tenant.tenantId }}
                           </span>
                         </span>
                         <span class="tenant-name">
                           <span class="copyable tenant-name-copy"
-                            :title="`点击复制租户名称：${tenant.tenantName || '-'}`"
-                            @click.stop="copyText(tenant.tenantName || '-', '租户名称')">
-                            {{ tenant.tenantName || "-" }}
+                            :title="`点击复制租户名称：${row.tenant.tenantName || '-'}`"
+                            @click.stop="copyText(row.tenant.tenantName || '-', '租户名称')">
+                            {{ row.tenant.tenantName || "-" }}
                           </span>
+                        </span>
+                        <span class="tenant-level-cell">
+                          <n-tooltip v-if="row.carLevel" trigger="hover" placement="top">
+                            <template #trigger>
+                              <n-tag size="small" :bordered="true" class="tenant-level-tag"
+                                :color="row.carLevel.color">
+                                {{ row.carLevel.level }}
+                              </n-tag>
+                            </template>
+                            <div class="tenant-level-tooltip">
+                              {{ row.carLevel.level }} 级：{{ row.carLevel.definition }}
+                            </div>
+                          </n-tooltip>
                         </span>
                         <n-tag size="small" :bordered="true" class="tenant-ebike-tag" title="昨日车辆数"
                           :color="ebikeCountTagColor">
                           <span class="tenant-ebike-tag-inner">
                             <n-icon :component="ScooterElectric" class="tenant-ebike-icon" />
-                            <span class="tenant-ebike-num">{{ formatYesterdayCarTotal(tenant.carTotal) }}</span>
+                            <span class="tenant-ebike-num">{{ formatYesterdayCarTotal(row.tenant.carTotal) }}</span>
                           </span>
                         </n-tag>
-                        <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(tenant.env).color"
-                          :title="envTagOf(tenant.env).cloud || undefined">
-                          {{ envTagDisplayText(tenant.env, panel.key) }}
+                        <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(row.tenant.env).color"
+                          :title="envTagOf(row.tenant.env).cloud || undefined">
+                          {{ envTagDisplayText(row.tenant.env, panel.key) }}
                         </n-tag>
                       </div>
                     </div>
@@ -196,7 +209,9 @@ import { tenant_all_api, tenant_gray_api } from "@/api/business";
 import {
   normalizeGrayList,
   normalizeTenantList,
+  resolveTenantCarLevel,
   resolveTenantEnvTag,
+  type TenantCarLevelMeta,
   type TenantGrayItem,
   type TenantItem,
 } from "./tenant-dashboard.service";
@@ -233,6 +248,18 @@ function panelPageSlice(items: TenantItem[], panelKey: string): TenantItem[] {
   const page = panelPageByKey[panelKey] ?? 1;
   const start = (page - 1) * PANEL_PAGE_SIZE;
   return items.slice(start, start + PANEL_PAGE_SIZE);
+}
+
+type TenantPanelRow = {
+  tenant: TenantItem;
+  carLevel: TenantCarLevelMeta | null;
+};
+
+function panelPageRows(items: TenantItem[], panelKey: string): TenantPanelRow[] {
+  return panelPageSlice(items, panelKey).map((tenant) => ({
+    tenant,
+    carLevel: resolveTenantCarLevel(tenant.carTotal),
+  }));
 }
 
 function setPanelPage(panelKey: string, page: number) {
@@ -1422,8 +1449,8 @@ onScopeDispose(() => {
 .tenant-line {
   display: grid;
   /* 第一列固定约 4 位数字宽（ch = 「0」字宽，tabular-nums 下对齐） */
-  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-ebike, 58px)
-    var(--tenant-col-env, 84px);
+  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-level, 22px)
+    var(--tenant-col-ebike, 58px) var(--tenant-col-env, 84px);
   align-items: center;
   column-gap: 3px;
   font-size: 11px;
@@ -1434,6 +1461,7 @@ onScopeDispose(() => {
 }
 
 .tenant-id {
+  grid-column: 1;
   font-weight: 500;
   color: #111827;
   min-width: 0;
@@ -1453,6 +1481,7 @@ onScopeDispose(() => {
 }
 
 .tenant-name {
+  grid-column: 2;
   min-width: 0;
   max-width: 100%;
   justify-self: start;
@@ -1470,7 +1499,43 @@ onScopeDispose(() => {
   line-height: 1;
 }
 
+.tenant-level-cell {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 17px;
+}
+
+.tenant-line :deep(.tenant-level-tag) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  margin-left: 0;
+  height: 17px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  padding: 0 2px;
+  cursor: default;
+}
+
+.tenant-line :deep(.tenant-level-tag .n-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tenant-level-tooltip {
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
 .tenant-line :deep(.tenant-ebike-tag) {
+  grid-column: 4;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -1511,6 +1576,7 @@ onScopeDispose(() => {
 }
 
 .tenant-line :deep(.tenant-env-tag) {
+  grid-column: 5;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;

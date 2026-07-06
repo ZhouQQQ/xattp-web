@@ -78,6 +78,59 @@ export function normalizeGrayList(raw: unknown): TenantGrayItem[] {
     .filter((item): item is TenantGrayItem => item != null);
 }
 
+export type TenantCarLevel = "S" | "A" | "B" | "C" | "D";
+
+export interface TenantCarLevelMeta {
+  level: TenantCarLevel;
+  definition: string;
+  color: {
+    color: string;
+    textColor: string;
+    borderColor: string;
+  };
+}
+
+/** 租户车辆数分级（昨日车辆数） */
+export const TENANT_CAR_LEVEL_RULES: ReadonlyArray<{
+  level: TenantCarLevel;
+  definition: string;
+}> = [
+  { level: "S", definition: "> 10000" },
+  { level: "A", definition: "5000 - 10000" },
+  { level: "B", definition: "2000 - 5000" },
+  { level: "C", definition: "1000 - 2000" },
+  { level: "D", definition: "0 - 1000" },
+] as const;
+
+const TENANT_CAR_LEVEL_COLORS: Record<TenantCarLevel, TenantCarLevelMeta["color"]> = {
+  S: { color: "#fee2e2", textColor: "#b91c1c", borderColor: "#f87171" },
+  A: { color: "#ffedd5", textColor: "#c2410c", borderColor: "#fb923c" },
+  B: { color: "#eff6ff", textColor: "#1d4ed8", borderColor: "#93c5fd" },
+  C: { color: "#ecfeff", textColor: "#0e7490", borderColor: "#67e8f9" },
+  D: { color: "#f4f4f5", textColor: "#52525b", borderColor: "#d4d4d8" },
+};
+
+function tenantCarLevelMeta(level: TenantCarLevel): TenantCarLevelMeta {
+  const rule = TENANT_CAR_LEVEL_RULES.find((item) => item.level === level)!;
+  return {
+    level,
+    definition: rule.definition,
+    color: TENANT_CAR_LEVEL_COLORS[level],
+  };
+}
+
+/** 根据昨日车辆数返回租户级别；无有效数据时返回 null */
+export function resolveTenantCarLevel(carTotal?: number | null): TenantCarLevelMeta | null {
+  if (carTotal == null || !Number.isFinite(Number(carTotal))) return null;
+  const n = Number(carTotal);
+  if (n > 10000) return tenantCarLevelMeta("S");
+  if (n >= 5000) return tenantCarLevelMeta("A");
+  if (n >= 2000) return tenantCarLevelMeta("B");
+  if (n >= 1000) return tenantCarLevelMeta("C");
+  if (n >= 0) return tenantCarLevelMeta("D");
+  return null;
+}
+
 export function resolveTenantEnvTag(env?: string | number): TenantEnvTagMeta {
   const key = String(env ?? "").trim().toLowerCase();
   if (key === "1") {
