@@ -24,11 +24,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 import { DingtalkOutlined } from '@vicons/antd';
-import { toLogin } from '@/utils/location';
+import { sanitizeLoginRedirect, toLogin } from '@/utils/location';
+
+const route = useRoute();
+
+const postLoginRedirect = computed(() => {
+  const raw = route.query.redirect;
+  return sanitizeLoginRedirect(typeof raw === 'string' ? raw : '/');
+});
 
 function handleLogin() {
-  toLogin('/');
+  toLogin(postLoginRedirect.value);
 }
 </script>
 

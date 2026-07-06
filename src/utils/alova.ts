@@ -1,6 +1,7 @@
 import { createAlova } from 'alova';
 import adapterFetch from 'alova/fetch';
 import { config } from '@/config';
+import { sanitizeLoginRedirect } from '@/utils/location';
 
 // 定义不需要处理401的白名单路径
 const AUTH_WHITELIST = [
@@ -35,9 +36,14 @@ export const AlovaInstance = createAlova({
             
             if (response.status == 401 && !isAuthRequest) {
                 localStorage.removeItem("token");
-                // 跳转到登录页，但避免在登录页重复跳转
                 if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-                    window.location.href = '/login';
+                    const redirect = sanitizeLoginRedirect(
+                        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+                    );
+                    const loginPath = redirect === '/'
+                        ? '/login'
+                        : `/login?redirect=${encodeURIComponent(redirect)}`;
+                    window.location.href = loginPath;
                 }
             }
             return response.json();

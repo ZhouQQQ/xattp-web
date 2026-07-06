@@ -10,6 +10,7 @@ import { ref } from 'vue';
 import { useUserStore } from '@/stores/user.store';
 import { useRoute, useRouter } from 'vue-router';
 import { login, getUserInfo } from '@/api/auth';
+import { resolvePostLoginRedirect } from '@/utils/location';
 import { nextTick } from 'vue';
 import { useMessage } from 'naive-ui';
 
@@ -66,16 +67,11 @@ if (!authCode) {
                 // }
                 
                 await nextTick();
-                
-                // 确定跳转目标
-                let redirect = route.query.r || '/';
-                if (typeof redirect === 'string' && (redirect.includes('/oauth/callback') || redirect === '/login')) {
-                    redirect = '/';
-                }
-                
+
+                const redirect = resolvePostLoginRedirect(route.query.state, route.query.r);
+
                 status.value = `登录成功，正在跳转到 ${redirect}...`;
-                
-                // 立即跳转，不再延迟
+
                 router.replace(redirect);
             } else {
                 status.value = '登录失败: ' + loginResponse.msg;

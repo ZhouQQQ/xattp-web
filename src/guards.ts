@@ -24,7 +24,10 @@ export function createRouterGuards(router: Router, pinia: Pinia) {
         const token = localStorage.getItem('token');
         if (!token) {
             if (to.path !== '/login') {
-                return '/login';
+                return {
+                    path: '/login',
+                    query: { redirect: to.fullPath },
+                };
             }
             return true;
         }
