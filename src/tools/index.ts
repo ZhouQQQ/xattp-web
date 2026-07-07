@@ -121,7 +121,7 @@ export const toolsByCategory: ToolCategory[] = [
             xiaoanEcuMock,
             tenantDashboard,
             tenantGrayPlan,
-            mrDeployCheck,
+            // mrDeployCheck,
         ],
     },
     {
