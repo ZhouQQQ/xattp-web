@@ -2645,5 +2645,258 @@ export const BIN82_PROTOCOL_SCHEMAS: Bin82ProtocolSchema[] = [
         ]
       }
     ]
+  },
+  {
+    "protocolVer": 255,
+    "title": "BIN82 统一上报协议 (protocolVer=255)",
+    "fields": [
+      {
+        "key": "timestamp",
+        "label": "timestamp",
+        "type": "u32",
+        "description": "最近一次获取到燃料电池信息的时间戳，单位秒",
+        "unit": "秒"
+      },
+      {
+        "key": "SN",
+        "label": "SN",
+        "type": "a32",
+        "description": "FCU序列号，不足位后补0x00",
+        "unit": ""
+      },
+      {
+        "key": "manufacturer",
+        "label": "manufacturer",
+        "type": "a16",
+        "description": "厂商名称，不够16位补0x00",
+        "unit": ""
+      },
+      {
+        "key": "softwareVer",
+        "label": "softwareVer",
+        "type": "u32",
+        "description": "软件版本号",
+        "unit": ""
+      },
+      {
+        "key": "hardwareVer",
+        "label": "hardwareVer",
+        "type": "u32",
+        "description": "硬件版本号",
+        "unit": ""
+      },
+      {
+        "key": "HySoc",
+        "label": "HySoc",
+        "type": "u8",
+        "description": "氢气剩余容量，单位%",
+        "unit": "%"
+      },
+      {
+        "key": "HyVoltage",
+        "label": "HyVoltage",
+        "type": "u16",
+        "description": "燃料电池电压，单位mV",
+        "unit": "mV"
+      },
+      {
+        "key": "HyCurrent",
+        "label": "HyCurrent",
+        "type": "i16",
+        "description": "燃料电池电流，单位mA",
+        "unit": "mA"
+      },
+      {
+        "key": "HyTemperature",
+        "label": "HyTemperature",
+        "type": "i16",
+        "description": "燃料电池温度，单位0.1°",
+        "unit": "0.1℃"
+      },
+      {
+        "key": "HyEnvTempture",
+        "label": "HyEnvTempture",
+        "type": "i16",
+        "description": "环境温度，单位：0.1°",
+        "unit": "0.1℃"
+      },
+      {
+        "key": "HyToltalTime",
+        "label": "HyToltalTime",
+        "type": "u16",
+        "description": "燃料电池累计运行时间，单位：0.1h",
+        "unit": "0.1h"
+      },
+      {
+        "key": "HyCylinderPress",
+        "label": "HyCylinderPress",
+        "type": "u16",
+        "description": "氢气瓶压力，单位：Kpa",
+        "unit": "KPa"
+      },
+      {
+        "key": "HyCylinderHeatState",
+        "label": "HyCylinderHeatState",
+        "type": "enum",
+        "description": "氢气瓶加热状态，0：未加热 1：加热",
+        "unit": "",
+        "enumOptions": [
+          {
+            "value": 0,
+            "label": "未加热"
+          },
+          {
+            "value": 1,
+            "label": "加热"
+          }
+        ]
+      },
+      {
+        "key": "HyCylinderTempture",
+        "label": "HyCylinderTempture",
+        "type": "i16",
+        "description": "氢气瓶温度，单位：0.1°",
+        "unit": "0.1℃"
+      },
+      {
+        "key": "HyFanSpeed",
+        "label": "HyFanSpeed",
+        "type": "u16",
+        "description": "电堆风扇转速，单位：RPM",
+        "unit": "rpm"
+      },
+      {
+        "key": "HyEleCtrSysOutCurr",
+        "label": "HyEleCtrSysOutCurr",
+        "type": "u16",
+        "description": "电控输出电流，单位：0.1A",
+        "unit": "0.1A"
+      },
+      {
+        "key": "HyEleCtrSysOutVolt",
+        "label": "HyEleCtrSysOutVolt",
+        "type": "u16",
+        "description": "电控输出电压，单位：0.1V",
+        "unit": "0.1V"
+      },
+      {
+        "key": "HyState",
+        "label": "HyState",
+        "type": "u8",
+        "description": "燃料电池状态",
+        "unit": ""
+      },
+      {
+        "key": "LiSoc",
+        "label": "LiSoc",
+        "type": "u8",
+        "description": "锂电SOC，单位%",
+        "unit": "%"
+      },
+      {
+        "key": "LiVoltage",
+        "label": "LiVoltage",
+        "type": "u16",
+        "description": "锂电池电压，单位mV",
+        "unit": "mV"
+      },
+      {
+        "key": "LiCurrent",
+        "label": "LiCurrent",
+        "type": "i16",
+        "description": "锂电池电流，单位mA",
+        "unit": "mA"
+      },
+      {
+        "key": "LiTemperature",
+        "label": "LiTemperature",
+        "type": "i16",
+        "description": "锂电池温度，单位：0.1°",
+        "unit": "0.1℃"
+      },
+      {
+        "key": "LiState",
+        "label": "LiState",
+        "type": "enum",
+        "description": "状态 1 充电 2 放电 3 储藏",
+        "unit": "",
+        "enumOptions": [
+          {
+            "value": 1,
+            "label": "充电"
+          },
+          {
+            "value": 2,
+            "label": "放电"
+          },
+          {
+            "value": 3,
+            "label": "储藏"
+          }
+        ]
+      },
+      {
+        "key": "faultMapVer",
+        "label": "faultMapVer",
+        "type": "u8",
+        "description": "故障字典版本号，默认为1",
+        "unit": ""
+      },
+      {
+        "key": "hyFault",
+        "label": "hyFault",
+        "type": "bit32",
+        "description": "氢故障，故障位：0为正常，1为故障",
+        "unit": "",
+        "bits": [
+          { "bit": 0, "label": "氢气泄露" },
+          { "bit": 1, "label": "电堆启动失败" },
+          { "bit": 2, "label": "气瓶过温" },
+          { "bit": 3, "label": "气瓶低温" },
+          { "bit": 4, "label": "电堆过温" },
+          { "bit": 5, "label": "电堆低温" },
+          { "bit": 6, "label": "管道过压" },
+          { "bit": 7, "label": "管道欠压" },
+          { "bit": 8, "label": "气瓶过压" },
+          { "bit": 9, "label": "气瓶欠压" },
+          { "bit": 10, "label": "电堆过流" },
+          { "bit": 11, "label": "风扇故障" },
+          { "bit": 12, "label": "电堆温度传感器故障" },
+          { "bit": 13, "label": "环温传感器故障" },
+          { "bit": 14, "label": "电池故障" },
+          { "bit": 15, "label": "氢气计量模块故障" },
+          { "bit": 16, "label": "降压模块故障" },
+          { "bit": 17, "label": "升压模块故障" },
+          { "bit": 18, "label": "进氢阀故障" },
+          { "bit": 19, "label": "排氢阀故障" },
+          { "bit": 20, "label": "气瓶温度传感器故障" },
+          { "bit": 21, "label": "电机电压异常" },
+          { "bit": 22, "label": "电机过流" },
+          { "bit": 23, "label": "FCU过温" },
+          { "bit": 24, "label": "FCU故障" }
+        ]
+      },
+      {
+        "key": "liFault",
+        "label": "liFault",
+        "type": "bit32",
+        "description": "锂故障，故障位：0为正常，1为故障",
+        "unit": "",
+        "bits": [
+          { "bit": 0, "label": "电池短路" },
+          { "bit": 1, "label": "放电过流" },
+          { "bit": 2, "label": "充电过流" },
+          { "bit": 3, "label": "总电压过压" },
+          { "bit": 4, "label": "总电压欠压" },
+          { "bit": 5, "label": "单节电池过压" },
+          { "bit": 6, "label": "单节电池欠压" },
+          { "bit": 7, "label": "前端采集错误" },
+          { "bit": 8, "label": "放电低温" },
+          { "bit": 9, "label": "充电低温" },
+          { "bit": 10, "label": "放电过温" },
+          { "bit": 11, "label": "充电过温" }
+        ]
+      }
+    ]
   }
 ];

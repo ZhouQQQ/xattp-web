@@ -301,6 +301,14 @@ export function xiaoanEcuMockBin5API(data: {
   return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/bin/5`, data);
 }
 
+/** 小安中控模拟：直接上报任意原始 BIN 十六进制报文 */
+export function xiaoanEcuMockBinAPI(data: {
+  connect_id: string;
+  hex: string;
+}) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/bin`, data);
+}
+
 /** 小安中控模拟：CMD82 各 protocolVer 字段定义 */
 export function xiaoanEcuMockBin82SchemasAPI() {
   return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/bin/82/schemas`);

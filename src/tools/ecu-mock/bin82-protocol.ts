@@ -157,11 +157,15 @@ export function packBin82Bits(selected: number[]): number {
 
 /** 表单默认值：数值为 0，字符串为空 */
 export function bin82FieldDefault(
-  _key: string,
+  key: string,
   type: string,
   _ctx?: Bin82FormContext,
 ): string | number {
   if (isBin82StringField(type)) return "";
+  // 统一协议 faultMapVer 文档默认值为 1
+  if (key === "faultMapVer") return 1;
+  // timestamp 默认当前秒级时间戳
+  if (key === "timestamp") return Math.floor(Date.now() / 1000);
   return 0;
 }
 
@@ -184,6 +188,14 @@ export function packBin82SubmitData(
   const payload: Record<string, unknown> = { protocolVer };
   for (const field of fields) {
     const raw = formData[field.key];
+    if (field.key === "timestamp") {
+      const n = Number(raw);
+      payload.timestamp =
+        raw === null || raw === undefined || raw === "" || !Number.isFinite(n) || n <= 0
+          ? Math.floor(Date.now() / 1000)
+          : n;
+      continue;
+    }
     if (raw === null || raw === undefined || raw === "") continue;
     if (isBin82StringField(field.type)) {
       payload[field.key] = String(raw);

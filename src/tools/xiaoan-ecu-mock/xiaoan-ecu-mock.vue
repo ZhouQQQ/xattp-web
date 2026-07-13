@@ -272,6 +272,9 @@
                   <n-button type="default" @click="openBin82Modal">
                     Bin82上报
                   </n-button>
+                  <n-button type="default" @click="openRawBinModal">
+                    原始BIN上报
+                  </n-button>
                 </n-space>
               </template>
             </n-form-item>
@@ -435,7 +438,7 @@
       title="CMD_BMS_INFO_V4 通用BMS信息上报{cmd:82}"
       :mask-closable="false"
       class="bin82-modal"
-      :style="{ width: 'min(1520px, 94vw)' }"
+      :style="{ width: 'min(1880px, 98vw)' }"
     >
       <template #footer>
         <n-space justify="end">
@@ -455,7 +458,6 @@
             class="bin82-protocol-select"
             @update:value="onBin82ProtocolChange"
           />
-          <n-button size="small" @click="openBin82HexModal">原始十六进制解析</n-button>
           <n-button text type="primary" size="small" @click="openBin82ProtocolDoc">
             参考文档
           </n-button>
@@ -529,39 +531,47 @@
                 size="small"
                 class="bin82-field-input"
                 :show-button="false"
+                :title="formatBin82UnitFillHint(field) || undefined"
               />
-              <span v-if="formatBin82UnitFillHint(field)" class="bin82-field-unit-hint">
-                {{ formatBin82UnitFillHint(field) }}
-              </span>
             </template>
           </div>
         </div>
       </n-spin>
     </n-modal>
 
-    <!-- Bin82 原始十六进制解析弹窗 -->
+    <!-- 原始 BIN 十六进制上报弹窗（任意 cmd） -->
     <n-modal
-      v-model:show="showBin82HexModal"
+      v-model:show="showRawBinModal"
       preset="dialog"
-      title="原始十六进制解析"
+      title="原始 BIN 十六进制上报"
       :mask-closable="false"
       style="width: 720px"
     >
       <template #action>
         <n-space :size="8">
-          <n-button @click="bin82HexInput = ''">清空</n-button>
-          <n-button type="primary" :loading="bin82ParseLoading" @click="handleBin82ParseHex">
-            解析并填充表单
+          <n-button size="small" @click="triggerRawBinFile">上传文件</n-button>
+          <n-button size="small" @click="rawBinHexInput = ''">清空</n-button>
+          <n-button type="primary" :loading="rawBinLoading" @click="handleRawBinSubmit">
+            上报
           </n-button>
         </n-space>
       </template>
-      <p class="bin82-hex-hint">支持 CMD82 消息体或完整报文（AA55 52 …），解析后写入上报表单</p>
+      <p class="bin82-hex-hint">
+        直接向中控链路发送原始报文，不限 cmd（如 bin5/bin66/bin68/bin82 等）。可粘贴或上传文件。
+      </p>
+      <input
+        ref="rawBinFileInput"
+        type="file"
+        accept=".txt,.hex,.log,text/plain"
+        class="bin82-hex-file-input"
+        @change="onRawBinFileChange"
+      />
       <n-input
-        v-model:value="bin82HexInput"
+        v-model:value="rawBinHexInput"
         type="textarea"
         :rows="12"
         size="small"
-        placeholder="例如：02 53 4E … 或 AA55 52 01 6B 02 …"
+        placeholder="例如：AA55 44 … 完整 TCP 报文十六进制"
         class="bin82-hex-input"
       />
     </n-modal>
@@ -635,8 +645,8 @@ import {
   xiaoanEcuMockMoveAPI,
   xiaoanEcuMockTrajectoryAPI,
   xiaoanEcuMockBin5API,
+  xiaoanEcuMockBinAPI,
   xiaoanEcuMockBin82API,
-  xiaoanEcuMockBin82ParseAPI,
 } from "@/api/device";
 import {
   bin5AlarmTypeOptions,
@@ -644,7 +654,6 @@ import {
   parseBin5AlarmType,
 } from "@/tools/ecu-mock/bin5-alarm-types";
 import {
-  applyBin82ParsedData,
   BIN82_PROTOCOL_DOC_URL,
   BIN82_FORM_UNIT_TIP,
   buildBin82FormData,
@@ -1624,10 +1633,11 @@ async function handleBin5Submit() {
 
 /* ========== Bin82 氢协议上报 ========== */
 const showBin82Modal = ref(false);
-const showBin82HexModal = ref(false);
+const showRawBinModal = ref(false);
 const bin82Loading = ref(false);
-const bin82ParseLoading = ref(false);
-const bin82HexInput = ref("");
+const rawBinLoading = ref(false);
+const rawBinHexInput = ref("");
+const rawBinFileInput = ref<HTMLInputElement | null>(null);
 /** 协议字段定义（注释、单位、BIT）前端写死，见 bin82-schemas.ts */
 const bin82Schemas: Bin82ProtocolSchema[] = BIN82_PROTOCOL_SCHEMAS;
 const bin82Form = reactive<{
@@ -1674,6 +1684,13 @@ function openBin82Modal() {
   // 仅首次打开时初始化默认值；再次打开保留上次填写
   if (Object.keys(bin82Form.data).length === 0) {
     resetBin82FieldValues();
+  } else if (
+    bin82Form.data.timestamp == null ||
+    bin82Form.data.timestamp === "" ||
+    Number(bin82Form.data.timestamp) <= 0
+  ) {
+    // 再次打开时若 timestamp 未填，刷新为当前时间
+    bin82Form.data.timestamp = Math.floor(Date.now() / 1000);
   }
   showBin82Modal.value = true;
 }
@@ -1682,12 +1699,82 @@ function onBin82ProtocolChange() {
   resetBin82FieldValues();
 }
 
-function openBin82HexModal() {
-  showBin82HexModal.value = true;
-}
-
 function openBin82ProtocolDoc() {
   window.open(BIN82_PROTOCOL_DOC_URL, "_blank", "noopener,noreferrer");
+}
+
+/* ========== 原始 BIN 十六进制上报（任意 cmd） ========== */
+function openRawBinModal() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  showRawBinModal.value = true;
+}
+
+function triggerRawBinFile() {
+  rawBinFileInput.value?.click();
+}
+
+/**
+ * 规范化十六进制文本：去掉 0x/空格/逗号等，仅保留 0-9A-F
+ * @param hexText 用户输入或文件内容
+ */
+function normalizeHexText(hexText: string): string {
+  return String(hexText || "")
+    .replace(/0x/gi, "")
+    .replace(/[^0-9a-fA-F]/g, "")
+    .toUpperCase();
+}
+
+/**
+ * 读取上传的十六进制文件内容到输入框
+ * @param e 文件选择事件
+ */
+function onRawBinFileChange(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    rawBinHexInput.value = String(reader.result ?? "").trim();
+    message.success(`已载入文件：${file.name}`);
+  };
+  reader.onerror = () => {
+    message.error("读取文件失败");
+  };
+  reader.readAsText(file);
+  input.value = "";
+}
+
+/** 直接上报任意原始 BIN 十六进制报文 */
+async function handleRawBinSubmit() {
+  if (!connectId.value) {
+    message.error("请先开始模拟");
+    return;
+  }
+  const hex = normalizeHexText(rawBinHexInput.value);
+  if (!hex) {
+    message.error("请输入或上传十六进制数据");
+    return;
+  }
+  if (hex.length % 2) {
+    message.error("十六进制长度必须为偶数");
+    return;
+  }
+  rawBinLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockBinAPI({
+      connect_id: connectId.value,
+      hex,
+    });
+    if (!checkResCode(res)) return;
+    message.success(res?.data || "上报原始 BIN 成功");
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "原始 BIN 上报失败");
+  } finally {
+    rawBinLoading.value = false;
+  }
 }
 
 function getBin82BitMax(field: Bin82FieldSchema): number {
@@ -1706,32 +1793,6 @@ function getBin82SelectedBits(field: Bin82FieldSchema): number[] {
 
 function setBin82SelectedBits(field: Bin82FieldSchema, bits: number[]) {
   bin82Form.data[field.key] = packBin82Bits(bits);
-}
-
-async function handleBin82ParseHex() {
-  const hex = bin82HexInput.value.trim();
-  if (!hex) {
-    message.error("请输入十六进制数据");
-    return;
-  }
-  bin82ParseLoading.value = true;
-  try {
-    const res: any = await xiaoanEcuMockBin82ParseAPI({ hex });
-    if (!checkResCode(res)) return;
-    const parsed = (res?.data && typeof res.data === "object" ? res.data : {}) as Record<string, unknown>;
-    const ver = Number(parsed.protocolVer);
-    if (Number.isFinite(ver) && ver >= 1 && ver !== bin82Form.protocolVer) {
-      bin82Form.protocolVer = ver;
-      await nextTick();
-    }
-    applyBin82ParsedData(bin82ActiveFields.value, bin82Form.data, parsed);
-    showBin82HexModal.value = false;
-    message.success("解析成功，已填充表单");
-  } catch (e: any) {
-    message.error(e?.message || String(e) || "十六进制解析失败");
-  } finally {
-    bin82ParseLoading.value = false;
-  }
 }
 
 async function handleBin82Submit() {
@@ -1939,30 +2000,31 @@ async function handleCloseTab(name: string) {
   max-width: 960px;
 }
 
-/* Bin82 弹窗：大卡片 + 自适应网格，宽高给足 */
+/* Bin82 弹窗：宽屏紧凑网格，页脚固定可见上报按钮 */
 :deep(.bin82-modal) {
   .n-card {
-    min-height: min(880px, 90vh);
     max-height: 92vh;
     display: flex;
     flex-direction: column;
   }
 
   .n-card-header {
-    padding: 18px 24px 14px;
-    font-size: 16px;
+    flex-shrink: 0;
+    padding: 10px 16px 8px;
+    font-size: 14px;
     font-weight: 600;
   }
 
   .n-card__content {
     flex: 1;
     min-height: 0;
-    padding: 0 24px 12px;
+    padding: 0 16px 8px;
     overflow: auto;
   }
 
   .n-card__footer {
-    padding: 14px 24px 18px;
+    flex-shrink: 0;
+    padding: 8px 16px 10px;
     border-top: 1px solid var(--n-divider-color);
   }
 }
@@ -1970,37 +2032,31 @@ async function handleCloseTab(name: string) {
 .bin82-toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--n-divider-color);
 }
 
 .bin82-toolbar-label {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--n-text-color);
 }
 
 .bin82-protocol-select {
-  width: min(520px, 100%);
+  width: min(420px, 100%);
 }
 
 .bin82-unit-tip {
-  margin-bottom: 12px;
-  font-size: 12px;
-  line-height: 1.5;
-
-  :deep(.n-alert-body) {
-    padding: 6px 10px;
-  }
-}
-
-.bin82-field-unit-hint {
+  margin-bottom: 8px;
   font-size: 11px;
   line-height: 1.35;
-  color: var(--n-warning-color);
+
+  :deep(.n-alert-body) {
+    padding: 4px 8px;
+  }
 }
 
 .bin82-hex-hint {
@@ -2009,23 +2065,28 @@ async function handleCloseTab(name: string) {
   color: var(--n-text-color-3);
 }
 
+.bin82-hex-file-input {
+  display: none;
+}
+
 .bin82-hex-input {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
 }
 
 .bin82-fields {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 6px 8px;
   align-content: start;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
 }
 
 .bin82-field-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -2033,15 +2094,15 @@ async function handleCloseTab(name: string) {
   display: flex;
   align-items: baseline;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  line-height: 1.35;
+  line-height: 1.2;
   overflow: hidden;
 }
 
 .bin82-field-name {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--n-text-color);
 }
@@ -2049,7 +2110,7 @@ async function handleCloseTab(name: string) {
 .bin82-field-summary {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--n-text-color-3);
   white-space: nowrap;
   overflow: hidden;
@@ -2062,35 +2123,43 @@ async function handleCloseTab(name: string) {
 
 .bin82-field-cell--bits {
   grid-column: 1 / -1;
-  padding: 10px 12px;
+  padding: 6px 8px;
   border: 1px dashed var(--n-border-color);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--n-color-modal);
-  gap: 6px;
+  gap: 4px;
 }
 
 .bin82-bit-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  margin-bottom: 4px;
+  gap: 6px 10px;
+  margin-bottom: 2px;
 }
 
 .bin82-bit-num {
-  width: 120px;
+  width: 100px;
 }
 
 .bin82-bit-meta {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--n-text-color-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .bin82-bit-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 4px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 8px;
+
+  :deep(.n-checkbox) {
+    font-size: 11px;
+  }
+
+  :deep(.n-checkbox__label) {
+    padding-left: 6px;
+  }
 }
 
 .existing-tabs-wrap {
