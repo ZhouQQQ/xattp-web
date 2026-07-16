@@ -37,21 +37,22 @@
                       非必填。可切换输入名称或ID，若填写将自动绑定车辆并上架该服务区
                     </n-tooltip>
                   </template>
-                  <div class="service-area-row">
-                    <n-select v-model:value="formData.serviceAreaInputMode" :options="serviceAreaInputModeOptions"
-                      size="small" :disabled="!!connectId" @update:value="onServiceAreaInputModeChange"
-                      class="service-area-type-select" />
-                    <n-input v-if="formData.serviceAreaInputMode === 'name'" v-model:value="formData.service_area_name"
-                      placeholder="选填，服务区名称" clearable size="small" :readonly="!!connectId"
-                      :class="{ 'input-readonly-gray': connectId }" class="service-area-input" />
-                    <n-input v-else v-model:value="formData.service_area_id" placeholder="选填，服务区ID" clearable
-                      size="small" :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }"
-                      class="service-area-input" />
+                  <div class="service-area-block">
+                    <div class="service-area-row">
+                      <n-select v-model:value="formData.serviceAreaInputMode" :options="serviceAreaInputModeOptions"
+                        size="small" :disabled="!!connectId" @update:value="onServiceAreaInputModeChange"
+                        class="service-area-type-select" />
+                      <n-input v-if="formData.serviceAreaInputMode === 'name'" v-model:value="formData.service_area_name"
+                        placeholder="选填，服务区名称" clearable size="small" :readonly="!!connectId"
+                        :class="{ 'input-readonly-gray': connectId }" class="service-area-input" />
+                      <n-input v-else v-model:value="formData.service_area_id" placeholder="选填，服务区ID" clearable
+                        size="small" :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }"
+                        class="service-area-input" />
+                    </div>
+                    <div v-if="connectId && carId" class="car-id-hint" title="模拟绑定的车辆号，可复制">
+                      车辆号 {{ carId }}
+                    </div>
                   </div>
-                </n-form-item>
-                <n-form-item v-if="connectId && carId" label="车辆号">
-                  <n-input :value="carId" size="small" readonly class="input-readonly-gray" style="width: 100%"
-                    title="模拟绑定的车辆号" />
                 </n-form-item>
               </n-gi>
               <!-- 第二行：IMEI、参考IMEI -->
@@ -2330,6 +2331,16 @@ async function handleCloseTab(name: string) {
   margin-bottom: 0;
 }
 
+.car-id-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #15803d;
+  word-break: break-all;
+  user-select: text;
+  cursor: text;
+}
+
 /* 模拟成功后的只读输入框：灰底只读样式，可选中、可复制 */
 .form-section .input-readonly-gray :deep(.n-input__input-el) {
   cursor: text;
@@ -2352,6 +2363,14 @@ async function handleCloseTab(name: string) {
 
 .imei-row .n-input {
   flex: 1;
+  min-width: 0;
+}
+
+.service-area-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
   min-width: 0;
 }
 
