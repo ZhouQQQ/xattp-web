@@ -395,6 +395,16 @@
       </n-form>
     </n-modal>
 
+    <!-- 上次模拟可能未停止提示 -->
+    <n-modal v-model:show="showPrevMockModal" :mask-closable="true" style="width: 340px">
+      <div class="gif-tip-modal">
+        <img :src="baojiGif" alt="上次模拟可能未停止" class="gif-tip-img" />
+        <div class="gif-tip-text">你的上一个模拟停止了吗？</div>
+        <div class="gif-tip-sub">请及时关闭，避免占用连接资源</div>
+        <n-button type="primary" size="small" @click="showPrevMockModal = false">知道了</n-button>
+      </div>
+    </n-modal>
+
     <!-- 新增 Cmd 弹窗 -->
     <n-modal v-model:show="showAddModal" preset="dialog" title="新增命令" positive-text="确定"
       @positive-click="confirmAddCmd">
@@ -495,6 +505,7 @@ defineOptions({ name: "RentalEcuMock" });
 import { ref, reactive, nextTick, computed, watch } from "vue";
 import { createDiscreteApi } from "naive-ui";
 import { Help, Gps, Trash, Dice } from "@vicons/tabler";
+import baojiGif from "@/assets/image/baoji.gif";
 import {
   getRentalEnvListAPI,
   rentalBusinessAddEbikeAPI,
@@ -573,6 +584,40 @@ const vFitTextareaHeight = {
 };
 
 const STORAGE_KEY = "XATTP_RENTAL_ECU_MOCK_FORM";
+
+/** 模拟成功后写入；停止模拟后清除。下次创建时若仍存在则提示（不拦截） */
+const ACTIVE_MOCK_FLAG_KEY = "XATTP_RENTAL_ECU_MOCK_ACTIVE";
+const showPrevMockModal = ref(false);
+
+function hasActiveMockFlag(): boolean {
+  try {
+    return localStorage.getItem(ACTIVE_MOCK_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setActiveMockFlag() {
+  try {
+    localStorage.setItem(ACTIVE_MOCK_FLAG_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+function clearActiveMockFlag() {
+  try {
+    localStorage.removeItem(ACTIVE_MOCK_FLAG_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function warnIfPrevMockPossiblyActive() {
+  if (hasActiveMockFlag()) {
+    showPrevMockModal.value = true;
+  }
+}
 
 /** 表单持久化结构（与 formData 字段一致，用于 localStorage） */
 interface StoredForm {
@@ -1106,6 +1151,7 @@ async function handleCreate() {
     message.error("请填写 环境");
     return;
   }
+  warnIfPrevMockPossiblyActive();
   createLoading.value = true;
   createError.value = "";
   try {
@@ -1144,6 +1190,7 @@ async function handleCreate() {
       return;
     }
     connectId.value = id;
+    setActiveMockFlag();
     await fetchCmdAll();
     saveFormToStorage();
     message.success(`模拟中控成功`);
@@ -1201,6 +1248,7 @@ async function handleDisconnect() {
     // message.error("断开失败");
   } finally {
     connectId.value = "";
+    clearActiveMockFlag();
     cmdMap.value = {};
     cmdEntries.value = [];
     cmdLoadDone.value = false;
@@ -1982,6 +2030,37 @@ async function handleCloseTab(name: string) {
 
 .track-clear-btn:hover {
   color: #f56c6c;
+}
+
+.gif-tip-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px 16px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.gif-tip-img {
+  width: 220px;
+  max-width: 100%;
+  border-radius: 6px;
+  display: block;
+}
+
+.gif-tip-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+.gif-tip-sub {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: -4px;
 }
 
 </style>
