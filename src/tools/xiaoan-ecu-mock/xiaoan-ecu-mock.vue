@@ -427,6 +427,15 @@
       </div>
     </n-modal>
 
+    <!-- 未修改数据却更新提示 -->
+    <n-modal v-model:show="showNoChangeModal" :mask-closable="true" style="width: 340px">
+      <div class="gif-tip-modal">
+        <img :src="qinghuapinAGif" alt="未修改数据" class="gif-tip-img" />
+        <div class="gif-tip-text">你都没有更改任何数据，为什么要更新？</div>
+        <n-button type="primary" size="small" @click="showNoChangeModal = false">知道了</n-button>
+      </div>
+    </n-modal>
+
     <!-- Bin5 告警上报弹窗 -->
     <n-modal v-model:show="showBin5Modal" preset="dialog" title="Bin5 告警上报" :mask-closable="false" style="width: 640px">
       <template #action>
@@ -698,6 +707,7 @@ import {
 import { BIN82_PROTOCOL_SCHEMAS } from "@/tools/ecu-mock/bin82-schemas";
 import haqiGif from "@/assets/image/haqi.gif";
 import baojiGif from "@/assets/image/baoji.gif";
+import qinghuapinAGif from "@/assets/image/qinghuapinA.gif";
 
 const { message } = createDiscreteApi(["message"]);
 
@@ -993,6 +1003,41 @@ const envOptions = [
 ];
 
 const formData = reactive(getInitialFormData());
+
+/** 可更新字段快照：用于判断「立即更新」时表单是否有改动 */
+const lastUpdateableSnapshot = ref<string | null>(null);
+const showNoChangeModal = ref(false);
+
+function getUpdateableFormSnapshot(): string {
+  return JSON.stringify({
+    lng: formData.lng ?? null,
+    lat: formData.lat ?? null,
+    voltage: formData.voltage ?? null,
+    battery_sn: (formData.battery_sn ?? "").trim(),
+    battery_soc: formData.battery_soc ?? null,
+    version: formData.version ?? "",
+    seat_locked: !!formData.seat_locked,
+    power_exists: !!formData.power_exists,
+    has_helmet: !!formData.has_helmet,
+    helmet_react: !!formData.helmet_react,
+    helmet_lock: !!formData.helmet_lock,
+    tlv: formData.tlv ?? "",
+  });
+}
+
+function rememberUpdateableFormSnapshot() {
+  lastUpdateableSnapshot.value = getUpdateableFormSnapshot();
+}
+
+function clearUpdateableFormSnapshot() {
+  lastUpdateableSnapshot.value = null;
+}
+
+function isUpdateableFormUnchanged(): boolean {
+  if (lastUpdateableSnapshot.value == null) return false;
+  return lastUpdateableSnapshot.value === getUpdateableFormSnapshot();
+}
+
 interface ExistingMockItem {
   imei: string;
   raw: Record<string, unknown>;
@@ -1450,6 +1495,7 @@ async function handleCreate() {
     connectId.value = id;
     carId.value = data && typeof data === "object" ? pickCarId(data as Record<string, unknown>) : null;
     setActiveMockFlag();
+    rememberUpdateableFormSnapshot();
     await fetchCmdAll();
     saveFormToStorage();
     message.success(`模拟中控成功`);
@@ -1464,6 +1510,9 @@ async function handleCreate() {
 /** 更新 mock 数据（经度、纬度、电压、版本、座舱锁、电源在位） */
 async function handleUpdate() {
   if (!connectId.value) return;
+  if (isUpdateableFormUnchanged()) {
+    showNoChangeModal.value = true;
+  }
   checkTooFastClick();
   const tlvError = validateTlvFormValue(formData.tlv);
   if (tlvError) {
@@ -1493,6 +1542,7 @@ async function handleUpdate() {
     payload.tlv = parseTlvFormValue(formData.tlv);
     const res: any = await xiaoanEcuMockUpdateAPI(payload);
     if (!checkResCode(res)) return;
+    rememberUpdateableFormSnapshot();
     saveFormToStorage();
     message.success("更新模拟数据成功");
   } catch (e: any) {
@@ -1519,6 +1569,7 @@ async function handleDisconnect() {
     connectId.value = "";
     carId.value = null;
     clearActiveMockFlag();
+    clearUpdateableFormSnapshot();
     cmdMap.value = {};
     cmdEntries.value = [];
     cmdLoadDone.value = false;
@@ -1653,6 +1704,7 @@ async function handleMoveSubmit(): Promise<boolean> {
         if (!Number.isNaN(nLat)) formData.lat = nLat;
       }
     }
+    rememberUpdateableFormSnapshot();
     const bearing = Number(moveForm.bearing) || 0;
     const distance = Number(moveForm.distance) || 0;
     moveRecordList.value.unshift({

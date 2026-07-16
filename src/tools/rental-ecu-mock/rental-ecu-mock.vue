@@ -405,6 +405,15 @@
       </div>
     </n-modal>
 
+    <!-- 未修改数据却更新提示 -->
+    <n-modal v-model:show="showNoChangeModal" :mask-closable="true" style="width: 340px">
+      <div class="gif-tip-modal">
+        <img :src="qinghuapinAGif" alt="未修改数据" class="gif-tip-img" />
+        <div class="gif-tip-text">你都没有更改任何数据，为什么要更新？</div>
+        <n-button type="primary" size="small" @click="showNoChangeModal = false">知道了</n-button>
+      </div>
+    </n-modal>
+
     <!-- 新增 Cmd 弹窗 -->
     <n-modal v-model:show="showAddModal" preset="dialog" title="新增命令" positive-text="确定"
       @positive-click="confirmAddCmd">
@@ -506,6 +515,7 @@ import { ref, reactive, nextTick, computed, watch } from "vue";
 import { createDiscreteApi } from "naive-ui";
 import { Help, Gps, Trash, Dice } from "@vicons/tabler";
 import baojiGif from "@/assets/image/baoji.gif";
+import qinghuapinAGif from "@/assets/image/qinghuapinA.gif";
 import {
   getRentalEnvListAPI,
   rentalBusinessAddEbikeAPI,
@@ -729,6 +739,39 @@ const targetModeOptions = [
 ];
 
 const formData = reactive(getInitialFormData());
+
+/** 可更新字段快照：用于判断「立即更新」时表单是否有改动 */
+const lastUpdateableSnapshot = ref<string | null>(null);
+const showNoChangeModal = ref(false);
+
+function getUpdateableFormSnapshot(): string {
+  return JSON.stringify({
+    lng: formData.lng ?? null,
+    lat: formData.lat ?? null,
+    voltage: formData.voltage ?? null,
+    battery_sn: (formData.battery_sn ?? "").trim(),
+    battery_soc: formData.battery_soc ?? null,
+    version: formData.version ?? "",
+    seat_locked: !!formData.seat_locked,
+    power_exists: !!formData.power_exists,
+    has_helmet: !!formData.has_helmet,
+    helmet_react: !!formData.helmet_react,
+    helmet_lock: !!formData.helmet_lock,
+  });
+}
+
+function rememberUpdateableFormSnapshot() {
+  lastUpdateableSnapshot.value = getUpdateableFormSnapshot();
+}
+
+function clearUpdateableFormSnapshot() {
+  lastUpdateableSnapshot.value = null;
+}
+
+function isUpdateableFormUnchanged(): boolean {
+  if (lastUpdateableSnapshot.value == null) return false;
+  return lastUpdateableSnapshot.value === getUpdateableFormSnapshot();
+}
 
 /** 将当前表单保存到 localStorage */
 function saveFormToStorage() {
@@ -1191,6 +1234,7 @@ async function handleCreate() {
     }
     connectId.value = id;
     setActiveMockFlag();
+    rememberUpdateableFormSnapshot();
     await fetchCmdAll();
     saveFormToStorage();
     message.success(`模拟中控成功`);
@@ -1204,6 +1248,9 @@ async function handleCreate() {
 /** 更新 mock 数据（经度、纬度、电压、版本、座舱锁、电源在位） */
 async function handleUpdate() {
   if (!connectId.value) return;
+  if (isUpdateableFormUnchanged()) {
+    showNoChangeModal.value = true;
+  }
   updateLoading.value = true;
   try {
     const payload: Record<string, unknown> = {
@@ -1224,6 +1271,7 @@ async function handleUpdate() {
     payload.helmet_lock = formData.helmet_lock;
     const res: any = await xiaoanEcuMockUpdateAPI(payload);
     if (!checkResCode(res)) return;
+    rememberUpdateableFormSnapshot();
     saveFormToStorage();
     message.success("更新模拟数据成功");
   } catch (e: any) {
@@ -1249,6 +1297,7 @@ async function handleDisconnect() {
   } finally {
     connectId.value = "";
     clearActiveMockFlag();
+    clearUpdateableFormSnapshot();
     cmdMap.value = {};
     cmdEntries.value = [];
     cmdLoadDone.value = false;
@@ -1381,6 +1430,7 @@ async function handleMoveSubmit(): Promise<boolean> {
         if (!Number.isNaN(nLat)) formData.lat = nLat;
       }
     }
+    rememberUpdateableFormSnapshot();
     const bearing = Number(moveForm.bearing) || 0;
     const distance = Number(moveForm.distance) || 0;
     moveRecordList.value.unshift({
