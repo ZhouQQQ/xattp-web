@@ -49,6 +49,10 @@
                       class="service-area-input" />
                   </div>
                 </n-form-item>
+                <n-form-item v-if="connectId && carId" label="车辆号">
+                  <n-input :value="carId" size="small" readonly class="input-readonly-gray" style="width: 100%"
+                    title="模拟绑定的车辆号" />
+                </n-form-item>
               </n-gi>
               <!-- 第二行：IMEI、参考IMEI -->
               <n-gi :span="6">
@@ -404,6 +408,25 @@
       </div>
     </n-modal>
 
+    <!-- 操作过快提示 -->
+    <n-modal v-model:show="showTooFastModal" :mask-closable="true" style="width: 340px">
+      <div class="gif-tip-modal">
+        <img :src="haqiGif" alt="操作太快" class="gif-tip-img" />
+        <div class="gif-tip-text">操作太快啦，不要点这么快～</div>
+        <n-button type="primary" size="small" @click="showTooFastModal = false">知道了</n-button>
+      </div>
+    </n-modal>
+
+    <!-- 上次模拟可能未停止提示 -->
+    <n-modal v-model:show="showPrevMockModal" :mask-closable="true" style="width: 340px">
+      <div class="gif-tip-modal">
+        <img :src="baojiGif" alt="上次模拟可能未停止" class="gif-tip-img" />
+        <div class="gif-tip-text">你的上一个模拟停止了吗？</div>
+        <div class="gif-tip-sub">请及时关闭，避免占用连接资源</div>
+        <n-button type="primary" size="small" @click="showPrevMockModal = false">知道了</n-button>
+      </div>
+    </n-modal>
+
     <!-- Bin5 告警上报弹窗 -->
     <n-modal v-model:show="showBin5Modal" preset="dialog" title="Bin5 告警上报" :mask-closable="false" style="width: 640px">
       <template #action>
@@ -673,8 +696,64 @@ import {
   type Bin82ProtocolSchema,
 } from "@/tools/ecu-mock/bin82-protocol";
 import { BIN82_PROTOCOL_SCHEMAS } from "@/tools/ecu-mock/bin82-schemas";
+import haqiGif from "@/assets/image/haqi.gif";
+import baojiGif from "@/assets/image/baoji.gif";
 
 const { message } = createDiscreteApi(["message"]);
+
+/** 5 秒内「立即更新 / 手动移动」点击次数达到阈值时弹提示（不拦截操作） */
+const TOO_FAST_WINDOW_MS = 5000;
+const TOO_FAST_THRESHOLD = 2;
+const showTooFastModal = ref(false);
+const tooFastClickTimes: number[] = [];
+
+function checkTooFastClick() {
+  const now = Date.now();
+  while (
+    tooFastClickTimes.length > 0 &&
+    now - tooFastClickTimes[0]! > TOO_FAST_WINDOW_MS
+  ) {
+    tooFastClickTimes.shift();
+  }
+  tooFastClickTimes.push(now);
+  if (tooFastClickTimes.length >= TOO_FAST_THRESHOLD) {
+    showTooFastModal.value = true;
+  }
+}
+
+/** 模拟成功后写入；停止模拟后清除。下次创建时若仍存在则提示（不拦截） */
+const ACTIVE_MOCK_FLAG_KEY = "XATTP_ECU_MOCK_ACTIVE";
+const showPrevMockModal = ref(false);
+
+function hasActiveMockFlag(): boolean {
+  try {
+    return localStorage.getItem(ACTIVE_MOCK_FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setActiveMockFlag() {
+  try {
+    localStorage.setItem(ACTIVE_MOCK_FLAG_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+function clearActiveMockFlag() {
+  try {
+    localStorage.removeItem(ACTIVE_MOCK_FLAG_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function warnIfPrevMockPossiblyActive() {
+  if (hasActiveMockFlag()) {
+    showPrevMockModal.value = true;
+  }
+}
 const BASE_PATH = "/xattp-server";
 const DEFAULT_COORD_LNG = 114.434888;
 const DEFAULT_COORD_LAT = 30.500136;
@@ -1018,6 +1097,7 @@ function applyExistingMockToForm(item: Record<string, unknown>) {
   } else {
     formData.tlv = "";
   }
+  carId.value = pickCarId(item);
 }
 
 /**
@@ -1103,8 +1183,18 @@ const updateLoading = ref(false);
 const deleteLoading = ref(false);
 const createError = ref("");
 const connectId = ref("");
+/** 模拟成功后后端返回的车辆号（无则不展示） */
+const carId = ref<string | null>(null);
 const cmdMap = ref<Record<string, string>>({});
 const cmdLoadDone = ref(false);
+
+/** 从接口对象中解析 car_id，无有效值时返回 null */
+function pickCarId(source: Record<string, unknown> | null | undefined): string | null {
+  if (!source || typeof source !== "object") return null;
+  const raw = source.car_id ?? source.carId;
+  if (raw == null || raw === "") return null;
+  return String(raw);
+}
 
 /** 用于 Tab 展示与编辑的条目：key + 原始 value + 当前编辑 value */
 interface CmdEntry {
@@ -1309,6 +1399,7 @@ async function handleCreate() {
     message.error(tlvError);
     return;
   }
+  warnIfPrevMockPossiblyActive();
   createLoading.value = true;
   createError.value = "";
   try {
@@ -1357,6 +1448,8 @@ async function handleCreate() {
       return;
     }
     connectId.value = id;
+    carId.value = data && typeof data === "object" ? pickCarId(data as Record<string, unknown>) : null;
+    setActiveMockFlag();
     await fetchCmdAll();
     saveFormToStorage();
     message.success(`模拟中控成功`);
@@ -1371,6 +1464,7 @@ async function handleCreate() {
 /** 更新 mock 数据（经度、纬度、电压、版本、座舱锁、电源在位） */
 async function handleUpdate() {
   if (!connectId.value) return;
+  checkTooFastClick();
   const tlvError = validateTlvFormValue(formData.tlv);
   if (tlvError) {
     message.error(tlvError);
@@ -1423,6 +1517,8 @@ async function handleDisconnect() {
     message.error(e?.message || String(e) || "断开失败");
   } finally {
     connectId.value = "";
+    carId.value = null;
+    clearActiveMockFlag();
     cmdMap.value = {};
     cmdEntries.value = [];
     cmdLoadDone.value = false;
@@ -1537,6 +1633,7 @@ function openMoveModal() {
 /** 手动移动：调用接口后 toast 提示，不关闭弹窗 */
 async function handleMoveSubmit(): Promise<boolean> {
   if (!connectId.value) return false;
+  checkTooFastClick();
   moveLoading.value = true;
   try {
     const res: any = await xiaoanEcuMockMoveAPI({
@@ -2547,5 +2644,36 @@ async function handleCloseTab(name: string) {
 
 .track-clear-btn:hover {
   color: #f56c6c;
+}
+
+.gif-tip-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px 16px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.gif-tip-img {
+  width: 220px;
+  max-width: 100%;
+  border-radius: 6px;
+  display: block;
+}
+
+.gif-tip-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+.gif-tip-sub {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: -4px;
 }
 </style>

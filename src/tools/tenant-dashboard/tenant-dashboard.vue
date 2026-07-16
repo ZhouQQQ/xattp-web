@@ -132,26 +132,29 @@
                             {{ row.tenant.tenantName || "-" }}
                           </span>
                         </span>
-                        <span class="tenant-level-cell">
+                        <span class="tenant-car-level-cell">
                           <n-tooltip v-if="row.carLevel" trigger="hover" placement="top">
                             <template #trigger>
-                              <n-tag size="small" :bordered="true" class="tenant-level-tag"
-                                :color="row.carLevel.color">
-                                {{ row.carLevel.level }}
+                              <n-tag size="small" :bordered="true" class="tenant-car-level-tag"
+                                :color="ebikeCountTagColor" title="昨日车辆数">
+                                <span class="tenant-car-level-inner">
+                                  <span class="tenant-car-level-letter"
+                                    :style="{ color: row.carLevel.color.textColor }">{{ row.carLevel.level }}</span>
+                                  <span class="tenant-car-level-num">{{ formatYesterdayCarTotal(row.tenant.carTotal) }}</span>
+                                </span>
                               </n-tag>
                             </template>
                             <div class="tenant-level-tooltip">
                               {{ row.carLevel.level }} 级：{{ row.carLevel.definition }}
                             </div>
                           </n-tooltip>
+                          <n-tag v-else size="small" :bordered="true" class="tenant-car-level-tag"
+                            :color="ebikeCountTagColor" title="昨日车辆数">
+                            <span class="tenant-car-level-inner tenant-car-level-inner-only-num">
+                              <span class="tenant-car-level-num">{{ formatYesterdayCarTotal(row.tenant.carTotal) }}</span>
+                            </span>
+                          </n-tag>
                         </span>
-                        <n-tag size="small" :bordered="true" class="tenant-ebike-tag" title="昨日车辆数"
-                          :color="ebikeCountTagColor">
-                          <span class="tenant-ebike-tag-inner">
-                            <n-icon :component="ScooterElectric" class="tenant-ebike-icon" />
-                            <span class="tenant-ebike-num">{{ formatYesterdayCarTotal(row.tenant.carTotal) }}</span>
-                          </span>
-                        </n-tag>
                         <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(row.tenant.env).color"
                           :title="envTagOf(row.tenant.env).cloud || undefined">
                           {{ envTagDisplayText(row.tenant.env, panel.key) }}
@@ -1448,9 +1451,9 @@ onScopeDispose(() => {
 
 .tenant-line {
   display: grid;
-  /* 第一列固定约 4 位数字宽（ch = 「0」字宽，tabular-nums 下对齐） */
-  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-level, 22px)
-    var(--tenant-col-ebike, 58px) var(--tenant-col-env, 84px);
+  /* ID、名称、等级+车辆合并 tag、环境 */
+  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-car-level, 64px)
+    var(--tenant-col-env, 84px);
   align-items: center;
   column-gap: 3px;
   font-size: 11px;
@@ -1499,33 +1502,59 @@ onScopeDispose(() => {
   line-height: 1;
 }
 
-.tenant-level-cell {
+.tenant-car-level-cell {
   grid-column: 3;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: stretch;
   width: 100%;
   min-width: 0;
-  min-height: 17px;
 }
 
-.tenant-line :deep(.tenant-level-tag) {
+.tenant-line :deep(.tenant-car-level-tag) {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   justify-content: center;
   margin-left: 0;
   height: 17px;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
   line-height: 15px;
-  padding: 0 2px;
+  padding: 0 4px;
   cursor: default;
 }
 
-.tenant-line :deep(.tenant-level-tag .n-tag__content) {
+.tenant-line :deep(.tenant-car-level-tag .n-tag__content) {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.tenant-car-level-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.tenant-car-level-inner-only-num {
+  justify-content: flex-end;
+}
+
+.tenant-car-level-letter {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tenant-car-level-num {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .tenant-level-tooltip {
@@ -1534,49 +1563,8 @@ onScopeDispose(() => {
   white-space: nowrap;
 }
 
-.tenant-line :deep(.tenant-ebike-tag) {
-  grid-column: 4;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  justify-content: flex-start;
-  margin-left: 0;
-  height: 17px;
-  font-size: 11px;
-  line-height: 15px;
-  padding: 0 3px;
-}
-
-.tenant-line :deep(.tenant-ebike-tag .n-tag__content) {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.tenant-ebike-tag-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2px;
-  width: 100%;
-  min-width: 0;
-}
-
-.tenant-ebike-icon {
-  font-size: 12px;
-  flex-shrink: 0;
-  opacity: 0.92;
-}
-
-.tenant-ebike-num {
-  flex-shrink: 0;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
 .tenant-line :deep(.tenant-env-tag) {
-  grid-column: 5;
+  grid-column: 4;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
