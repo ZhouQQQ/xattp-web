@@ -47,20 +47,23 @@
               </n-gi>
               <n-gi :span="2">
                 <n-form-item label="IMEI" path="imei" required>
-                  <div class="imei-row">
-                    <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
-                      :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
-                    <n-tooltip trigger="hover">
-                      <template #trigger>
-                        <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
-                          <template #icon>
-                            <n-icon :component="Dice" :size="18" />
-                          </template>
-                          随机
-                        </n-button>
-                      </template>
-                      随机
-                    </n-tooltip>
+                  <div class="imei-field">
+                    <div class="imei-row">
+                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
+                        :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
+                      <n-tooltip trigger="hover">
+                        <template #trigger>
+                          <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
+                            <template #icon>
+                              <n-icon :component="Dice" :size="18" />
+                            </template>
+                            随机
+                          </n-button>
+                        </template>
+                        随机
+                      </n-tooltip>
+                    </div>
+                    <div class="imei-warn-tip">请不要使用真实存在的 IMEI，以免影响真实设备</div>
                   </div>
                 </n-form-item>
               </n-gi>
@@ -537,7 +540,7 @@ import {
   parseBin5AlarmType,
 } from "@/tools/ecu-mock/bin5-alarm-types";
 
-const { message } = createDiscreteApi(["message"]);
+const { message, dialog } = createDiscreteApi(["message", "dialog"]);
 const DEFAULT_COORD_LNG = 114.434888;
 const DEFAULT_COORD_LAT = 30.500136;
 
@@ -1177,23 +1180,44 @@ async function handleBatchAddSubmit() {
   }
 }
 
-/** 创建 mock 连接 */
-async function handleCreate() {
+function validateBeforeCreate(): boolean {
   const useServer = formData.target_mode === "server";
   const server = formData.server?.trim() || "";
   const env = formData.env?.trim() || "";
   if (!formData.imei?.trim()) {
     message.error("请填写 IMEI");
-    return;
+    return false;
   }
   if (useServer && !server) {
     message.error("请填写 指定网关（server）");
-    return;
+    return false;
   }
   if (!useServer && !env) {
     message.error("请填写 环境");
-    return;
+    return false;
   }
+  return true;
+}
+
+/** 创建 mock 连接：点击按钮时二次确认 */
+function handleCreate() {
+  if (!validateBeforeCreate()) return;
+  dialog.warning({
+    title: "确认开始模拟",
+    content: "请确认未使用真实存在的 IMEI。使用真实 IMEI 可能影响线上/真实设备，是否继续？",
+    positiveText: "确认开始",
+    negativeText: "取消",
+    onPositiveClick: () => {
+      void doCreate();
+    },
+  });
+}
+
+async function doCreate() {
+  if (!validateBeforeCreate()) return;
+  const useServer = formData.target_mode === "server";
+  const server = formData.server?.trim() || "";
+  const env = formData.env?.trim() || "";
   warnIfPrevMockPossiblyActive();
   createLoading.value = true;
   createError.value = "";
@@ -1238,7 +1262,7 @@ async function handleCreate() {
     await fetchCmdAll();
     saveFormToStorage();
     message.success(`模拟中控成功`);
-  } catch (e: any) {   
+  } catch (e: any) {
     message.error("模拟中控请求失败");
   } finally {
     createLoading.value = false;
@@ -1776,6 +1800,10 @@ async function handleCloseTab(name: string) {
   background-color: #f3f4f6 !important;
 }
 
+.imei-field {
+  width: 100%;
+}
+
 .imei-row {
   display: flex;
   align-items: center;
@@ -1786,6 +1814,13 @@ async function handleCloseTab(name: string) {
 .imei-row .n-input {
   flex: 1;
   min-width: 0;
+}
+
+.imei-warn-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #d03050;
 }
 
 .battery-soc-row {

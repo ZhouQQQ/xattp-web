@@ -58,20 +58,23 @@
               <!-- 第二行：IMEI、参考IMEI -->
               <n-gi :span="6">
                 <n-form-item label="IMEI" path="imei" required>
-                  <div class="imei-row">
-                    <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
-                      :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
-                    <n-tooltip trigger="hover">
-                      <template #trigger>
-                        <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
-                          <template #icon>
-                            <n-icon :component="Dice" :size="18" />
-                          </template>
-                          随机
-                        </n-button>
-                      </template>
-                      随机生成
-                    </n-tooltip>
+                  <div class="imei-field">
+                    <div class="imei-row">
+                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
+                        :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
+                      <n-tooltip trigger="hover">
+                        <template #trigger>
+                          <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
+                            <template #icon>
+                              <n-icon :component="Dice" :size="18" />
+                            </template>
+                            随机
+                          </n-button>
+                        </template>
+                        随机生成
+                      </n-tooltip>
+                    </div>
+                    <div class="imei-warn-tip">请不要使用真实存在的 IMEI，以免影响真实设备</div>
                   </div>
                 </n-form-item>
               </n-gi>
@@ -710,7 +713,7 @@ import haqiGif from "@/assets/image/haqi.gif";
 import baojiGif from "@/assets/image/baoji.gif";
 import qinghuapinAGif from "@/assets/image/qinghuapinA.gif";
 
-const { message } = createDiscreteApi(["message"]);
+const { message, dialog } = createDiscreteApi(["message", "dialog"]);
 
 /** 5 秒内「立即更新 / 手动移动」点击次数达到阈值时弹提示（不拦截操作） */
 const TOO_FAST_WINDOW_MS = 5000;
@@ -1181,7 +1184,7 @@ async function handleExistingMockTabChange(imei: string) {
     await handleDisconnect();
   }
   applyExistingMockToForm(selected.raw);
-  await handleCreate();
+  await doCreate();
 }
 
 /**
@@ -1428,23 +1431,43 @@ function onHasHelmetChange(val: boolean) {
   }
 }
 
-/** 创建 mock 连接 */
-async function handleCreate() {
+function validateBeforeCreate(): boolean {
   if (!formData.env || !formData.tenant_id?.trim() || !formData.imei?.trim()) {
     message.error("请填写 环境、租户ID、IMEI");
-    return;
+    return false;
   }
   const imei = formData.imei.trim();
   const refImei = formData.ref_imei?.trim();
   if (refImei && refImei === imei) {
     message.error("参考IMEI不能和 IMEI 填一样");
-    return;
+    return false;
   }
   const tlvError = validateTlvFormValue(formData.tlv);
   if (tlvError) {
     message.error(tlvError);
-    return;
+    return false;
   }
+  return true;
+}
+
+/** 创建 mock 连接：点击按钮时二次确认 */
+function handleCreate() {
+  if (!validateBeforeCreate()) return;
+  dialog.warning({
+    title: "确认开始模拟",
+    content: "请确认未使用真实存在的 IMEI。使用真实 IMEI 可能影响线上/真实设备，是否继续？",
+    positiveText: "确认开始",
+    negativeText: "取消",
+    onPositiveClick: () => {
+      void doCreate();
+    },
+  });
+}
+
+async function doCreate() {
+  if (!validateBeforeCreate()) return;
+  const imei = formData.imei.trim();
+  const refImei = formData.ref_imei?.trim();
   warnIfPrevMockPossiblyActive();
   createLoading.value = true;
   createError.value = "";
@@ -2354,11 +2377,22 @@ async function handleCloseTab(name: string) {
   background-color: #f3f4f6 !important;
 }
 
+.imei-field {
+  width: 100%;
+}
+
 .imei-row {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
+}
+
+.imei-warn-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #d03050;
 }
 
 .imei-row .n-input {
