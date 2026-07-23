@@ -241,12 +241,39 @@ export function xiaoanEcuMockCmdAllAPI(params: { connect_id: string }) {
   return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/cmd/all`, { params });
 }
 
-/**
- * 小安中控模拟：获取当前用户已有 mock 连接列表
- * @returns mock 请求实例
- */
-export function xiaoanEcuMockListAPI() {
-  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/list`);
+export interface XiaoanEcuMockActiveItem {
+  connect_id: string;
+  imei: string;
+  env?: string;
+  tenant_id?: string;
+  ref_imei?: string;
+  lng?: number;
+  lat?: number;
+  voltage?: number;
+  battery_sn?: string;
+  battery_soc?: number;
+  version?: string;
+  service_area_id?: string;
+  car_id?: string;
+  seat_locked?: boolean;
+  power_exists?: boolean;
+  has_helmet?: boolean;
+  helmet_react?: boolean;
+  helmet_lock?: boolean;
+  tlv?: unknown[] | string;
+  server?: string;
+  business_type?: number | string;
+  create_at?: string;
+  status?: "running" | "disconnected";
+  is_mocking?: boolean;
+  [key: string]: unknown;
+}
+
+/** 获取当前用户单中控列表（含已断开）；business_type: 1共享 2短租 */
+export function xiaoanEcuMockActiveListAPI(params?: { business_type?: 1 | 2 | 3 }) {
+  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/mine`, {
+    params: { business_type: params?.business_type ?? 1 },
+  });
 }
 
 /** 小安中控模拟：设置单条 mock 命令 */

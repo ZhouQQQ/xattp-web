@@ -1,15 +1,104 @@
 <template>
   <div class="xiaoan-ecu-mock">
+    <div v-if="existingMockList.length > 0" class="existing-tabs-wrap">
+      <div class="existing-tabs-row">
+        <button
+          v-for="item in existingMockList"
+          :key="item.connectId"
+          type="button"
+          class="mock-tab"
+          :class="{ 'mock-tab-active': !isCreateMode && item.connectId === activeExistingMockConnectId }"
+          @click="handleExistingMockTabChange(item.connectId)"
+        >
+          <span
+            class="mock-status-dot"
+            :class="item.raw.status === 'running' ? 'mock-status-dot-running' : 'mock-status-dot-disconnected'"
+            :title="item.raw.status === 'running' ? '模拟中' : '已断开'"
+          />
+          <span class="mock-tab-text">
+            <span class="mock-tab-top">
+              <span class="mock-status-tag mock-status-env">{{ item.raw.env || "-" }}</span>
+              <span class="mock-status-tag mock-status-tenant">{{ item.raw.tenant_id || "-" }}</span>
+              <span class="mock-tab-time" :title="item.raw.create_at || ''">{{ formatRelativeCreateAt(item.raw.create_at) }}</span>
+            </span>
+            <span class="mock-tab-imei-row">
+              <span class="mock-tab-imei">{{ item.imei }}</span>
+              <n-button
+                quaternary
+                circle
+                size="tiny"
+                class="mock-tab-copy-btn"
+                title="复制 IMEI"
+                @click.stop="copyTabImei(item.imei)"
+              >
+                <template #icon>
+                  <n-icon :component="Copy" :size="12" />
+                </template>
+              </n-button>
+            </span>
+          </span>
+          <n-button
+            quaternary
+            circle
+            size="tiny"
+            class="mock-tab-close-btn"
+            @click.stop="handleCloseExistingMock(item.connectId)"
+          >
+            <template #icon>
+              <n-icon :component="Trash" :size="12" />
+            </template>
+          </n-button>
+        </button>
+        <button
+          v-if="isCreateMode"
+          type="button"
+          class="mock-tab mock-tab-placeholder mock-tab-active"
+        >
+          <span class="mock-status-dot mock-status-dot-draft" title="待开始" />
+          <span class="mock-tab-text">
+            <span class="mock-tab-top">
+              <span class="mock-status-tag mock-status-env">新建</span>
+            </span>
+            <span class="mock-tab-imei">填写参数后开始模拟</span>
+          </span>
+          <n-button
+            quaternary
+            circle
+            size="tiny"
+            class="mock-tab-close-btn"
+            @click.stop="handleCloseCreatePlaceholder"
+          >
+            <template #icon>
+              <n-icon :component="Trash" :size="12" />
+            </template>
+          </n-button>
+        </button>
+        <n-button
+          type="primary"
+          size="small"
+          secondary
+          class="add-mock-button"
+          :disabled="isCreateMode || existingMockList.length >= MAX_ACTIVE_MOCKS"
+          :title="
+            isCreateMode
+              ? '请先完成当前新建'
+              : existingMockList.length >= MAX_ACTIVE_MOCKS
+                ? '每人暂时最多 3 个在线模拟中控'
+                : ''
+          "
+          @click="handleAddMockTab"
+        >
+          <template #icon>
+            <n-icon :component="Plus" :size="16" />
+          </template>
+          新增模拟
+        </n-button>
+      </div>
+    </div>
+
     <div class="card-wrap" :class="{ 'card-wrap-reporting': connectId }">
       <n-card>
         <div class="form-section">
-          <div v-if="existingMockList.length > 0" class="existing-tabs-wrap">
-            <div class="existing-tabs-title">已有模拟连接</div>
-            <n-tabs v-model:value="activeExistingMockImei" type="line" size="small"
-              @update:value="handleExistingMockTabChange">
-              <n-tab-pane v-for="item in existingMockList" :key="item.imei" :name="item.imei" :tab="item.imei" />
-            </n-tabs>
-          </div>
           <n-form :model="formData" label-placement="left" label-width="100px">
             <n-grid :cols="12" :x-gap="1" :y-gap="2">
               <!-- 第一行：环境、租户ID、服务区（服务区宽一点） -->
@@ -227,8 +316,7 @@
                   </n-form-item>
                 </n-space>
               </n-gi>
-              <!-- TLV 独占一行 -->
-              <n-gi :span="12">
+              <n-gi v-show="false" :span="12">
                 <n-form-item path="tlv">
                   <template #label>
                     <span>TLV数据</span>
@@ -256,7 +344,7 @@
               </template>
               <template v-else>
                 <n-space :size="8">
-                  <n-button type="error" :loading="deleteLoading" @click="handleDisconnect">
+                  <n-button type="error" :loading="deleteLoading" @click="handleCloseExistingMock(connectId)">
                     <template #icon>
                       <n-icon :component="Trash" :size="18" />
                     </template>
@@ -418,16 +506,6 @@
         <img :src="haqiGif" alt="操作太快" class="gif-tip-img" />
         <div class="gif-tip-text">操作太快啦，不要点这么快～</div>
         <n-button type="primary" size="small" @click="showTooFastModal = false">知道了</n-button>
-      </div>
-    </n-modal>
-
-    <!-- 上次模拟可能未停止提示 -->
-    <n-modal v-model:show="showPrevMockModal" :mask-closable="true" style="width: 340px">
-      <div class="gif-tip-modal">
-        <img :src="baojiGif" alt="上次模拟可能未停止" class="gif-tip-img" />
-        <div class="gif-tip-text">你的上一个模拟停止了吗？</div>
-        <div class="gif-tip-sub">请及时关闭，避免占用连接资源</div>
-        <n-button type="primary" size="small" @click="showPrevMockModal = false">知道了</n-button>
       </div>
     </n-modal>
 
@@ -668,13 +746,13 @@
 <script setup lang="ts">
 defineOptions({ name: "XiaoanEcuMock" });
 
-import { ref, reactive, nextTick, computed } from "vue";
+import { ref, reactive, nextTick, computed, onActivated, onMounted, onUnmounted } from "vue";
 import { createDiscreteApi } from "naive-ui";
-import { Help, Gps, Trash, Dice } from "@vicons/tabler";
+import { Help, Gps, Trash, Dice, Plus, Copy } from "@vicons/tabler";
 import {
   rentalEcuMockAddAPI,
   xiaoanEcuMockCmdAllAPI,
-  xiaoanEcuMockListAPI,
+  xiaoanEcuMockActiveListAPI,
   xiaoanEcuMockCmdSetAPI,
   xiaoanEcuMockDeleteAPI,
   xiaoanEcuMockUpdateAPI,
@@ -683,6 +761,7 @@ import {
   xiaoanEcuMockBin5API,
   xiaoanEcuMockBinAPI,
   xiaoanEcuMockBin82API,
+  type XiaoanEcuMockActiveItem,
 } from "@/api/device";
 import {
   bin5AlarmTypeOptions,
@@ -710,7 +789,6 @@ import {
 } from "@/tools/ecu-mock/bin82-protocol";
 import { BIN82_PROTOCOL_SCHEMAS } from "@/tools/ecu-mock/bin82-schemas";
 import haqiGif from "@/assets/image/haqi.gif";
-import baojiGif from "@/assets/image/baoji.gif";
 import qinghuapinAGif from "@/assets/image/qinghuapinA.gif";
 
 const { message, dialog } = createDiscreteApi(["message", "dialog"]);
@@ -735,39 +813,6 @@ function checkTooFastClick() {
   }
 }
 
-/** 模拟成功后写入；停止模拟后清除。下次创建时若仍存在则提示（不拦截） */
-const ACTIVE_MOCK_FLAG_KEY = "XATTP_ECU_MOCK_ACTIVE";
-const showPrevMockModal = ref(false);
-
-function hasActiveMockFlag(): boolean {
-  try {
-    return localStorage.getItem(ACTIVE_MOCK_FLAG_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function setActiveMockFlag() {
-  try {
-    localStorage.setItem(ACTIVE_MOCK_FLAG_KEY, "1");
-  } catch {
-    // ignore
-  }
-}
-
-function clearActiveMockFlag() {
-  try {
-    localStorage.removeItem(ACTIVE_MOCK_FLAG_KEY);
-  } catch {
-    // ignore
-  }
-}
-
-function warnIfPrevMockPossiblyActive() {
-  if (hasActiveMockFlag()) {
-    showPrevMockModal.value = true;
-  }
-}
 const BASE_PATH = "/xattp-server";
 const DEFAULT_COORD_LNG = 114.434888;
 const DEFAULT_COORD_LAT = 30.500136;
@@ -1043,11 +1088,69 @@ function isUpdateableFormUnchanged(): boolean {
 }
 
 interface ExistingMockItem {
+  connectId: string;
   imei: string;
-  raw: Record<string, unknown>;
+  raw: XiaoanEcuMockActiveItem;
 }
+const MAX_ACTIVE_MOCKS = 3;
 const existingMockList = ref<ExistingMockItem[]>([]);
-const activeExistingMockImei = ref("");
+const activeExistingMockConnectId = ref("");
+/** 点击「新增模拟」后的占位 Tab，与真实连接 Tab 互斥选中 */
+const showCreatePlaceholder = ref(false);
+const isCreateMode = computed(
+  () => showCreatePlaceholder.value && existingMockList.value.length > 0,
+);
+const hasLoadedExistingMocks = ref(false);
+let existingMockListRequestId = 0;
+/** 驱动「X分钟前」按时刷新 */
+const relativeTimeNow = ref(Date.now());
+let relativeTimeTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * 将 create_at 格式化为相对时间文案。
+ * @param createAt 创建时间，格式如 2026-07-23 12:00:00
+ */
+function formatRelativeCreateAt(createAt?: string): string {
+  void relativeTimeNow.value;
+  if (!createAt || typeof createAt !== "string") return "-";
+  const createMs = Date.parse(createAt.replace(/-/g, "/"));
+  if (Number.isNaN(createMs)) return "-";
+  const diffSec = Math.max(0, Math.floor((Date.now() - createMs) / 1000));
+  if (diffSec < 60) return "刚刚";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} 小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} 天前`;
+}
+
+async function copyTabImei(imei: string) {
+  const text = String(imei || "").trim();
+  if (!text) {
+    message.warning("IMEI 为空");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success("IMEI 已复制");
+  } catch {
+    message.error("复制失败");
+  }
+}
+
+function startRelativeTimeTicker() {
+  if (relativeTimeTimer != null) return;
+  relativeTimeTimer = setInterval(() => {
+    relativeTimeNow.value = Date.now();
+  }, 30000);
+}
+
+function stopRelativeTimeTicker() {
+  if (relativeTimeTimer == null) return;
+  clearInterval(relativeTimeTimer);
+  relativeTimeTimer = null;
+}
 
 /**
  * 从对象中按候选 key 取字符串值
@@ -1124,16 +1227,21 @@ function applyExistingMockToForm(item: Record<string, unknown>) {
   if (typeof env === "string" && env.trim()) formData.env = env.trim();
   if (typeof tenantId === "string") formData.tenant_id = tenantId.replace(/\D/g, "");
   if (typeof imei === "string") formData.imei = imei;
-  if (typeof refImei === "string") formData.ref_imei = refImei;
+  formData.ref_imei = typeof refImei === "string" ? refImei : "";
   if (typeof lng === "number") formData.lng = lng;
   if (typeof lat === "number") formData.lat = lat;
   if (typeof voltage === "number") formData.voltage = voltage;
-  if (typeof batterySn === "string") formData.battery_sn = batterySn;
-  if (typeof batterySoc === "number") formData.battery_soc = batterySoc;
+  formData.battery_sn = typeof batterySn === "string" ? batterySn : "";
+  formData.battery_soc =
+    typeof batterySoc === "number" ? batterySoc : defaultFormData.battery_soc;
   if (typeof version === "string") formData.version = version;
   formData.service_area_id = typeof serviceAreaId === "string" ? serviceAreaId : "";
   formData.service_area_name = typeof serviceAreaName === "string" ? serviceAreaName : "";
-  formData.serviceAreaInputMode = formData.service_area_name?.trim() ? "name" : "id";
+  formData.serviceAreaInputMode = formData.service_area_name?.trim()
+    ? "name"
+    : formData.service_area_id?.trim()
+      ? "id"
+      : defaultFormData.serviceAreaInputMode;
   if (typeof seatLocked === "boolean") formData.seat_locked = seatLocked;
   if (typeof powerExists === "boolean") formData.power_exists = powerExists;
   if (typeof hasHelmet === "boolean") formData.has_helmet = hasHelmet;
@@ -1150,42 +1258,139 @@ function applyExistingMockToForm(item: Record<string, unknown>) {
 }
 
 /**
- * 拉取当前用户已有 mock 连接，按 imei 作为 tab
+ * 拉取当前用户仍在运行的小安中控连接。
+ * @param preferredConnectId 刷新后优先选中的连接
  */
-async function fetchExistingMockList() {
+async function fetchExistingMockList(preferredConnectId = "") {
+  const requestId = ++existingMockListRequestId;
   try {
-    const res: any = await xiaoanEcuMockListAPI();
+    const res: any = await xiaoanEcuMockActiveListAPI({ business_type: 1 });
+    if (requestId !== existingMockListRequestId) return;
     if (!checkResCode(res)) return;
     const data = Array.isArray(res?.data) ? res.data : [];
     const list: ExistingMockItem[] = data
       .map((raw: unknown) => {
-        const record = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+        const record = raw && typeof raw === "object" ? (raw as XiaoanEcuMockActiveItem) : null;
         if (!record) return null;
         const imei = pickString(record, ["imei"]);
-        if (!imei) return null;
-        return { imei, raw: record };
+        const itemConnectId = pickString(record, ["connect_id", "connectId"]);
+        if (!imei || !itemConnectId) return null;
+        return { connectId: itemConnectId, imei, raw: record };
       })
       .filter((item: ExistingMockItem | null): item is ExistingMockItem => item != null);
     existingMockList.value = list;
+
+    let targetConnectId = preferredConnectId;
+    if (!list.some((item) => item.connectId === targetConnectId)) {
+      targetConnectId = list.some((item) => item.connectId === connectId.value)
+        ? connectId.value
+        : "";
+    }
+    if (!targetConnectId && !hasLoadedExistingMocks.value) {
+      targetConnectId = list[0]?.connectId ?? "";
+    }
+    hasLoadedExistingMocks.value = true;
+
+    if (targetConnectId) {
+      await activateExistingMock(targetConnectId);
+    } else if (connectId.value && !list.some((item) => item.connectId === connectId.value)) {
+      enterCreateMode();
+    }
   } catch (_e) {
+    activeExistingMockConnectId.value = connectId.value;
     // 列表加载失败不阻塞页面使用
   }
 }
 
 /**
- * 切换已存在连接 tab：回显对象到表单并自动开始模拟
- * @param imei tab 名称（即 imei）
+ * 切换已有连接 Tab，只改变当前操作对象，不停止其他连接。
+ * @param selectedConnectId Tab 的连接 ID
  */
-async function handleExistingMockTabChange(imei: string) {
-  if (!imei || createLoading.value) return;
-  const selected = existingMockList.value.find((item) => item.imei === imei);
-  if (!selected) return;
-  if (connectId.value) {
-    await handleDisconnect();
+async function handleExistingMockTabChange(selectedConnectId: string) {
+  if (!selectedConnectId) return;
+  if (hasPendingSessionOperation()) {
+    activeExistingMockConnectId.value = connectId.value;
+    message.warning("当前操作完成后再切换中控");
+    return;
   }
-  applyExistingMockToForm(selected.raw);
-  await doCreate();
+  await fetchExistingMockList(selectedConnectId);
 }
+
+async function activateExistingMock(selectedConnectId: string) {
+  const selected = existingMockList.value.find((item) => item.connectId === selectedConnectId);
+  if (!selected) return;
+  showCreatePlaceholder.value = false;
+  resetActiveSessionRuntime();
+  activeExistingMockConnectId.value = selected.connectId;
+  applyExistingMockToForm(selected.raw);
+  const isRunning = selected.raw.status === "running";
+  if (isRunning) {
+    connectId.value = selected.connectId;
+    rememberUpdateableFormSnapshot();
+    await fetchCmdAll();
+  } else {
+    // 已断开：仅回填参数，需重新开始模拟
+    connectId.value = "";
+    clearUpdateableFormSnapshot();
+  }
+}
+
+/** 进入新增模拟状态，已运行的连接保持不变。 */
+function handleAddMockTab() {
+  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
+    message.warning("每人暂时最多 3 个在线模拟中控");
+    return;
+  }
+  if (hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再新增中控");
+    return;
+  }
+  if (showCreatePlaceholder.value) return;
+  enterCreateMode();
+}
+
+function enterCreateMode() {
+  existingMockListRequestId += 1;
+  activeExistingMockConnectId.value = "";
+  connectId.value = "";
+  showCreatePlaceholder.value = existingMockList.value.length > 0;
+  resetActiveSessionRuntime();
+  clearUpdateableFormSnapshot();
+  Object.assign(formData, getInitialFormData(), { imei: "" });
+}
+
+/** 关闭新建占位 Tab：切回列表中的下一个可用中控 */
+async function handleCloseCreatePlaceholder() {
+  if (hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再关闭");
+    return;
+  }
+  showCreatePlaceholder.value = false;
+  const fallback = existingMockList.value[0];
+  if (fallback) {
+    await activateExistingMock(fallback.connectId);
+  } else {
+    enterCreateMode();
+  }
+}
+
+onMounted(() => {
+  startRelativeTimeTicker();
+});
+
+onUnmounted(() => {
+  stopRelativeTimeTicker();
+});
+
+let skipFirstActivatedRefresh = true;
+onActivated(() => {
+  if (skipFirstActivatedRefresh) {
+    skipFirstActivatedRefresh = false;
+    return;
+  }
+  relativeTimeNow.value = Date.now();
+  void fetchExistingMockList();
+});
 
 /**
  * 切换服务区输入模式时，清除原输入框内容，避免把旧值带到新模式
@@ -1376,6 +1581,19 @@ function validateTlvFormValue(raw: string): string | null {
 }
 
 /**
+ * TLV 输入当前隐藏时：非法内容静默清空，避免阻断开始/更新模拟。
+ * @returns 可用于接口的 TLV 数组
+ */
+function resolveTlvPayload(): unknown[] {
+  const tlvError = validateTlvFormValue(formData.tlv);
+  if (tlvError) {
+    formData.tlv = "";
+    return [];
+  }
+  return parseTlvFormValue(formData.tlv);
+}
+
+/**
  * 解析 TLV 表单字符串为数组，供接口使用。非法或空则返回 []。
  * @param raw - 用户输入的 JSON 字符串
  * @returns TLV 项数组
@@ -1442,16 +1660,16 @@ function validateBeforeCreate(): boolean {
     message.error("参考IMEI不能和 IMEI 填一样");
     return false;
   }
-  const tlvError = validateTlvFormValue(formData.tlv);
-  if (tlvError) {
-    message.error(tlvError);
-    return false;
-  }
+  resolveTlvPayload();
   return true;
 }
 
 /** 创建 mock 连接：点击按钮时二次确认 */
 function handleCreate() {
+  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
+    message.warning("每人暂时最多 3 个在线模拟中控");
+    return;
+  }
   if (!validateBeforeCreate()) return;
   dialog.warning({
     title: "确认开始模拟",
@@ -1465,10 +1683,13 @@ function handleCreate() {
 }
 
 async function doCreate() {
+  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
+    message.warning("每人暂时最多 3 个在线模拟中控");
+    return;
+  }
   if (!validateBeforeCreate()) return;
   const imei = formData.imei.trim();
   const refImei = formData.ref_imei?.trim();
-  warnIfPrevMockPossiblyActive();
   createLoading.value = true;
   createError.value = "";
   try {
@@ -1499,7 +1720,7 @@ async function doCreate() {
     payload.has_helmet = formData.has_helmet;
     payload.helmet_react = formData.helmet_react;
     payload.helmet_lock = formData.helmet_lock;
-    payload.tlv = parseTlvFormValue(formData.tlv);
+    payload.tlv = resolveTlvPayload();
 
     const res: any = await rentalEcuMockAddAPI(payload);
     if (!checkResCode(res)) return;
@@ -1518,10 +1739,9 @@ async function doCreate() {
     }
     connectId.value = id;
     carId.value = data && typeof data === "object" ? pickCarId(data as Record<string, unknown>) : null;
-    setActiveMockFlag();
     rememberUpdateableFormSnapshot();
-    await fetchCmdAll();
     saveFormToStorage();
+    await fetchExistingMockList(id);
     message.success(`模拟中控成功`);
   } catch (e: any) {
     createError.value = e?.message || String(e) || "创建失败";
@@ -1538,11 +1758,6 @@ async function handleUpdate() {
     showNoChangeModal.value = true;
   }
   checkTooFastClick();
-  const tlvError = validateTlvFormValue(formData.tlv);
-  if (tlvError) {
-    message.error(tlvError);
-    return;
-  }
   updateLoading.value = true;
   try {
     const payload: Record<string, unknown> = {
@@ -1563,7 +1778,7 @@ async function handleUpdate() {
     payload.has_helmet = formData.has_helmet;
     payload.helmet_react = formData.helmet_react;
     payload.helmet_lock = formData.helmet_lock;
-    payload.tlv = parseTlvFormValue(formData.tlv);
+    payload.tlv = resolveTlvPayload();
     const res: any = await xiaoanEcuMockUpdateAPI(payload);
     if (!checkResCode(res)) return;
     rememberUpdateableFormSnapshot();
@@ -1576,28 +1791,43 @@ async function handleUpdate() {
   }
 }
 
-/** 断开 mock 连接：无论接口成功或失败都重置连接与 cmd 状态 */
-async function handleDisconnect() {
-  if (!connectId.value) return;
+/** 停止指定连接并关闭对应 Tab。 */
+async function handleCloseExistingMock(targetConnectId: string) {
+  if (!targetConnectId || deleteLoading.value) return;
+  if (targetConnectId === connectId.value && hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再停止模拟");
+    return;
+  }
+  const closingIndex = existingMockList.value.findIndex(
+    (item) => item.connectId === targetConnectId,
+  );
+  const wasActive = connectId.value === targetConnectId;
   deleteLoading.value = true;
   try {
-    const res: any = await xiaoanEcuMockDeleteAPI({ connect_id: connectId.value });
-    if (checkResCode(res)) {
-      message.success(`已断开连接`);
+    const res: any = await xiaoanEcuMockDeleteAPI({ connect_id: targetConnectId });
+    if (!checkResCode(res)) return;
+    message.success("已停止模拟");
+
+    const remainingList = existingMockList.value.filter(
+      (item) => item.connectId !== targetConnectId,
+    );
+    existingMockList.value = remainingList;
+    if (!wasActive) {
+      return;
+    }
+
+    const nextItem =
+      remainingList[closingIndex] ??
+      remainingList[Math.max(0, closingIndex - 1)] ??
+      null;
+    if (nextItem) {
+      await fetchExistingMockList(nextItem.connectId);
     } else {
-      message.error("断开请求失败");
+      enterCreateMode();
     }
   } catch (e: any) {
-    message.error(e?.message || String(e) || "断开失败");
+    message.error(e?.message || String(e) || "停止模拟失败");
   } finally {
-    connectId.value = "";
-    carId.value = null;
-    clearActiveMockFlag();
-    clearUpdateableFormSnapshot();
-    cmdMap.value = {};
-    cmdEntries.value = [];
-    cmdLoadDone.value = false;
-    moveRecordList.value = [];
     deleteLoading.value = false;
   }
 }
@@ -1605,11 +1835,13 @@ async function handleDisconnect() {
 /** 拉取所有 mock 命令数据 */
 async function fetchCmdAll() {
   if (!connectId.value) return;
+  const targetConnectId = connectId.value;
   cmdLoadDone.value = false;
   try {
     const res: any = await xiaoanEcuMockCmdAllAPI({
-      connect_id: connectId.value,
+      connect_id: targetConnectId,
     });
+    if (connectId.value !== targetConnectId) return;
     if (!checkResCode(res)) {
       cmdMap.value = {};
       syncCmdEntries();
@@ -1620,11 +1852,14 @@ async function fetchCmdAll() {
       data && typeof data === "object" && !Array.isArray(data) ? { ...data } : {};
     syncCmdEntries();
   } catch (e: any) {
+    if (connectId.value !== targetConnectId) return;
     message.error(e?.message || String(e) || "获取命令数据失败");
     cmdMap.value = {};
     syncCmdEntries();
   } finally {
-    cmdLoadDone.value = true;
+    if (connectId.value === targetConnectId) {
+      cmdLoadDone.value = true;
+    }
   }
 }
 
@@ -2143,6 +2378,52 @@ async function handleCloseTab(name: string) {
   }
 }
 
+/** 清理仅属于当前 Tab 的临时界面状态。 */
+function resetActiveSessionRuntime() {
+  carId.value = null;
+  createError.value = "";
+  clearUpdateableFormSnapshot();
+  cmdMap.value = {};
+  cmdEntries.value = [];
+  activeCmdTab.value = "";
+  cmdLoadDone.value = false;
+  moveRecordList.value = [];
+  consecutiveNorthCount.value = 0;
+  trackText.value = "";
+  rawBinHexInput.value = "";
+  bin82Form.data = {};
+  bin5Form.alarm_type = null;
+  addForm.cmd = "";
+  addForm.value = "";
+  moveForm.bearing = 0;
+  moveForm.distance = 100;
+  tooFastClickTimes.length = 0;
+  showTooFastModal.value = false;
+  showNoChangeModal.value = false;
+  showMoveModal.value = false;
+  showCoordPicker.value = false;
+  showBin5Modal.value = false;
+  showBin82Modal.value = false;
+  showRawBinModal.value = false;
+  showTrackModal.value = false;
+  showAddModal.value = false;
+}
+
+function hasPendingSessionOperation(): boolean {
+  return (
+    createLoading.value ||
+    updateLoading.value ||
+    deleteLoading.value ||
+    moveLoading.value ||
+    trackLoading.value ||
+    bin5Loading.value ||
+    bin82Loading.value ||
+    rawBinLoading.value
+  );
+}
+
+void fetchExistingMockList();
+
 </script>
 
 <style lang="less" scoped>
@@ -2336,13 +2617,168 @@ async function handleCloseTab(name: string) {
 }
 
 .existing-tabs-wrap {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.existing-tabs-title {
-  font-size: 12px;
+.existing-tabs-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.add-mock-button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.mock-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 220px;
+  max-width: 100%;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.mock-tab:hover {
+  border-color: #d1d5db;
+}
+
+.mock-tab-active {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.mock-tab-placeholder {
+  border-style: dashed;
+  border-color: #86efac;
+  min-width: 200px;
+}
+
+.mock-status-dot-draft {
+  background: #d1d5db;
+}
+
+.mock-tab-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.mock-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.mock-status-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
   color: #6b7280;
-  margin-bottom: 4px;
+  background: #f9fafb;
+}
+
+.mock-status-env,
+.mock-status-tenant {
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.mock-status-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.mock-status-dot-running {
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  animation: mock-status-ripple 1.6s ease-out infinite;
+}
+
+.mock-status-dot-disconnected {
+  background: #ef4444;
+}
+
+@keyframes mock-status-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.mock-tab-imei-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mock-tab-imei {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mock-tab-copy-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: #9ca3af;
+}
+
+.mock-tab-copy-btn:hover {
+  color: #374151;
+}
+
+.mock-tab-time {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.mock-tab-close-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: #9ca3af;
+}
+
+.mock-tab-close-btn:hover {
+  color: #d03050;
 }
 
 .form-section :deep(.n-form-item) {

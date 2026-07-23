@@ -1,5 +1,100 @@
 <template>
   <div class="rental-ecu-mock">
+    <div v-if="existingMockList.length > 0" class="existing-tabs-wrap">
+      <div class="existing-tabs-row">
+        <button
+          v-for="item in existingMockList"
+          :key="item.connectId"
+          type="button"
+          class="mock-tab"
+          :class="{ 'mock-tab-active': !isCreateMode && item.connectId === activeExistingMockConnectId }"
+          @click="handleExistingMockTabChange(item.connectId)"
+        >
+          <span
+            class="mock-status-dot"
+            :class="item.raw.status === 'running' ? 'mock-status-dot-running' : 'mock-status-dot-disconnected'"
+            :title="item.raw.status === 'running' ? '模拟中' : '已断开'"
+          />
+          <span class="mock-tab-text">
+            <span class="mock-tab-top">
+              <span class="mock-status-tag mock-status-env">{{ getMockTabEnvLabel(item.raw) }}</span>
+              <span class="mock-tab-time" :title="item.raw.create_at || ''">{{ formatRelativeCreateAt(item.raw.create_at) }}</span>
+            </span>
+            <span class="mock-tab-imei-row">
+              <span class="mock-tab-imei">{{ item.imei }}</span>
+              <n-button
+                quaternary
+                circle
+                size="tiny"
+                class="mock-tab-copy-btn"
+                title="复制 IMEI"
+                @click.stop="copyTabImei(item.imei)"
+              >
+                <template #icon>
+                  <n-icon :component="Copy" :size="12" />
+                </template>
+              </n-button>
+            </span>
+          </span>
+          <n-button
+            quaternary
+            circle
+            size="tiny"
+            class="mock-tab-close-btn"
+            @click.stop="handleCloseExistingMock(item.connectId)"
+          >
+            <template #icon>
+              <n-icon :component="Trash" :size="12" />
+            </template>
+          </n-button>
+        </button>
+        <button
+          v-if="isCreateMode"
+          type="button"
+          class="mock-tab mock-tab-placeholder mock-tab-active"
+        >
+          <span class="mock-status-dot mock-status-dot-draft" title="待开始" />
+          <span class="mock-tab-text">
+            <span class="mock-tab-top">
+              <span class="mock-status-tag mock-status-env">新建</span>
+            </span>
+            <span class="mock-tab-imei">填写参数后开始模拟</span>
+          </span>
+          <n-button
+            quaternary
+            circle
+            size="tiny"
+            class="mock-tab-close-btn"
+            @click.stop="handleCloseCreatePlaceholder"
+          >
+            <template #icon>
+              <n-icon :component="Trash" :size="12" />
+            </template>
+          </n-button>
+        </button>
+        <n-button
+          type="primary"
+          size="small"
+          secondary
+          class="add-mock-button"
+          :disabled="isCreateMode || existingMockList.length >= MAX_ACTIVE_MOCKS"
+          :title="
+            isCreateMode
+              ? '请先完成当前新建'
+              : existingMockList.length >= MAX_ACTIVE_MOCKS
+                ? '每人暂时最多 3 个在线模拟中控'
+                : ''
+          "
+          @click="handleAddMockTab"
+        >
+          <template #icon>
+            <n-icon :component="Plus" :size="16" />
+          </template>
+          新增模拟
+        </n-button>
+      </div>
+    </div>
+
     <div class="card-wrap" :class="{ 'card-wrap-reporting': connectId }">
       <n-card>
         <div class="form-section">
@@ -191,7 +286,7 @@
               <template v-else>
                 <div class="create-actions-row">
                   <n-space :size="8">
-                  <n-button type="error" :loading="deleteLoading" @click="handleDisconnect">
+                  <n-button type="error" :loading="deleteLoading" @click="handleCloseExistingMock(connectId)">
                     <template #icon>
                       <n-icon :component="Trash" :size="18" />
                     </template>
@@ -398,16 +493,6 @@
       </n-form>
     </n-modal>
 
-    <!-- 上次模拟可能未停止提示 -->
-    <n-modal v-model:show="showPrevMockModal" :mask-closable="true" style="width: 340px">
-      <div class="gif-tip-modal">
-        <img :src="baojiGif" alt="上次模拟可能未停止" class="gif-tip-img" />
-        <div class="gif-tip-text">你的上一个模拟停止了吗？</div>
-        <div class="gif-tip-sub">请及时关闭，避免占用连接资源</div>
-        <n-button type="primary" size="small" @click="showPrevMockModal = false">知道了</n-button>
-      </div>
-    </n-modal>
-
     <!-- 未修改数据却更新提示 -->
     <n-modal v-model:show="showNoChangeModal" :mask-closable="true" style="width: 340px">
       <div class="gif-tip-modal">
@@ -514,10 +599,9 @@
 <script setup lang="ts">
 defineOptions({ name: "RentalEcuMock" });
 
-import { ref, reactive, nextTick, computed, watch } from "vue";
+import { ref, reactive, nextTick, computed, watch, onActivated, onMounted, onUnmounted } from "vue";
 import { createDiscreteApi } from "naive-ui";
-import { Help, Gps, Trash, Dice } from "@vicons/tabler";
-import baojiGif from "@/assets/image/baoji.gif";
+import { Help, Gps, Trash, Dice, Plus, Copy } from "@vicons/tabler";
 import qinghuapinAGif from "@/assets/image/qinghuapinA.gif";
 import {
   getRentalEnvListAPI,
@@ -526,6 +610,7 @@ import {
   rentalBusinessTenantAllAPI,
   rentalBusinessVehicleModelAllAPI,
   rentalEcuMockAddAPI,
+  xiaoanEcuMockActiveListAPI,
   xiaoanEcuMockCmdAllAPI,
   xiaoanEcuMockCmdSetAPI,
   xiaoanEcuMockDeleteAPI,
@@ -533,6 +618,7 @@ import {
   xiaoanEcuMockMoveAPI,
   xiaoanEcuMockTrajectoryAPI,
   xiaoanEcuMockBin5API,
+  type XiaoanEcuMockActiveItem,
 } from "@/api/device";
 import {
   bin5AlarmTypeOptions,
@@ -598,40 +684,6 @@ const vFitTextareaHeight = {
 
 const STORAGE_KEY = "XATTP_RENTAL_ECU_MOCK_FORM";
 
-/** 模拟成功后写入；停止模拟后清除。下次创建时若仍存在则提示（不拦截） */
-const ACTIVE_MOCK_FLAG_KEY = "XATTP_RENTAL_ECU_MOCK_ACTIVE";
-const showPrevMockModal = ref(false);
-
-function hasActiveMockFlag(): boolean {
-  try {
-    return localStorage.getItem(ACTIVE_MOCK_FLAG_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function setActiveMockFlag() {
-  try {
-    localStorage.setItem(ACTIVE_MOCK_FLAG_KEY, "1");
-  } catch {
-    // ignore
-  }
-}
-
-function clearActiveMockFlag() {
-  try {
-    localStorage.removeItem(ACTIVE_MOCK_FLAG_KEY);
-  } catch {
-    // ignore
-  }
-}
-
-function warnIfPrevMockPossiblyActive() {
-  if (hasActiveMockFlag()) {
-    showPrevMockModal.value = true;
-  }
-}
-
 /** 表单持久化结构（与 formData 字段一致，用于 localStorage） */
 interface StoredForm {
   target_mode?: "env" | "server";
@@ -661,6 +713,7 @@ const defaultFormData = {
   lat: 30.500136,
   voltage: 55,
   battery_sn: "",
+  battery_soc: 100,
   version: "1.2.3",
   seat_locked: true,
   power_exists: true,
@@ -809,6 +862,260 @@ const createError = ref("");
 const connectId = ref("");
 const cmdMap = ref<Record<string, string>>({});
 const cmdLoadDone = ref(false);
+
+interface ExistingMockItem {
+  connectId: string;
+  imei: string;
+  raw: XiaoanEcuMockActiveItem;
+}
+const MAX_ACTIVE_MOCKS = 3;
+const existingMockList = ref<ExistingMockItem[]>([]);
+const activeExistingMockConnectId = ref("");
+/** 点击「新增模拟」后的占位 Tab，与真实连接 Tab 互斥选中 */
+const showCreatePlaceholder = ref(false);
+const isCreateMode = computed(
+  () => showCreatePlaceholder.value && existingMockList.value.length > 0,
+);
+const hasLoadedExistingMocks = ref(false);
+let existingMockListRequestId = 0;
+const relativeTimeNow = ref(Date.now());
+let relativeTimeTimer: ReturnType<typeof setInterval> | null = null;
+
+function formatRelativeCreateAt(createAt?: string): string {
+  void relativeTimeNow.value;
+  if (!createAt || typeof createAt !== "string") return "-";
+  const createMs = Date.parse(createAt.replace(/-/g, "/"));
+  if (Number.isNaN(createMs)) return "-";
+  const diffSec = Math.max(0, Math.floor((Date.now() - createMs) / 1000));
+  if (diffSec < 60) return "刚刚";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} 小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} 天前`;
+}
+
+async function copyTabImei(imei: string) {
+  const text = String(imei || "").trim();
+  if (!text) {
+    message.warning("IMEI 为空");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success("IMEI 已复制");
+  } catch {
+    message.error("复制失败");
+  }
+}
+
+function startRelativeTimeTicker() {
+  if (relativeTimeTimer != null) return;
+  relativeTimeTimer = setInterval(() => {
+    relativeTimeNow.value = Date.now();
+  }, 30000);
+}
+
+function stopRelativeTimeTicker() {
+  if (relativeTimeTimer == null) return;
+  clearInterval(relativeTimeTimer);
+  relativeTimeTimer = null;
+}
+
+function getMockTabEnvLabel(raw: XiaoanEcuMockActiveItem): string {
+  const env = typeof raw.env === "string" ? raw.env.trim() : "";
+  if (env) return env;
+  const server = typeof raw.server === "string" ? raw.server.trim() : "";
+  return server || "-";
+}
+
+function pickString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+function pickNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+  }
+  return undefined;
+}
+
+function pickBoolean(source: Record<string, unknown>, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") return value;
+  }
+  return undefined;
+}
+
+function applyExistingMockToForm(item: Record<string, unknown>) {
+  const env = pickString(item, ["env"]);
+  const server = pickString(item, ["server"]);
+  const imei = pickString(item, ["imei"]);
+  const lng = pickNumber(item, ["lng", "longitude"]);
+  const lat = pickNumber(item, ["lat", "latitude"]);
+  const voltage = pickNumber(item, ["voltage"]);
+  const batterySn = pickString(item, ["battery_sn", "batterySn"]);
+  const batterySoc = pickNumber(item, ["battery_soc", "batterySoc"]);
+  const version = pickString(item, ["version"]);
+  const seatLocked = pickBoolean(item, ["seat_locked", "seatLocked"]);
+  const powerExists = pickBoolean(item, ["power_exists", "powerExists"]);
+  const hasHelmet = pickBoolean(item, ["has_helmet", "hasHelmet"]);
+  const helmetReact = pickBoolean(item, ["helmet_react", "helmetReact"]);
+  const helmetLock = pickBoolean(item, ["helmet_lock", "helmetLock"]);
+
+  if (typeof env === "string" && env.trim()) {
+    formData.target_mode = "env";
+    formData.env = env.trim();
+  } else if (typeof server === "string" && server.trim()) {
+    formData.target_mode = "server";
+    formData.server = server.trim();
+  }
+  if (typeof imei === "string") formData.imei = imei;
+  if (typeof lng === "number") formData.lng = lng;
+  if (typeof lat === "number") formData.lat = lat;
+  if (typeof voltage === "number") formData.voltage = voltage;
+  formData.battery_sn = typeof batterySn === "string" ? batterySn : "";
+  if (typeof batterySoc === "number") formData.battery_soc = batterySoc;
+  if (typeof version === "string") formData.version = version;
+  if (typeof seatLocked === "boolean") formData.seat_locked = seatLocked;
+  if (typeof powerExists === "boolean") formData.power_exists = powerExists;
+  if (typeof hasHelmet === "boolean") formData.has_helmet = hasHelmet;
+  if (typeof helmetReact === "boolean") formData.helmet_react = helmetReact;
+  if (typeof helmetLock === "boolean") formData.helmet_lock = helmetLock;
+}
+
+async function fetchExistingMockList(preferredConnectId = "") {
+  const requestId = ++existingMockListRequestId;
+  try {
+    const res: any = await xiaoanEcuMockActiveListAPI({ business_type: 2 });
+    if (requestId !== existingMockListRequestId) return;
+    if (!checkResCode(res)) return;
+    const data = Array.isArray(res?.data) ? res.data : [];
+    const list: ExistingMockItem[] = data
+      .map((raw: unknown) => {
+        const record = raw && typeof raw === "object" ? (raw as XiaoanEcuMockActiveItem) : null;
+        if (!record) return null;
+        const imei = pickString(record, ["imei"]);
+        const itemConnectId = pickString(record, ["connect_id", "connectId"]);
+        if (!imei || !itemConnectId) return null;
+        return { connectId: itemConnectId, imei, raw: record };
+      })
+      .filter((item: ExistingMockItem | null): item is ExistingMockItem => item != null);
+    existingMockList.value = list;
+
+    let targetConnectId = preferredConnectId;
+    if (!list.some((item) => item.connectId === targetConnectId)) {
+      targetConnectId = list.some((item) => item.connectId === connectId.value)
+        ? connectId.value
+        : "";
+    }
+    if (!targetConnectId && !hasLoadedExistingMocks.value) {
+      targetConnectId = list[0]?.connectId ?? "";
+    }
+    hasLoadedExistingMocks.value = true;
+
+    if (targetConnectId) {
+      await activateExistingMock(targetConnectId);
+    } else if (connectId.value && !list.some((item) => item.connectId === connectId.value)) {
+      enterCreateMode();
+    }
+  } catch (_e) {
+    activeExistingMockConnectId.value = connectId.value;
+  }
+}
+
+async function handleExistingMockTabChange(selectedConnectId: string) {
+  if (!selectedConnectId) return;
+  if (hasPendingSessionOperation()) {
+    activeExistingMockConnectId.value = connectId.value;
+    message.warning("当前操作完成后再切换中控");
+    return;
+  }
+  await fetchExistingMockList(selectedConnectId);
+}
+
+async function activateExistingMock(selectedConnectId: string) {
+  const selected = existingMockList.value.find((item) => item.connectId === selectedConnectId);
+  if (!selected) return;
+  showCreatePlaceholder.value = false;
+  resetActiveSessionRuntime();
+  activeExistingMockConnectId.value = selected.connectId;
+  applyExistingMockToForm(selected.raw);
+  const isRunning = selected.raw.status === "running";
+  if (isRunning) {
+    connectId.value = selected.connectId;
+    rememberUpdateableFormSnapshot();
+    await fetchCmdAll();
+  } else {
+    connectId.value = "";
+    clearUpdateableFormSnapshot();
+  }
+}
+
+function handleAddMockTab() {
+  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
+    message.warning("每人暂时最多 3 个在线模拟中控");
+    return;
+  }
+  if (hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再新增中控");
+    return;
+  }
+  if (showCreatePlaceholder.value) return;
+  enterCreateMode();
+}
+
+function enterCreateMode() {
+  existingMockListRequestId += 1;
+  activeExistingMockConnectId.value = "";
+  connectId.value = "";
+  showCreatePlaceholder.value = existingMockList.value.length > 0;
+  resetActiveSessionRuntime();
+  clearUpdateableFormSnapshot();
+  Object.assign(formData, getInitialFormData(), { imei: "" });
+}
+
+/** 关闭新建占位 Tab：切回列表中的下一个可用中控 */
+async function handleCloseCreatePlaceholder() {
+  if (hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再关闭");
+    return;
+  }
+  showCreatePlaceholder.value = false;
+  const fallback = existingMockList.value[0];
+  if (fallback) {
+    await activateExistingMock(fallback.connectId);
+  } else {
+    enterCreateMode();
+  }
+}
+
+onMounted(() => {
+  startRelativeTimeTicker();
+});
+
+onUnmounted(() => {
+  stopRelativeTimeTicker();
+});
+
+let skipFirstActivatedRefresh = true;
+onActivated(() => {
+  if (skipFirstActivatedRefresh) {
+    skipFirstActivatedRefresh = false;
+    return;
+  }
+  relativeTimeNow.value = Date.now();
+  void fetchExistingMockList();
+});
+
+void fetchExistingMockList();
 
 interface BatchAddFormData {
   env: string;
@@ -1201,6 +1508,10 @@ function validateBeforeCreate(): boolean {
 
 /** 创建 mock 连接：点击按钮时二次确认 */
 function handleCreate() {
+  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
+    message.warning("每人暂时最多 3 个在线模拟中控");
+    return;
+  }
   if (!validateBeforeCreate()) return;
   dialog.warning({
     title: "确认开始模拟",
@@ -1214,11 +1525,14 @@ function handleCreate() {
 }
 
 async function doCreate() {
+  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
+    message.warning("每人暂时最多 3 个在线模拟中控");
+    return;
+  }
   if (!validateBeforeCreate()) return;
   const useServer = formData.target_mode === "server";
   const server = formData.server?.trim() || "";
   const env = formData.env?.trim() || "";
-  warnIfPrevMockPossiblyActive();
   createLoading.value = true;
   createError.value = "";
   try {
@@ -1257,10 +1571,9 @@ async function doCreate() {
       return;
     }
     connectId.value = id;
-    setActiveMockFlag();
     rememberUpdateableFormSnapshot();
-    await fetchCmdAll();
     saveFormToStorage();
+    await fetchExistingMockList(id);
     message.success(`模拟中控成功`);
   } catch (e: any) {
     message.error("模拟中控请求失败");
@@ -1305,27 +1618,41 @@ async function handleUpdate() {
   }
 }
 
-/** 断开 mock 连接：无论接口成功或失败都重置连接与 cmd 状态 */
-async function handleDisconnect() {
-  if (!connectId.value) return;
+/** 停止指定连接并关闭对应 Tab。 */
+async function handleCloseExistingMock(targetConnectId: string) {
+  if (!targetConnectId || deleteLoading.value) return;
+  if (targetConnectId === connectId.value && hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再停止模拟");
+    return;
+  }
+  const closingIndex = existingMockList.value.findIndex(
+    (item) => item.connectId === targetConnectId,
+  );
+  const wasActive = connectId.value === targetConnectId;
   deleteLoading.value = true;
   try {
-    const res: any = await xiaoanEcuMockDeleteAPI({ connect_id: connectId.value });
-    if (checkResCode(res)) {
-      message.success(`已停止模拟`);
+    const res: any = await xiaoanEcuMockDeleteAPI({ connect_id: targetConnectId });
+    if (!checkResCode(res)) return;
+    message.success("已停止模拟");
+
+    const remainingList = existingMockList.value.filter(
+      (item) => item.connectId !== targetConnectId,
+    );
+    existingMockList.value = remainingList;
+    if (!wasActive) return;
+
+    const nextItem =
+      remainingList[closingIndex] ??
+      remainingList[Math.max(0, closingIndex - 1)] ??
+      null;
+    if (nextItem) {
+      await fetchExistingMockList(nextItem.connectId);
     } else {
-      // message.error("停止模拟请求失败");
+      enterCreateMode();
     }
   } catch (e: any) {
-    // message.error("断开失败");
+    message.error(e?.message || String(e) || "停止模拟失败");
   } finally {
-    connectId.value = "";
-    clearActiveMockFlag();
-    clearUpdateableFormSnapshot();
-    cmdMap.value = {};
-    cmdEntries.value = [];
-    cmdLoadDone.value = false;
-    moveRecordList.value = [];
     deleteLoading.value = false;
   }
 }
@@ -1333,11 +1660,13 @@ async function handleDisconnect() {
 /** 拉取所有 mock 命令数据 */
 async function fetchCmdAll() {
   if (!connectId.value) return;
+  const targetConnectId = connectId.value;
   cmdLoadDone.value = false;
   try {
     const res: any = await xiaoanEcuMockCmdAllAPI({
-      connect_id: connectId.value,
+      connect_id: targetConnectId,
     });
+    if (connectId.value !== targetConnectId) return;
     if (!checkResCode(res)) {
       cmdMap.value = {};
       syncCmdEntries();
@@ -1348,11 +1677,14 @@ async function fetchCmdAll() {
       data && typeof data === "object" && !Array.isArray(data) ? { ...data } : {};
     syncCmdEntries();
   } catch (e: any) {
+    if (connectId.value !== targetConnectId) return;
     message.error(e?.message || String(e) || "获取命令数据失败");
     cmdMap.value = {};
     syncCmdEntries();
   } finally {
-    cmdLoadDone.value = true;
+    if (connectId.value === targetConnectId) {
+      cmdLoadDone.value = true;
+    }
   }
 }
 
@@ -1726,6 +2058,38 @@ async function handleCloseTab(name: string) {
   }
 }
 
+function resetActiveSessionRuntime() {
+  createError.value = "";
+  clearUpdateableFormSnapshot();
+  cmdMap.value = {};
+  cmdEntries.value = [];
+  activeCmdTab.value = "";
+  cmdLoadDone.value = false;
+  moveRecordList.value = [];
+  consecutiveNorthCount.value = 0;
+  trackText.value = "";
+  addForm.cmd = "";
+  addForm.value = "";
+  moveForm.bearing = 0;
+  moveForm.distance = 100;
+  showNoChangeModal.value = false;
+  showMoveModal.value = false;
+  showBin5Modal.value = false;
+  showTrackModal.value = false;
+  showAddModal.value = false;
+}
+
+function hasPendingSessionOperation(): boolean {
+  return (
+    createLoading.value ||
+    updateLoading.value ||
+    deleteLoading.value ||
+    moveLoading.value ||
+    trackLoading.value ||
+    bin5Loading.value
+  );
+}
+
 </script>
 
 <style lang="less" scoped>
@@ -1736,6 +2100,170 @@ async function handleCloseTab(name: string) {
   :deep(.n-card) {
     padding: 16px;
   }
+}
+
+.existing-tabs-wrap {
+  margin-bottom: 8px;
+}
+
+.existing-tabs-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.add-mock-button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.mock-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 220px;
+  max-width: 100%;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.mock-tab:hover {
+  border-color: #d1d5db;
+}
+
+.mock-tab-active {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.mock-tab-placeholder {
+  border-style: dashed;
+  border-color: #86efac;
+  min-width: 200px;
+}
+
+.mock-status-dot-draft {
+  background: #d1d5db;
+}
+
+.mock-tab-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.mock-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.mock-status-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.mock-status-env {
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.mock-status-dot {
+  position: relative;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.mock-status-dot-running {
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  animation: mock-status-ripple 1.6s ease-out infinite;
+}
+
+.mock-status-dot-disconnected {
+  background: #ef4444;
+}
+
+@keyframes mock-status-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.mock-tab-imei-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mock-tab-imei {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mock-tab-copy-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: #9ca3af;
+}
+
+.mock-tab-copy-btn:hover {
+  color: #374151;
+}
+
+.mock-tab-time {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.mock-tab-close-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: #9ca3af;
+}
+
+.mock-tab-close-btn:hover {
+  color: #d03050;
 }
 
 /* 连接成功时：整卡绿色边框（无动画） */
