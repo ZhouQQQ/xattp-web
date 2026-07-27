@@ -222,7 +222,7 @@
             :data="filteredRows"
             :pagination="false"
             :bordered="false"
-            size="small"
+            size="medium"
             table-layout="fixed"
             :scroll-x="mrTableScrollX"
             :row-class-name="() => 'compact-row'"
@@ -308,7 +308,7 @@
                 :data="getItemMrRows(item)"
                 :pagination="false"
                 :bordered="true"
-                size="small"
+                size="medium"
                 :row-class-name="() => 'compact-row'"
                 :striped="true"
                 class="mr-table item-group-table"
@@ -376,15 +376,15 @@ const { message } = createDiscreteApi(['message']);
 // 常量
 const HISTORY_STORAGE_KEY = 'tapdReleaseHistory';
 const FILTER_STORAGE_KEY = 'tapdReleaseFilterState';
-const MR_COLUMN_WIDTH_STORAGE_KEY = 'tapdReleaseMrColumnWidths';
+const MR_COLUMN_WIDTH_STORAGE_KEY = 'tapdReleaseMrColumnWidths_v2';
 
 const DEFAULT_MR_COLUMN_WIDTHS = {
   type: 46,
-  title: 250,
+  title: 180,
   item_status: 88,
   mr_url: 250,
-  target_branch: 96,
-  author: 56,
+  target_branch: 140,
+  author: 88,
   merge_status: 116,
   mr_status: 88,
 };
@@ -750,22 +750,39 @@ const normalizeUrl = (url) => {
 };
 
 const renderTitleCell = (row) => {
-  return h('a', {
-    href: normalizeUrl(row.url),
-    target: '_blank',
-    class: 'title-link',
-    title: row.title,
-  }, row.title);
+  return h(NTooltip, { trigger: 'hover', keepAliveOnHover: false }, {
+    trigger: () => h('div', { class: 'cell-link-wrap' }, [
+      h(
+        'a',
+        {
+          href: normalizeUrl(row.url),
+          target: '_blank',
+          class: 'title-link',
+        },
+        row.title
+      ),
+    ]),
+    default: () => row.title,
+  });
 };
 
 const renderMrUrlCell = (row) => {
   if (row.noMr) return '';
-  return h('a', {
-    href: row.mr.url,
-    target: '_blank',
-    class: 'mr-link',
-    title: row.mr.url,
-  }, row.mr.url);
+  const url = row.mr.url;
+  return h(NTooltip, { trigger: 'hover', keepAliveOnHover: false, style: { maxWidth: '640px' } }, {
+    trigger: () => h('div', { class: 'cell-link-wrap cell-link-wrap--mr' }, [
+      h(
+        'a',
+        {
+          href: url,
+          target: '_blank',
+          class: 'mr-link',
+        },
+        [h('span', { class: 'mr-link-text' }, url)]
+      ),
+    ]),
+    default: () => url,
+  });
 };
 
 const getMrStatusPriority = (status) => {
@@ -1015,21 +1032,12 @@ const mrColumns = computed(() => [
     title: 'MR链接',
     key: 'mr_url',
     minWidth: 280,
-    render: (row) => {
-      if (!row.noMr) {
-        return h('a', {
-          href: row.mr.url,
-          target: '_blank',
-          class: 'mr-link',
-        }, row.mr.url);
-      }
-      return '';
-    },
+    render: renderMrUrlCell,
   },
   {
     title: '目标分支',
     key: 'target_branch',
-    width: 96,
+    width: 140,
     render: (row) => {
       if (!row.noMr) {
         return row.mr.target_branch || '-';
@@ -1040,7 +1048,7 @@ const mrColumns = computed(() => [
   {
     title: '提交人',
     key: 'author',
-    width: 56,
+    width: 88,
     ellipsis: { tooltip: true },
     render: (row) => {
       if (!row.noMr) {
@@ -1070,6 +1078,7 @@ const columns = computed(() => [
   {
     title: '类型',
     key: 'type',
+    fixed: 'left',
     ...mrResizableColumn('type', 40),
     align: 'center',
     render: (row) => {
@@ -1086,7 +1095,8 @@ const columns = computed(() => [
   {
     title: '标题',
     key: 'title',
-    ...mrResizableColumn('title', 120),
+    fixed: 'left',
+    ...mrResizableColumn('title', 100),
     render: renderTitleCell,
     sorter: (a, b) => compareRowField(a, b, r => r.title),
     sortOrder: getColumnSortOrder('title'),
@@ -1094,6 +1104,7 @@ const columns = computed(() => [
   {
     title: '状态',
     key: 'item_status',
+    fixed: 'left',
     ...mrResizableColumn('item_status', 60),
     align: 'center',
     render: (row) => {
@@ -1106,6 +1117,7 @@ const columns = computed(() => [
   {
     title: 'MR链接',
     key: 'mr_url',
+    fixed: 'left',
     ...mrResizableColumn('mr_url', 120),
     render: renderMrUrlCell,
     sorter: (a, b) => compareRowField(a, b, r => r.mr?.url),
@@ -1114,7 +1126,7 @@ const columns = computed(() => [
   {
     title: '目标分支',
     key: 'target_branch',
-    ...mrResizableColumn('target_branch', 72),
+    ...mrResizableColumn('target_branch', 100),
     render: (row) => {
       if (!row.noMr) {
         return row.mr.target_branch || '-';
@@ -1127,7 +1139,7 @@ const columns = computed(() => [
   {
     title: '提交人',
     key: 'author',
-    ...mrResizableColumn('author', 48),
+    ...mrResizableColumn('author', 64),
     ellipsis: { tooltip: true },
     render: (row) => {
       if (!row.noMr) {
@@ -1956,9 +1968,9 @@ watch(
     color: #333;
     font-weight: 600;
     cursor: pointer;
-    font-size: 11px;
-    line-height: 1.15;
-    padding: 2px 4px;
+    font-size: 13px;
+    line-height: 1.35;
+    padding: 6px 8px;
     white-space: nowrap;
     
     &:hover {
@@ -1967,9 +1979,9 @@ watch(
   }
   
   :deep(.n-data-table-td) {
-    padding: 1px 4px;
-    font-size: 11px;
-    line-height: 1.15;
+    padding: 6px 8px;
+    font-size: 13px;
+    line-height: 1.35;
     overflow: hidden;
     
     // 确保标题和MR链接列不换行
@@ -1981,19 +1993,19 @@ watch(
     }
   }
   
-  :deep(.n-data-table-tr:hover) {
-    background: #f0f7ff;
+  :deep(.n-data-table-tr:hover > .n-data-table-td) {
+    background: #e6f4ff !important;
   }
   
   :deep(.compact-row) {
-    height: 22px;
+    height: 32px;
   }
   
   :deep(.n-tag) {
-    font-size: 10px;
-    padding: 0 3px;
-    height: 16px;
-    line-height: 14px;
+    font-size: 12px;
+    padding: 0 6px;
+    height: 22px;
+    line-height: 20px;
   }
   
   // 确保tag颜色正确显示 - 使用多种选择器确保匹配
@@ -2087,44 +2099,78 @@ watch(
     width: 40px;
   }
   
-  :deep(.n-data-table-tr:nth-child(even)) {
+  :deep(.n-data-table-tr:nth-child(even) > .n-data-table-td) {
     background: #fafbfc;
   }
   
-  :deep(.n-data-table-tr:nth-child(even):hover) {
-    background: #f0f7ff;
+  :deep(.n-data-table-tr:nth-child(even):hover > .n-data-table-td) {
+    background: #e6f4ff !important;
   }
-}
 
-.title-link {
-  color: #1677ff;
-  text-decoration: underline;
-  font-size: 11px;
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
-
-  &:hover {
-    color: #1456c2;
+  // 固定列背景，避免横向滚动时透出下层内容
+  :deep(.n-data-table-td--fixed-left) {
+    background: #fff;
   }
-}
 
-.mr-link {
-  color: #1677ff;
-  text-decoration: underline;
-  font-size: 11px;
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
+  :deep(.n-data-table-th--fixed-left) {
+    background: #f6f8fa;
+  }
 
-  &:hover {
-    color: #1456c2;
+  :deep(.n-data-table-tr:nth-child(even) > .n-data-table-td--fixed-left) {
+    background: #fafbfc;
+  }
+
+  :deep(.n-data-table-tr:hover > .n-data-table-td--fixed-left) {
+    background: #e6f4ff !important;
+  }
+
+  :deep(.cell-link-wrap) {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  :deep(.title-link),
+  :deep(.mr-link),
+  :deep(a.title-link),
+  :deep(a.mr-link) {
+    color: #1677ff !important;
+    text-decoration: none !important;
+    text-decoration-line: none !important;
+    font-size: 13px;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    vertical-align: bottom;
+    box-shadow: none !important;
+    border-bottom: none !important;
+    background-image: none !important;
+
+    &:hover,
+    &:focus,
+    &:visited,
+    &:active {
+      color: #1456c2 !important;
+      text-decoration: none !important;
+      text-decoration-line: none !important;
+    }
+  }
+
+  :deep(.title-link) {
+    display: block;
+    text-overflow: ellipsis;
+  }
+
+  // MR 链接左侧省略，优先展示 URL 末尾
+  :deep(.mr-link) {
+    display: block;
+    direction: rtl;
+    text-align: left;
+    text-overflow: ellipsis;
+  }
+
+  :deep(.mr-link-text) {
+    direction: ltr;
+    unicode-bidi: bidi-override;
   }
 }
 
@@ -2169,5 +2215,23 @@ watch(
   .stat-label {
     font-size: 12px;
   }
+}
+</style>
+
+<style lang="less">
+/* 非 scoped：覆盖浏览器默认 a 下划线 */
+.release-merge-check .mr-table a.title-link,
+.release-merge-check .mr-table a.mr-link,
+.release-merge-check .mr-table a.title-link:hover,
+.release-merge-check .mr-table a.mr-link:hover,
+.release-merge-check .mr-table a.title-link:visited,
+.release-merge-check .mr-table a.mr-link:visited,
+.release-merge-check .mr-table a.title-link:active,
+.release-merge-check .mr-table a.mr-link:active,
+.release-merge-check .mr-table a.title-link:focus,
+.release-merge-check .mr-table a.mr-link:focus {
+  text-decoration: none !important;
+  text-decoration-line: none !important;
+  border-bottom: none !important;
 }
 </style>
