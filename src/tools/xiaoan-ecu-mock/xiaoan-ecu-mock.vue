@@ -42,7 +42,8 @@
             circle
             size="tiny"
             class="mock-tab-close-btn"
-            @click.stop="handleCloseExistingMock(item.connectId)"
+            title="删除模拟"
+            @click.stop="handleRemoveExistingMock(item.connectId)"
           >
             <template #icon>
               <n-icon :component="Trash" :size="12" />
@@ -149,7 +150,7 @@
                 <n-form-item label="IMEI" path="imei" required>
                   <div class="imei-field">
                     <div class="imei-row">
-                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 86 开头）" clearable size="small"
+                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 878787 开头）" clearable size="small"
                         :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
                       <n-tooltip trigger="hover">
                         <template #trigger>
@@ -344,7 +345,7 @@
               </template>
               <template v-else>
                 <n-space :size="8">
-                  <n-button type="error" :loading="deleteLoading" @click="handleCloseExistingMock(connectId)">
+                  <n-button type="error" :loading="deleteLoading" @click="handleStopExistingMock(connectId)">
                     <template #icon>
                       <n-icon :component="Trash" :size="18" />
                     </template>
@@ -1616,13 +1617,13 @@ function onTenantIdInput(v: string | null) {
   formData.tenant_id = next;
 }
 
-/** 生成 15 位数字、以 868686 开头的随机 IMEI */
+/** 生成 15 位数字、以 878787 开头的随机 IMEI */
 function randomImei() {
   let tail = "";
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 9; i++) {
     tail += Math.floor(Math.random() * 10);
   }
-  formData.imei = `86868686${tail}`;
+  formData.imei = `878787${tail}`;
 }
 
 function resetDefaultCoords() {
@@ -1791,22 +1792,50 @@ async function handleUpdate() {
   }
 }
 
-/** 停止指定连接并关闭对应 Tab。 */
-async function handleCloseExistingMock(targetConnectId: string) {
+/** 表单「停止模拟」：断开连接，保留 Tab，便于再次开始。 */
+async function handleStopExistingMock(targetConnectId: string) {
   if (!targetConnectId || deleteLoading.value) return;
   if (targetConnectId === connectId.value && hasPendingSessionOperation()) {
     message.warning("当前操作完成后再停止模拟");
     return;
   }
+  deleteLoading.value = true;
+  try {
+    const res: any = await xiaoanEcuMockDeleteAPI({
+      connect_id: targetConnectId,
+      hide: false,
+    });
+    if (!checkResCode(res)) return;
+    message.success("已停止模拟，可再次开始");
+    await fetchExistingMockList(targetConnectId);
+  } catch (e: any) {
+    message.error(e?.message || String(e) || "停止模拟失败");
+  } finally {
+    deleteLoading.value = false;
+  }
+}
+
+/** Tab 删除：停止并隐藏列表记录。 */
+async function handleRemoveExistingMock(targetConnectId: string) {
+  if (!targetConnectId || deleteLoading.value) return;
+  if (targetConnectId === connectId.value && hasPendingSessionOperation()) {
+    message.warning("当前操作完成后再删除模拟");
+    return;
+  }
   const closingIndex = existingMockList.value.findIndex(
     (item) => item.connectId === targetConnectId,
   );
-  const wasActive = connectId.value === targetConnectId;
+  const wasActive =
+    activeExistingMockConnectId.value === targetConnectId ||
+    connectId.value === targetConnectId;
   deleteLoading.value = true;
   try {
-    const res: any = await xiaoanEcuMockDeleteAPI({ connect_id: targetConnectId });
+    const res: any = await xiaoanEcuMockDeleteAPI({
+      connect_id: targetConnectId,
+      hide: true,
+    });
     if (!checkResCode(res)) return;
-    message.success("已停止模拟");
+    message.success("已删除模拟");
 
     const remainingList = existingMockList.value.filter(
       (item) => item.connectId !== targetConnectId,
@@ -1826,7 +1855,7 @@ async function handleCloseExistingMock(targetConnectId: string) {
       enterCreateMode();
     }
   } catch (e: any) {
-    message.error(e?.message || String(e) || "停止模拟失败");
+    message.error(e?.message || String(e) || "删除模拟失败");
   } finally {
     deleteLoading.value = false;
   }

@@ -254,6 +254,7 @@ export interface XiaoanEcuMockActiveItem {
   battery_soc?: number;
   version?: string;
   service_area_id?: string;
+  service_area_name?: string;
   car_id?: string;
   seat_locked?: boolean;
   power_exists?: boolean;
@@ -285,8 +286,8 @@ export function xiaoanEcuMockCmdSetAPI(data: {
   return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/cmd/set`, data);
 }
 
-/** 小安中控模拟：断开 mock 连接 */
-export function xiaoanEcuMockDeleteAPI(data: { connect_id: string }) {
+/** 小安中控模拟：断开 mock 连接；hide=true 从列表移除，hide=false 仅停止并保留 Tab */
+export function xiaoanEcuMockDeleteAPI(data: { connect_id: string; hide?: boolean }) {
   return AlovaInstance.Delete(`${BASE_PATH}/ecu/mock/delete`, data);
 }
 
