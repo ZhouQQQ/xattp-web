@@ -6,6 +6,7 @@ import { tool as jsonBeautify } from './json-beautify';
 import { tool as tenantGrayPlan } from './tenant-gray-plan';
 import { tool as rentalGetMeituanShopToken } from './rental-get-meituan-shop-token';
 import { tool as tenantDashboard } from './tenant-dashboard';
+import { tool as serviceStatusBoard } from './service-status-board';
 import { tool as xiaoanEcuMockBatch } from './xiaoan-ecu-mock-batch';
 import { tool as addTester } from './add-tester';
 import { tool as rentalCabinetMock } from './rental-cabinet-mock';
@@ -121,6 +122,7 @@ export const toolsByCategory: ToolCategory[] = [
             xiaoanEcuMock,
             tenantDashboard,
             tenantGrayPlan,
+            serviceStatusBoard,
             // mrDeployCheck,
         ],
     },

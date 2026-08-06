@@ -150,8 +150,9 @@
                 <n-form-item label="IMEI" path="imei" required>
                   <div class="imei-field">
                     <div class="imei-row">
-                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 878787 开头）" clearable size="small"
-                        :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
+                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 868686 开头）" clearable size="small"
+                        :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }"
+                        :maxlength="15" show-count />
                       <n-tooltip trigger="hover">
                         <template #trigger>
                           <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
@@ -1617,13 +1618,13 @@ function onTenantIdInput(v: string | null) {
   formData.tenant_id = next;
 }
 
-/** 生成 15 位数字、以 878787 开头的随机 IMEI */
+/** 生成 15 位数字、以 868686 开头的随机 IMEI */
 function randomImei() {
   let tail = "";
   for (let i = 0; i < 9; i++) {
     tail += Math.floor(Math.random() * 10);
   }
-  formData.imei = `878787${tail}`;
+  formData.imei = `868686${tail}`;
 }
 
 function resetDefaultCoords() {
@@ -1656,10 +1657,20 @@ function validateBeforeCreate(): boolean {
     return false;
   }
   const imei = formData.imei.trim();
-  const refImei = formData.ref_imei?.trim();
-  if (refImei && refImei === imei) {
-    message.error("参考IMEI不能和 IMEI 填一样");
+  if (!/^\d{15}$/.test(imei)) {
+    message.error("IMEI 必须是 15 位数字");
     return false;
+  }
+  const refImei = formData.ref_imei?.trim();
+  if (refImei) {
+    if (!/^\d{15}$/.test(refImei)) {
+      message.error("参考IMEI 必须是 15 位数字");
+      return false;
+    }
+    if (refImei === imei) {
+      message.error("参考IMEI不能和 IMEI 填一样");
+      return false;
+    }
   }
   resolveTlvPayload();
   return true;

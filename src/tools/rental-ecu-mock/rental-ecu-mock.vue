@@ -145,8 +145,9 @@
                 <n-form-item label="IMEI" path="imei" required>
                   <div class="imei-field">
                     <div class="imei-row">
-                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 878787 开头）" clearable size="small"
-                        :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }" />
+                      <n-input v-model:value="formData.imei" placeholder="IMEI（15 位数字，以 868686 开头）" clearable size="small"
+                        :readonly="!!connectId" :class="{ 'input-readonly-gray': connectId }"
+                        :maxlength="15" show-count />
                       <n-tooltip trigger="hover">
                         <template #trigger>
                           <n-button type="default" size="small" :disabled="!!connectId" @click="randomImei">
@@ -540,7 +541,7 @@
         <n-form-item label="IMEI" required>
           <n-input
             v-model:value="batchAddForm.imei"
-            placeholder="IMEI（15 位数字，以 878787 开头）"
+            placeholder="IMEI（15 位数字，以 868686 开头）"
             clearable
             :readonly="true"
             :class="{ 'input-readonly-gray': true }"
@@ -1191,13 +1192,13 @@ function syncCmdEntries() {
   }
 }
 
-/** 生成 15 位数字、以 878787 开头的随机 IMEI */
+/** 生成 15 位数字、以 868686 开头的随机 IMEI */
 function randomImei() {
   let tail = "";
   for (let i = 0; i < 9; i++) {
     tail += Math.floor(Math.random() * 10);
   }
-  formData.imei = `878787${tail}`;
+  formData.imei = `868686${tail}`;
 }
 
 function resetDefaultCoords() {
@@ -1492,8 +1493,13 @@ function validateBeforeCreate(): boolean {
   const useServer = formData.target_mode === "server";
   const server = formData.server?.trim() || "";
   const env = formData.env?.trim() || "";
-  if (!formData.imei?.trim()) {
+  const imei = formData.imei?.trim() || "";
+  if (!imei) {
     message.error("请填写 IMEI");
+    return false;
+  }
+  if (!/^\d{15}$/.test(imei)) {
+    message.error("IMEI 必须是 15 位数字");
     return false;
   }
   if (useServer && !server) {

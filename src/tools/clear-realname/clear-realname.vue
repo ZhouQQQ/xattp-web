@@ -73,7 +73,7 @@ const envOptions = [
   {
     label: "uat",
     value: "uat",
-    disabled: true
+    disabled: false
   }
 ];
 
