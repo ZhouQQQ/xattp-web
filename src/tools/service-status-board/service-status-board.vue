@@ -107,9 +107,14 @@
               <div
                 v-else-if="!panel.report || isEmptyInspection(panel.report)"
                 class="ssb-card-empty"
+                :class="{ warn: Boolean(String(panel.report?.error_msg || '').trim()) }"
               >
                 <div class="ssb-empty-inner">
-                  <n-icon :component="MoodEmpty" :size="32" class="ssb-empty-icon" />
+                  <n-icon
+                    :component="String(panel.report?.error_msg || '').trim() ? AlertTriangle : MoodEmpty"
+                    :size="32"
+                    class="ssb-empty-icon"
+                  />
                   <div>{{ emptyInspectionText(panel.report) }}</div>
                 </div>
               </div>
@@ -165,6 +170,7 @@
                               class="ssb-status-tag"
                               :class="statusClass(step.step_status)"
                             >
+                              <i class="ssb-status-dot" aria-hidden="true" />
                               {{ statusLabel(step.step_status) }}
                             </n-tag>
                           </template>
@@ -233,28 +239,37 @@
           <div v-if="expandedPanel.report" class="ssb-expand-metrics">
             <div class="ssb-expand-metric is-ok">
               <span class="ssb-expand-metric-num">{{ expandedPanel.report.success_count ?? 0 }}</span>
-              <span class="ssb-expand-metric-label">正常</span>
+              <span class="ssb-expand-metric-label">
+                <i class="ssb-status-dot" aria-hidden="true" />
+                正常
+              </span>
             </div>
             <div class="ssb-expand-metric is-fail">
               <span class="ssb-expand-metric-num">{{ expandedPanel.report.fail_count ?? 0 }}</span>
-              <span class="ssb-expand-metric-label">失败</span>
+              <span class="ssb-expand-metric-label">
+                <i class="ssb-status-dot" aria-hidden="true" />
+                失败
+              </span>
             </div>
             <div class="ssb-expand-metric is-skip">
               <span class="ssb-expand-metric-num">{{ expandedPanel.report.skip_count ?? 0 }}</span>
-              <span class="ssb-expand-metric-label">跳过</span>
+              <span class="ssb-expand-metric-label">
+                <i class="ssb-status-dot" aria-hidden="true" />
+                跳过
+              </span>
             </div>
             <div class="ssb-expand-metric is-unk">
               <span class="ssb-expand-metric-num">{{ expandedPanel.report.unknown_count ?? 0 }}</span>
-              <span class="ssb-expand-metric-label">未知</span>
+              <span class="ssb-expand-metric-label">
+                <i class="ssb-status-dot" aria-hidden="true" />
+                未知
+              </span>
             </div>
             <div class="ssb-expand-metric is-total">
               <span class="ssb-expand-metric-num">{{ expandedPanel.report.total_count ?? 0 }}</span>
               <span class="ssb-expand-metric-label">合计</span>
             </div>
           </div>
-        </div>
-        <div v-if="expandedPanel.report?.error_msg" class="ssb-expand-err">
-          {{ expandedPanel.report.error_msg }}
         </div>
 
         <div v-if="expandedPanel.error" class="ssb-card-empty err">
@@ -265,9 +280,14 @@
         <div
           v-else-if="!expandedPanel.report || isEmptyInspection(expandedPanel.report)"
           class="ssb-card-empty"
+          :class="{ warn: Boolean(String(expandedPanel.report?.error_msg || '').trim()) }"
         >
           <div class="ssb-empty-inner">
-            <n-icon :component="MoodEmpty" :size="36" class="ssb-empty-icon" />
+            <n-icon
+              :component="String(expandedPanel.report?.error_msg || '').trim() ? AlertTriangle : MoodEmpty"
+              :size="36"
+              class="ssb-empty-icon"
+            />
             <div>{{ emptyInspectionText(expandedPanel.report) }}</div>
           </div>
         </div>
@@ -322,6 +342,7 @@
                       class="ssb-status-tag"
                       :class="sceneToneClass(scene)"
                     >
+                      <i class="ssb-status-dot" aria-hidden="true" />
                       {{ sceneStatusLabel(scene) }}
                     </n-tag>
                   </div>
@@ -342,6 +363,7 @@
                           class="ssb-status-tag"
                           :class="statusClass(step.step_status)"
                         >
+                          <i class="ssb-status-dot" aria-hidden="true" />
                           {{ statusLabel(step.step_status) }}
                         </n-tag>
                       </div>
@@ -523,6 +545,8 @@ function emptyClients(): ClientGroup[] {
 }
 
 function isEmptyInspection(report: ServiceStatusReport) {
+  // 报告级异常时步骤 list 无意义，按空报告展示 error_msg
+  if (String(report.error_msg || '').trim()) return true;
   return (report.list || []).length === 0;
 }
 
@@ -1232,6 +1256,12 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.ssb-card-empty.warn {
+  color: var(--muted);
+  flex-direction: column;
+  gap: 8px;
+}
+
 .ssb-empty-inner {
   display: flex;
   flex-direction: column;
@@ -1248,6 +1278,11 @@ onUnmounted(() => {
 .ssb-card-empty.err .ssb-empty-icon {
   color: var(--fail);
   opacity: 0.8;
+}
+
+.ssb-card-empty.warn .ssb-empty-icon {
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 .ssb-card-hint {
@@ -1405,6 +1440,37 @@ onUnmounted(() => {
 .ssb-status-tag {
   flex-shrink: 0;
   transform-origin: center;
+
+  :deep(.n-tag__content) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+}
+
+.ssb-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+.ssb-status-tag.is-ok .ssb-status-dot {
+  background: var(--ok);
+}
+
+.ssb-status-tag.is-fail .ssb-status-dot {
+  background: var(--fail);
+}
+
+.ssb-status-tag.is-unk .ssb-status-dot {
+  background: var(--unk);
+}
+
+.ssb-status-tag.is-skip .ssb-status-dot {
+  background: var(--muted);
 }
 
 .ssb-status-tag.is-ok {
@@ -1593,10 +1659,18 @@ onUnmounted(() => {
 }
 
 .ssb-expand-metric-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   margin-top: 2px;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
+}
+
+.ssb-expand-metric-label .ssb-status-dot {
+  background: currentColor;
 }
 
 .ssb-expand-metric.is-ok {
