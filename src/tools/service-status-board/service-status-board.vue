@@ -437,12 +437,12 @@ type EnvDef = {
 };
 
 const ENV_DEFS: EnvDef[] = [
-  { env: 'prod2', label: '阿里云正式', shortLabel: '正式', cloud: 'aliyun' },
   { env: 'prod2-gray', label: '阿里云灰度组1', shortLabel: '灰度组1', cloud: 'aliyun' },
   { env: 'prod2-gray2', label: '阿里云灰度组2', shortLabel: '灰度组2', cloud: 'aliyun' },
-  { env: 'prod', label: '华为云正式', shortLabel: '正式', cloud: 'huawei' },
+  { env: 'prod2', label: '阿里云正式', shortLabel: '正式', cloud: 'aliyun' },
   { env: 'prod-gray', label: '华为云灰度组1', shortLabel: '灰度组1', cloud: 'huawei' },
   { env: 'prod-gray2', label: '华为云灰度组2', shortLabel: '灰度组2', cloud: 'huawei' },
+  { env: 'prod', label: '华为云正式', shortLabel: '正式', cloud: 'huawei' },
 ];
 
 const CLIENT_ORDER = [

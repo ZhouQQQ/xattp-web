@@ -5,6 +5,8 @@ export interface Tool {
   path: string
   description: string
   tag?: string
+  /** 工具页顶部提示文案（如内测说明），有值时展示 */
+  notice?: string
   keywords: string[]
   component: () => Promise<Component>
   icon: Component

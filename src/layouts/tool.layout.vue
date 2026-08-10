@@ -29,7 +29,10 @@ const i18nKey = computed<string>(() => route.path.trim().replace('/', ''));
 const toolTitle = computed<string>(() => t(`tools.${i18nKey.value}.title`, String(route.meta.name)));
 const toolDescription = computed<string>(() => t(`tools.${i18nKey.value}.description`, String(route.meta.description)));
 const toolTag = computed<string | undefined>(() => route.meta?.tag as string | undefined);
-const showInternalBetaNotice = computed<boolean>(() => toolTag.value === '内测');
+const toolNotice = computed<string | undefined>(() => {
+  const notice = route.meta?.notice;
+  return typeof notice === 'string' && notice.trim() ? notice.trim() : undefined;
+});
 </script>
 
 <template>
@@ -53,8 +56,8 @@ const showInternalBetaNotice = computed<boolean>(() => toolTag.value === '内测
         <div class="description">
           {{ toolDescription }}
         </div>
-        <n-alert v-if="showInternalBetaNotice" class="internal-beta-notice" type="warning" :show-icon="true">
-          内测中，可能会出现连接中断/不存在/数据异常等问题，不保证长期在线可用
+        <n-alert v-if="toolNotice" class="tool-notice" type="warning" :show-icon="true">
+          {{ toolNotice }}
         </n-alert>
       </div>
     </div>
@@ -109,7 +112,7 @@ const showInternalBetaNotice = computed<boolean>(() => toolTag.value === '内测
       opacity: 0.7;
     }
 
-    .internal-beta-notice {
+    .tool-notice {
       margin-top: 10px;
     }
   }

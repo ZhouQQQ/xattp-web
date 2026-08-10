@@ -532,12 +532,19 @@ function formatPanelCarShortLabel(sum: number): string {
   return s === "—" ? "—" : `${s}辆`;
 }
 
-type CopyPanelMenuKey = "copy-ids-comma" | "copy-ids-space" | "copy-id-name" | "copy-id-name-car" | "copy-id-name-car-env";
+type CopyPanelMenuKey =
+  | "copy-ids-comma"
+  | "copy-ids-space"
+  | "copy-ids-yml"
+  | "copy-id-name"
+  | "copy-id-name-car"
+  | "copy-id-name-car-env";
 
 function copyPanelMenuOptions(_panel: { title: string; items: TenantItem[] }) {
   return [
     { label: "仅租户ID（逗号）", key: "copy-ids-comma" as CopyPanelMenuKey },
     { label: "仅租户ID（空格）", key: "copy-ids-space" as CopyPanelMenuKey },
+    { label: "仅租户ID（YML 列表）", key: "copy-ids-yml" as CopyPanelMenuKey },
     { label: "租户ID 名称", key: "copy-id-name" as CopyPanelMenuKey },
     { label: "租户ID 名称 车辆数", key: "copy-id-name-car" as CopyPanelMenuKey },
     { label: "租户ID 名称 车辆数 环境", key: "copy-id-name-car-env" as CopyPanelMenuKey },
@@ -561,6 +568,21 @@ async function copyPanelTenantIdsSpace(panel: { title: string; items: TenantItem
   try {
     await navigator.clipboard.writeText(text);
     message.success(`已复制${panel.title}（空格分隔）`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
+async function copyPanelTenantIdsYml(panel: { title: string; items: TenantItem[] }) {
+  if (!panel.items || panel.items.length === 0) return;
+  const text = panel.items
+    .map((t) => String(t.tenantId ?? "").trim())
+    .filter(Boolean)
+    .map((id) => `- ${id}`)
+    .join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制${panel.title}（YML 列表）`);
   } catch {
     message.error("复制失败，请手动复制");
   }
@@ -614,6 +636,7 @@ async function copyPanelTenantsIdNameCarEnv(panel: { key: string; title: string;
 function handleCopyPanelMenuSelect(key: string, panel: { key: string; title: string; items: TenantItem[] }) {
   if (key === "copy-ids-comma") void copyPanelTenantIdsComma(panel);
   else if (key === "copy-ids-space") void copyPanelTenantIdsSpace(panel);
+  else if (key === "copy-ids-yml") void copyPanelTenantIdsYml(panel);
   else if (key === "copy-id-name") void copyPanelTenantsIdName(panel);
   else if (key === "copy-id-name-car") void copyPanelTenantsIdNameCar(panel);
   else if (key === "copy-id-name-car-env") void copyPanelTenantsIdNameCarEnv(panel);
