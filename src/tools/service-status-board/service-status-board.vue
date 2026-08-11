@@ -1,6 +1,40 @@
 <template>
   <div class="ssb" :class="{ 'is-fullscreen': isFullscreen }">
     <header class="ssb-top">
+      <div class="ssb-top-left">
+        <n-tooltip trigger="hover" placement="bottom" :disabled="searchOpen">
+          <template #trigger>
+            <button
+              type="button"
+              class="ssb-card-refresh ssb-search-toggle"
+              :class="{ 'is-active': searchOpen || Boolean(stepFilter.trim()) }"
+              @click="toggleStepSearch"
+            >
+              <n-icon :component="Search" :size="14" />
+            </button>
+          </template>
+          搜索步骤名 / 接口
+        </n-tooltip>
+        <div v-if="searchOpen" class="ssb-search-box">
+          <input
+            ref="stepSearchInputRef"
+            v-model="stepFilter"
+            class="ssb-search-input"
+            type="search"
+            placeholder="步骤名 / 接口路径"
+            @keydown.esc="closeStepSearch"
+          />
+          <button
+            v-if="stepFilter.trim()"
+            type="button"
+            class="ssb-card-refresh ssb-search-clear"
+            title="清空"
+            @click="clearStepFilter"
+          >
+            <n-icon :component="X" :size="12" />
+          </button>
+        </div>
+      </div>
       <div class="ssb-top-actions">
         <span v-if="lastRefreshText" class="ssb-refresh-text">上次刷新 {{ lastRefreshText }}</span>
         <button type="button" class="ssb-btn" :disabled="loading" @click="refreshAll">
@@ -29,7 +63,7 @@
                         class="ssb-card-status"
                         :class="panelToneClass(panel)"
                         :component="panelStatusIcon(panel)"
-                        :size="16"
+                        :size="14"
                       />
                       <h3 class="ssb-card-title">
                         <span class="ssb-card-cloud">{{ group.label }}</span>
@@ -65,7 +99,7 @@
                         :class="{ 'is-loading': isEnvRefreshing(panel.env) }"
                         @click.stop="refreshEnv(panel.env)"
                       >
-                        <n-icon :component="Refresh" :size="14" />
+                        <n-icon :component="Refresh" :size="12" />
                       </button>
                     </template>
                     拉取最新一次巡检结果（不触发）
@@ -79,7 +113,7 @@
                         :class="{ 'is-loading': isEnvRunning(panel.env) }"
                         @click.stop="runEnv(panel.env)"
                       >
-                        <n-icon :component="PlayerPlay" :size="14" />
+                        <n-icon :component="PlayerPlay" :size="12" />
                       </button>
                     </template>
                     触发巡检
@@ -91,7 +125,7 @@
                         class="ssb-card-refresh"
                         @click.stop="openExpand(panel.env)"
                       >
-                        <n-icon :component="ArrowsMaximize" :size="14" />
+                        <n-icon :component="ArrowsMaximize" :size="12" />
                       </button>
                     </template>
                     展开详情
@@ -131,17 +165,17 @@
                       class="ssb-col-status"
                       :class="clientToneClass(client)"
                       :component="clientStatusIcon(client)"
-                      :size="13"
+                      :size="11"
                     />
                     <span>{{ client.label }}</span>
                   </div>
                   <div class="ssb-col-list">
-                    <template v-if="client.steps.length === 0">
-                      <div class="ssb-col-empty">—</div>
+                    <template v-if="filteredSteps(client.steps).length === 0">
+                      <div class="ssb-col-empty">{{ stepFilter.trim() ? '无匹配' : '—' }}</div>
                     </template>
                     <template v-else>
                       <div
-                        v-for="(step, idx) in client.steps"
+                        v-for="(step, idx) in filteredSteps(client.steps)"
                         :key="`${step.step_name}-${idx}`"
                         class="ssb-scene"
                         :class="statusClass(step.step_status)"
@@ -163,7 +197,7 @@
                         >
                           <template #trigger>
                             <n-tag
-                              size="small"
+                              size="tiny"
                               round
                               :bordered="false"
                               :type="stepTagType(step.step_status)"
@@ -200,8 +234,16 @@
       <template #header>
         <div v-if="expandedPanel" class="ssb-expand-head">
           <div class="ssb-expand-title">
-            <span>{{ expandedPanel.label }}</span>
-            <span class="ssb-expand-env">{{ expandedPanel.env }}</span>
+            <n-icon
+              class="ssb-expand-title-icon"
+              :class="panelToneClass(expandedPanel)"
+              :component="panelStatusIcon(expandedPanel)"
+              :size="15"
+            />
+            <span class="ssb-expand-title-text">{{ expandedPanel.label }}</span>
+            <n-tag size="tiny" round :bordered="false" class="ssb-env-tag ssb-expand-env-tag">
+              {{ expandedPanel.env }}
+            </n-tag>
           </div>
           <div class="ssb-expand-actions">
             <span v-if="relativeTime(expandedPanel)" class="ssb-card-time">
@@ -214,7 +256,7 @@
               :class="{ 'is-loading': isEnvRefreshing(expandedPanel.env) }"
               @click="refreshEnv(expandedPanel.env)"
             >
-              <n-icon :component="Refresh" :size="16" />
+              <n-icon :component="Refresh" :size="13" />
             </button>
           </div>
         </div>
@@ -224,15 +266,15 @@
         <div class="ssb-expand-meta">
           <div class="ssb-expand-meta-info">
             <span v-if="absoluteTime(expandedPanel)" class="ssb-expand-chip">
-              <n-icon :component="Clock" :size="13" />
+              <n-icon :component="Clock" :size="11" />
               <span>{{ absoluteTime(expandedPanel) }}</span>
             </span>
             <span v-if="expandedPanel.report?.tenant_id" class="ssb-expand-chip">
-              <n-icon :component="Building" :size="13" />
+              <n-icon :component="Building" :size="11" />
               <span>租户 {{ expandedPanel.report.tenant_id }}</span>
             </span>
             <span v-if="expandedPanel.report?.report_id" class="ssb-expand-chip muted">
-              <n-icon :component="FileText" :size="13" />
+              <n-icon :component="FileText" :size="11" />
               <span>{{ expandedPanel.report.report_id }}</span>
             </span>
           </div>
@@ -273,7 +315,7 @@
         </div>
 
         <div v-if="expandedPanel.error" class="ssb-card-empty err">
-          <n-icon :component="AlertCircle" :size="28" class="ssb-empty-icon" />
+          <n-icon :component="AlertCircle" :size="24" class="ssb-empty-icon" />
           <div>拉取失败：{{ expandedPanel.error }}</div>
         </div>
 
@@ -285,7 +327,7 @@
           <div class="ssb-empty-inner">
             <n-icon
               :component="String(expandedPanel.report?.error_msg || '').trim() ? AlertTriangle : MoodEmpty"
-              :size="36"
+              :size="28"
               class="ssb-empty-icon"
             />
             <div>{{ emptyInspectionText(expandedPanel.report) }}</div>
@@ -305,7 +347,7 @@
                   class="ssb-col-status"
                   :class="clientToneClass(client)"
                   :component="clientStatusIcon(client)"
-                  :size="14"
+                  :size="12"
                 />
                 {{ client.label }}
               </span>
@@ -314,12 +356,12 @@
               </span>
             </div>
             <div class="ssb-col-list">
-              <template v-if="client.scenes.length === 0">
-                <div class="ssb-col-empty">—</div>
+              <template v-if="filteredScenes(client.scenes).length === 0">
+                <div class="ssb-col-empty">{{ stepFilter.trim() ? '无匹配' : '—' }}</div>
               </template>
               <template v-else>
                 <div
-                  v-for="scene in client.scenes"
+                  v-for="scene in filteredScenes(client.scenes)"
                   :key="scene.name"
                   class="ssb-expand-scene"
                   :class="sceneToneClass(scene)"
@@ -329,7 +371,7 @@
                       <n-icon
                         class="ssb-expand-scene-icon"
                         :component="sceneStatusIcon(scene)"
-                        :size="13"
+                        :size="12"
                       />
                       <span class="ssb-expand-scene-name">{{ scene.name }}</span>
                       <span class="ssb-expand-scene-count">{{ scene.passed }}/{{ scene.total }}</span>
@@ -378,7 +420,7 @@
                         v-if="isFailOrAbnormal(step) && step.errormsg"
                         class="ssb-expand-step-err"
                       >
-                        <n-icon :component="AlertCircle" :size="13" class="ssb-expand-step-err-icon" />
+                        <n-icon :component="AlertCircle" :size="12" class="ssb-expand-step-err-icon" />
                         <div class="ssb-expand-step-err-text">{{ step.errormsg }}</div>
                       </div>
                     </div>
@@ -394,9 +436,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useThemeVars, useMessage } from 'naive-ui';
-import { Refresh, MoodEmpty, AlertCircle, ArrowsMaximize, CircleCheck, AlertTriangle, CircleDashed, Clock, Building, FileText, PlayerPlay } from '@vicons/tabler';
+import { Refresh, MoodEmpty, AlertCircle, ArrowsMaximize, CircleCheck, AlertTriangle, CircleDashed, Clock, Building, FileText, PlayerPlay, Search, X } from '@vicons/tabler';
 import {
   service_status_list_api,
   service_status_run_api,
@@ -487,6 +529,9 @@ const refreshingEnvs = ref<Record<string, boolean>>({});
 const runningEnvs = ref<Record<string, boolean>>({});
 const expandVisible = ref(false);
 const expandedEnv = ref<string | null>(null);
+const searchOpen = ref(false);
+const stepFilter = ref('');
+const stepSearchInputRef = ref<HTMLInputElement | null>(null);
 
 const panelMap = ref<Record<string, PanelState>>(
   Object.fromEntries(
@@ -923,6 +968,57 @@ async function refreshAll() {
   }
 }
 
+function stepMatchesFilter(step: ServiceStatusStep) {
+  const q = stepFilter.value.trim().toLowerCase();
+  if (!q) return true;
+  const name = String(step.step_name || '').toLowerCase();
+  const api = String(step.api_path || '').toLowerCase();
+  return name.includes(q) || api.includes(q);
+}
+
+function filteredSteps(steps: ServiceStatusStep[]) {
+  if (!stepFilter.value.trim()) return steps;
+  return steps.filter(stepMatchesFilter);
+}
+
+function filteredScenes(scenes: SceneGroup[]) {
+  if (!stepFilter.value.trim()) return scenes;
+  return scenes
+    .map((scene) => {
+      const steps = filteredSteps(scene.steps);
+      if (steps.length === 0) return null;
+      return buildSceneGroup(scene.name, steps);
+    })
+    .filter((scene): scene is SceneGroup => Boolean(scene));
+}
+
+async function toggleStepSearch() {
+  if (searchOpen.value) {
+    if (!stepFilter.value.trim()) {
+      searchOpen.value = false;
+      return;
+    }
+    searchOpen.value = false;
+    return;
+  }
+  searchOpen.value = true;
+  await nextTick();
+  stepSearchInputRef.value?.focus();
+}
+
+function closeStepSearch() {
+  if (stepFilter.value.trim()) {
+    stepFilter.value = '';
+    return;
+  }
+  searchOpen.value = false;
+}
+
+function clearStepFilter() {
+  stepFilter.value = '';
+  nextTick(() => stepSearchInputRef.value?.focus());
+}
+
 function toggleFullscreen() {
   isFullscreen.value = !isFullscreen.value;
 }
@@ -992,16 +1088,71 @@ onUnmounted(() => {
 .ssb-top {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-bottom: 8px;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
   padding: 0;
+}
+
+.ssb-top-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ssb-search-toggle.is-active {
+  color: var(--primary);
+  background: var(--hover);
+}
+
+.ssb-search-box {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: min(360px, 52vw);
+  flex: 1 1 220px;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 80%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.ssb-search-input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1;
+
+  &::placeholder {
+    color: var(--muted);
+    opacity: 0.85;
+  }
+
+  &::-webkit-search-cancel-button {
+    display: none;
+  }
+}
+
+.ssb-search-clear {
+  width: 18px;
+  height: 18px;
 }
 
 .ssb-top-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .ssb-refresh-text {
@@ -1048,7 +1199,7 @@ onUnmounted(() => {
 .ssb-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1064,7 +1215,7 @@ onUnmounted(() => {
 .ssb-cloud-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 6px;
   flex: 1;
   min-height: 0;
   height: 100%;
@@ -1102,7 +1253,7 @@ onUnmounted(() => {
 
 .ssb-card-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
   display: inline-flex;
   align-items: baseline;
@@ -1117,7 +1268,10 @@ onUnmounted(() => {
 .ssb-env-tag {
   flex-shrink: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: 10px !important;
+  height: 16px !important;
+  line-height: 16px !important;
+  padding: 0 5px !important;
   color: var(--muted) !important;
   background: color-mix(in srgb, var(--line) 55%, transparent) !important;
 }
@@ -1127,8 +1281,8 @@ onUnmounted(() => {
   flex-direction: column;
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px 8px;
+  border-radius: 6px;
+  padding: 6px 8px 4px;
   height: 100%;
   min-height: 0;
   max-height: none;
@@ -1153,8 +1307,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 4px;
+  margin-bottom: 4px;
   padding-bottom: 0;
   border-bottom: 0;
   flex-shrink: 0;
@@ -1163,7 +1317,7 @@ onUnmounted(() => {
 .ssb-card-title-wrap {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1193,7 +1347,7 @@ onUnmounted(() => {
 }
 
 .ssb-card-time {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   white-space: nowrap;
   cursor: default;
@@ -1202,7 +1356,7 @@ onUnmounted(() => {
 .ssb-card-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
@@ -1210,8 +1364,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -1245,9 +1399,9 @@ onUnmounted(() => {
   justify-content: center;
   flex: 1;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
-  padding: 12px;
+  padding: 8px;
 }
 
 .ssb-card-empty.err {
@@ -1293,7 +1447,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
   flex: 1;
@@ -1304,13 +1458,13 @@ onUnmounted(() => {
 .ssb-col {
   flex: 1 1 0;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 4px 5px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 5px;
   background: transparent;
 }
 
@@ -1342,9 +1496,9 @@ onUnmounted(() => {
 .ssb-col-title {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  font-size: 11px;
+  gap: 3px;
+  margin-bottom: 2px;
+  font-size: 10px;
   font-weight: 650;
   color: var(--muted);
   text-align: left;
@@ -1376,9 +1530,9 @@ onUnmounted(() => {
 
 .ssb-col-empty {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   text-align: left;
-  padding: 4px 0;
+  padding: 2px 0;
   opacity: 0.7;
 }
 
@@ -1404,12 +1558,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   margin: 0;
-  padding: 5px 0;
+  padding: 2px 0;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 0;
   background: transparent;
   color: var(--text);
@@ -1432,26 +1586,30 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.25;
   color: var(--muted);
 }
 
 .ssb-status-tag {
   flex-shrink: 0;
   transform-origin: center;
+  height: 16px !important;
+  font-size: 10px !important;
+  line-height: 16px !important;
+  padding: 0 5px !important;
 
   :deep(.n-tag__content) {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 3px;
   }
 }
 
 .ssb-status-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
   background: currentColor;
@@ -1523,35 +1681,52 @@ onUnmounted(() => {
   --muted: v-bind(ssbMuted);
   --primary: v-bind(ssbPrimary);
   --hover: v-bind(ssbHover);
+  --ok: v-bind(ssbOk);
+  --fail: v-bind(ssbFail);
+  --unk: v-bind(ssbWarn);
 
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  padding-right: 8px;
+  padding-right: 4px;
   color: var(--text);
 }
 
 .ssb-expand-title {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
 }
 
-.ssb-expand-env {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
+.ssb-expand-title-icon {
+  flex-shrink: 0;
+
+  &.is-ok { color: var(--ok); }
+  &.is-fail { color: var(--fail); }
+  &.is-unk { color: var(--unk); }
+  &.is-muted { color: var(--muted); opacity: 0.75; }
+}
+
+.ssb-expand-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ssb-expand-env-tag {
+  margin-left: 2px;
 }
 
 .ssb-expand-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -1573,46 +1748,52 @@ onUnmounted(() => {
 
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  height: min(82vh, 900px);
-  min-height: 420px;
+  gap: 6px;
+  height: min(84vh, 920px);
+  min-height: 360px;
   color: var(--text);
 }
 
 .ssb-expand-meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px 16px;
+  gap: 6px 10px;
   flex-shrink: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--line) 22%, transparent);
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: 6px;
+  background:
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--primary) 6%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--line) 18%, transparent);
 }
 
 .ssb-expand-meta-info {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  flex: 1 1 240px;
+  flex: 1 1 220px;
 }
 
 .ssb-expand-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   max-width: 100%;
-  padding: 3px 8px;
+  padding: 2px 6px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text);
-  background: color-mix(in srgb, var(--card) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  line-height: 1.3;
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  line-height: 1.25;
 
   > span {
     min-width: 0;
@@ -1634,7 +1815,7 @@ onUnmounted(() => {
 .ssb-expand-metrics {
   display: flex;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
   flex: 0 0 auto;
 }
 
@@ -1643,16 +1824,16 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--card) 75%, transparent);
+  min-width: 44px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--card) 80%, transparent);
   border: 1px solid transparent;
-  line-height: 1.15;
+  line-height: 1.1;
 }
 
 .ssb-expand-metric-num {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text);
@@ -1662,20 +1843,22 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  margin-top: 2px;
-  font-size: 11px;
+  gap: 3px;
+  margin-top: 1px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--muted);
 }
 
 .ssb-expand-metric-label .ssb-status-dot {
+  width: 4px;
+  height: 4px;
   background: currentColor;
 }
 
 .ssb-expand-metric.is-ok {
-  background: color-mix(in srgb, var(--ok-bg) 75%, transparent);
-  border-color: color-mix(in srgb, var(--ok) 25%, transparent);
+  background: color-mix(in srgb, var(--ok-bg) 70%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 22%, transparent);
 
   .ssb-expand-metric-num,
   .ssb-expand-metric-label {
@@ -1684,8 +1867,8 @@ onUnmounted(() => {
 }
 
 .ssb-expand-metric.is-fail {
-  background: color-mix(in srgb, var(--fail-bg) 75%, transparent);
-  border-color: color-mix(in srgb, var(--fail) 25%, transparent);
+  background: color-mix(in srgb, var(--fail-bg) 70%, transparent);
+  border-color: color-mix(in srgb, var(--fail) 22%, transparent);
 
   .ssb-expand-metric-num,
   .ssb-expand-metric-label {
@@ -1694,8 +1877,8 @@ onUnmounted(() => {
 }
 
 .ssb-expand-metric.is-unk {
-  background: color-mix(in srgb, var(--unk-bg) 75%, transparent);
-  border-color: color-mix(in srgb, var(--unk) 25%, transparent);
+  background: color-mix(in srgb, var(--unk-bg) 70%, transparent);
+  border-color: color-mix(in srgb, var(--unk) 22%, transparent);
 
   .ssb-expand-metric-num,
   .ssb-expand-metric-label {
@@ -1704,8 +1887,8 @@ onUnmounted(() => {
 }
 
 .ssb-expand-metric.is-skip {
-  background: color-mix(in srgb, var(--line) 55%, transparent);
-  border-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+  border-color: color-mix(in srgb, var(--muted) 35%, transparent);
 
   .ssb-expand-metric-num,
   .ssb-expand-metric-label {
@@ -1714,38 +1897,38 @@ onUnmounted(() => {
 }
 
 .ssb-expand-metric.is-total {
-  background: color-mix(in srgb, var(--soft) 55%, transparent);
-  border-color: color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--soft) 45%, transparent);
+  border-color: color-mix(in srgb, var(--line) 75%, transparent);
 }
 
 .ssb-expand-err {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--fail);
   background: color-mix(in srgb, var(--fail-bg) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--fail) 35%, transparent);
-  border-radius: 6px;
-  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent);
+  border-radius: 5px;
+  padding: 4px 6px;
   flex-shrink: 0;
 }
 
 .ssb-expand-cols {
   flex: 1;
   min-height: 0;
-  gap: 10px;
+  gap: 5px;
 }
 
 .ssb-expand-col {
-  padding: 6px 8px;
+  padding: 4px 5px;
 }
 
 .ssb-expand-col-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 11px;
   font-weight: 650;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   color: var(--text);
   flex-shrink: 0;
 }
@@ -1753,15 +1936,16 @@ onUnmounted(() => {
 .ssb-expand-col-label {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
 .ssb-expand-col-stat {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--muted);
   font-style: normal;
+  font-variant-numeric: tabular-nums;
 
   em {
     font-style: normal;
@@ -1774,33 +1958,82 @@ onUnmounted(() => {
 
 .ssb-expand-scene {
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
-  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: 6px;
   background: var(--card);
   overflow: hidden;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--line) 35%, transparent);
 }
 
 .ssb-expand-scene:last-child {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.ssb-expand-scene.is-ok {
+  border-color: color-mix(in srgb, var(--ok) 28%, var(--line));
+}
+
+.ssb-expand-scene.is-fail {
+  border-color: color-mix(in srgb, var(--fail) 35%, var(--line));
+}
+
+.ssb-expand-scene.is-unk {
+  border-color: color-mix(in srgb, var(--unk) 32%, var(--line));
 }
 
 .ssb-expand-scene-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  padding: 7px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line));
-  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  padding: 4px 7px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 16%, var(--line));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary) 12%, transparent),
+      color-mix(in srgb, var(--primary) 4%, transparent) 48%,
+      transparent
+    );
+}
+
+.ssb-expand-scene.is-fail .ssb-expand-scene-head {
+  border-bottom-color: color-mix(in srgb, var(--fail) 18%, var(--line));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--fail) 10%, transparent),
+      transparent 55%
+    );
+}
+
+.ssb-expand-scene.is-unk .ssb-expand-scene-head {
+  border-bottom-color: color-mix(in srgb, var(--unk) 18%, var(--line));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--unk) 10%, transparent),
+      transparent 55%
+    );
+}
+
+.ssb-expand-scene.is-ok .ssb-expand-scene-head {
+  border-bottom-color: color-mix(in srgb, var(--ok) 16%, var(--line));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ok) 8%, transparent),
+      transparent 55%
+    );
 }
 
 .ssb-expand-scene-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1809,40 +2042,50 @@ onUnmounted(() => {
   color: var(--primary);
 }
 
+.ssb-expand-scene.is-ok .ssb-expand-scene-icon { color: var(--ok); }
+.ssb-expand-scene.is-fail .ssb-expand-scene-icon { color: var(--fail); }
+.ssb-expand-scene.is-unk .ssb-expand-scene-icon { color: var(--unk); }
+.ssb-expand-scene.is-skip .ssb-expand-scene-icon { color: var(--muted); }
+
 .ssb-expand-scene-name {
   min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--primary);
+  color: var(--text);
 }
 
 .ssb-expand-scene-count {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  color: color-mix(in srgb, var(--primary) 55%, var(--muted));
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
 .ssb-expand-scene-steps {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  background: color-mix(in srgb, var(--bg) 55%, var(--card));
+  gap: 4px;
+  padding: 5px;
+  background: color-mix(in srgb, var(--bg) 45%, var(--card));
 }
 
 .ssb-expand-step {
   position: relative;
-  padding: 6px 8px 6px 10px;
+  padding: 4px 6px 4px 8px;
   margin: 0;
-  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ssb-expand-step:hover {
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--line));
 }
 
 .ssb-expand-step::before {
@@ -1852,40 +2095,40 @@ onUnmounted(() => {
   top: 0;
   bottom: 0;
   width: 2px;
-  border-radius: 6px 0 0 6px;
+  border-radius: 5px 0 0 5px;
   background: color-mix(in srgb, var(--line) 70%, transparent);
 }
 
 .ssb-expand-step.is-ok {
-  background: color-mix(in srgb, var(--ok-bg) 55%, var(--card));
-  border-color: color-mix(in srgb, var(--line) 50%, transparent);
+  background: color-mix(in srgb, var(--ok-bg) 45%, var(--card));
+  border-color: color-mix(in srgb, var(--ok) 18%, var(--line));
 }
 
 .ssb-expand-step.is-ok::before {
-  background: color-mix(in srgb, var(--ok) 55%, var(--line));
+  background: color-mix(in srgb, var(--ok) 70%, var(--line));
 }
 
 .ssb-expand-step.is-fail {
-  background: color-mix(in srgb, var(--fail-bg) 60%, var(--card));
-  border-color: color-mix(in srgb, var(--line) 55%, transparent);
+  background: color-mix(in srgb, var(--fail-bg) 50%, var(--card));
+  border-color: color-mix(in srgb, var(--fail) 22%, var(--line));
 }
 
 .ssb-expand-step.is-fail::before {
-  background: color-mix(in srgb, var(--fail) 60%, var(--line));
+  background: color-mix(in srgb, var(--fail) 75%, var(--line));
 }
 
 .ssb-expand-step.is-unk {
-  background: color-mix(in srgb, var(--unk-bg) 60%, var(--card));
-  border-color: color-mix(in srgb, var(--line) 55%, transparent);
+  background: color-mix(in srgb, var(--unk-bg) 50%, var(--card));
+  border-color: color-mix(in srgb, var(--unk) 20%, var(--line));
 }
 
 .ssb-expand-step.is-unk::before {
-  background: color-mix(in srgb, var(--unk) 55%, var(--line));
+  background: color-mix(in srgb, var(--unk) 70%, var(--line));
 }
 
 .ssb-expand-step.is-skip {
-  background: color-mix(in srgb, var(--line) 30%, var(--card));
-  border-color: color-mix(in srgb, var(--line) 50%, transparent);
+  background: color-mix(in srgb, var(--line) 22%, var(--card));
+  border-color: color-mix(in srgb, var(--line) 55%, transparent);
 }
 
 .ssb-expand-step.is-skip::before {
@@ -1896,15 +2139,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  min-height: 18px;
+  gap: 4px;
+  min-height: 16px;
 }
 
 .ssb-expand-step-name {
   min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1915,33 +2158,34 @@ onUnmounted(() => {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 1px;
   min-width: 0;
 }
 
 .ssb-expand-step-api {
   min-width: 0;
   flex: 1;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   word-break: break-all;
-  line-height: 1.3;
+  line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  opacity: 0.9;
 }
 
 .ssb-expand-step-err {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
-  margin-top: 5px;
-  padding: 6px 8px;
-  border-radius: 5px;
-  border: 1px solid color-mix(in srgb, var(--fail) 28%, var(--line));
-  background: color-mix(in srgb, var(--fail-bg) 70%, var(--card));
+  gap: 4px;
+  margin-top: 3px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--fail) 24%, var(--line));
+  background: color-mix(in srgb, var(--fail-bg) 65%, var(--card));
   color: var(--fail);
 }
 
@@ -1955,8 +2199,8 @@ onUnmounted(() => {
 .ssb-expand-step-err-text {
   min-width: 0;
   flex: 1;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.4;
   word-break: break-word;
   white-space: pre-wrap;
 }
@@ -1965,7 +2209,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   font-size: 10px;
   color: var(--muted);
-  opacity: 0.85;
+  opacity: 0.8;
   white-space: nowrap;
 }
 
@@ -1981,10 +2225,10 @@ onUnmounted(() => {
 }
 
 .ssb-expand-modal .n-card-header {
-  padding: 12px 16px 6px !important;
+  padding: 8px 12px 4px !important;
 }
 
 .ssb-expand-modal .n-card__content {
-  padding: 4px 16px 12px !important;
+  padding: 2px 12px 10px !important;
 }
 </style>
