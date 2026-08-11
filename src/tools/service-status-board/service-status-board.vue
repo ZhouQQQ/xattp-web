@@ -445,6 +445,7 @@ import {
   type ServiceStatusReport,
   type ServiceStatusStep,
 } from '@/api/service-status';
+import { use_log_report_api } from '@/api/use-log';
 import { useAppTheme } from '@/ui/theme/themes';
 
 const themeVars = useThemeVars();
@@ -1024,6 +1025,7 @@ function toggleFullscreen() {
 }
 
 onMounted(() => {
+  void use_log_report_api({ type: 'WATCH_SERVICE_STATUS' }).catch(() => undefined);
   refreshAll();
   pollTimer = setInterval(refreshAll, POLL_MS);
   tickTimer = setInterval(() => {
