@@ -22,6 +22,7 @@ import { tool as textToSpeech } from './text-to-speech';
 import { tool as rentalSwitch } from './rental-switch';
 import { tool as ebikeSwitch } from './ebike-switch';
 import { tool as overseaSwitch } from './oversea-switch';
+import { tool as overseaEcuMock } from './oversea-ecu-mock';
 import { tool as emailNormalizer } from './email-normalizer';
 
 import { tool as asciiTextDrawer } from './ascii-text-drawer';
@@ -132,7 +133,7 @@ export const toolsByCategory: ToolCategory[] = [
     },
     {
         name: 'Oversea-Business',
-        components: [overseaSwitch],
+        components: [overseaSwitch, overseaEcuMock],
     },
     // {
     //     name: 'Business',

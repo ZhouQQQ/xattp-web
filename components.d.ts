@@ -188,6 +188,7 @@ declare module 'vue' {
     NumeronymGenerator: typeof import('./src/tools/numeronym-generator/numeronym-generator.vue')['default']
     OauthCallback: typeof import('./src/views/OauthCallback.vue')['default']
     OtpCodeGeneratorAndValidator: typeof import('./src/tools/otp-code-generator-and-validator/otp-code-generator-and-validator.vue')['default']
+    OverseaEcuMock: typeof import('./src/tools/oversea-ecu-mock/oversea-ecu-mock.vue')['default']
     OverseaSwitch: typeof import('./src/tools/oversea-switch/oversea-switch.vue')['default']
     PasswordStrengthAnalyser: typeof import('./src/tools/password-strength-analyser/password-strength-analyser.vue')['default']
     PdfSignatureChecker: typeof import('./src/tools/pdf-signature-checker/pdf-signature-checker.vue')['default']

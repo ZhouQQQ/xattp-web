@@ -10,5 +10,5 @@ export const tool = defineTool({
     component: () => import('./service-status-board.vue'),
     icon: DeviceDesktopAnalytics,
     createdAt: new Date('2026-08-05'),
-    allowUsers:["15072314455"]
+    // allowUsers:["15072314455"]
 });
