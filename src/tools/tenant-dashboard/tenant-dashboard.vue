@@ -20,6 +20,8 @@
                 <n-checkbox value="prod2">阿里云(prod2)</n-checkbox>
               </n-space>
             </n-checkbox-group>
+            <n-select v-model:value="grayTypeFilter" size="small" :options="grayTypeFilterOptions"
+              class="gray-type-filter-select" :consistent-menu-width="false" />
             <div class="refresh-merged">
               <n-dropdown trigger="click" :options="refreshMenuOptions" @select="handleRefreshMenuSelect">
                 <n-button size="small" class="refresh-dropdown-btn refresh-merged-trigger" quaternary
@@ -155,10 +157,23 @@
                             </span>
                           </n-tag>
                         </span>
-                        <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(row.tenant.env).color"
-                          :title="envTagOf(row.tenant.env).cloud || undefined">
-                          {{ envTagDisplayText(row.tenant.env, panel.key) }}
-                        </n-tag>
+                        <span class="tenant-env-cell">
+                          <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(row.tenant.env).color"
+                            :title="envTagOf(row.tenant.env).cloud || undefined">
+                            {{ envTagDisplayText(row.tenant.env, panel.key) }}
+                          </n-tag>
+                        </span>
+                        <span class="tenant-gray-type-cell">
+                          <n-tooltip v-if="row.grayTypeTag" trigger="hover" placement="top">
+                            <template #trigger>
+                              <n-tag size="small" :bordered="true" class="tenant-gray-type-tag"
+                                :color="row.grayTypeTag.color">
+                                {{ row.grayTypeTag.text }}
+                              </n-tag>
+                            </template>
+                            <div class="tenant-level-tooltip">{{ row.grayTypeTag.detail }}</div>
+                          </n-tooltip>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -212,10 +227,12 @@ import { tenant_all_api, tenant_gray_api } from "@/api/business";
 import {
   normalizeGrayList,
   normalizeTenantList,
+  resolveGrayTypeTag,
   resolveTenantCarLevel,
   resolveTenantEnvTag,
   type TenantCarLevelMeta,
   type TenantGrayItem,
+  type TenantGrayTypeTagMeta,
   type TenantItem,
 } from "./tenant-dashboard.service";
 
@@ -256,12 +273,14 @@ function panelPageSlice(items: TenantItem[], panelKey: string): TenantItem[] {
 type TenantPanelRow = {
   tenant: TenantItem;
   carLevel: TenantCarLevelMeta | null;
+  grayTypeTag: TenantGrayTypeTagMeta | null;
 };
 
 function panelPageRows(items: TenantItem[], panelKey: string): TenantPanelRow[] {
   return panelPageSlice(items, panelKey).map((tenant) => ({
     tenant,
     carLevel: resolveTenantCarLevel(tenant.carTotal),
+    grayTypeTag: resolveGrayTypeTag(grayMap.value.get(tenant.tenantId)?.grayType),
   }));
 }
 
@@ -286,6 +305,14 @@ const panelSortOptions: Array<{ label: string; value: string }> = [
 /** 灰度组1 / 灰度组2 / 正式 共用同一套排序 */
 const globalPanelSortSpec = ref<string>("carTotal|desc");
 const grayEnvFilters = ref<Array<"prod" | "prod2">>(["prod", "prod2"]);
+type GrayTypeFilter = "all" | "1" | "2" | "3";
+const grayTypeFilter = ref<GrayTypeFilter>("all");
+const grayTypeFilterOptions: Array<{ label: string; value: GrayTypeFilter }> = [
+  { label: "全部加灰策略", value: "all" },
+  { label: "全量加灰", value: "1" },
+  { label: "B端加灰", value: "2" },
+  { label: "B端自主加灰", value: "3" },
+];
 const carFilterOp = ref<"lt" | "gte">("gte");
 const carFilterOpOptions: Array<{ label: string; value: "lt" | "gte" }> = [
   { label: "≥", value: "gte" },
@@ -363,9 +390,15 @@ function tenantMatchesEnvFilter(tenant: TenantItem): boolean {
   return grayEnvFilters.value.includes(envTag as "prod" | "prod2");
 }
 
-/** 搜索/车辆筛选后，再按华为云、阿里云勾选过滤 */
+function tenantMatchesGrayTypeFilter(tenant: TenantItem): boolean {
+  if (grayTypeFilter.value === "all") return true;
+  const grayType = grayMap.value.get(tenant.tenantId)?.grayType;
+  return String(grayType ?? "") === grayTypeFilter.value;
+}
+
+/** 搜索/车辆筛选后，再按华为云、阿里云勾选与加灰策略过滤 */
 const envFilteredTenants = computed(() =>
-  filteredTenants.value.filter(tenantMatchesEnvFilter),
+  filteredTenants.value.filter((tenant) => tenantMatchesEnvFilter(tenant) && tenantMatchesGrayTypeFilter(tenant)),
 );
 
 const metaCarTotal = computed(() => panelCarSum(envFilteredTenants.value));
@@ -469,6 +502,8 @@ watch(carFilterThreshold, resetAllPanelPages);
 
 watch(grayEnvFilters, resetAllPanelPages, { deep: true });
 
+watch(grayTypeFilter, resetAllPanelPages);
+
 watch(globalPanelSortSpec, resetAllPanelPages);
 
 const lastGrayAtText = computed(() => (lastGrayAt.value ? new Date(lastGrayAt.value).toLocaleString() : "-"));
@@ -538,7 +573,8 @@ type CopyPanelMenuKey =
   | "copy-ids-yml"
   | "copy-id-name"
   | "copy-id-name-car"
-  | "copy-id-name-car-env";
+  | "copy-id-name-car-env"
+  | "copy-id-name-car-env-gray";
 
 function copyPanelMenuOptions(_panel: { title: string; items: TenantItem[] }) {
   return [
@@ -548,6 +584,7 @@ function copyPanelMenuOptions(_panel: { title: string; items: TenantItem[] }) {
     { label: "租户ID 名称", key: "copy-id-name" as CopyPanelMenuKey },
     { label: "租户ID 名称 车辆数", key: "copy-id-name-car" as CopyPanelMenuKey },
     { label: "租户ID 名称 车辆数 环境", key: "copy-id-name-car-env" as CopyPanelMenuKey },
+    { label: "租户ID 名称 车辆数 环境 加灰策略", key: "copy-id-name-car-env-gray" as CopyPanelMenuKey },
   ];
 }
 
@@ -633,6 +670,26 @@ async function copyPanelTenantsIdNameCarEnv(panel: { key: string; title: string;
   }
 }
 
+function grayStrategyText(tenantId: string): string {
+  return resolveGrayTypeTag(grayMap.value.get(tenantId)?.grayType)?.detail || "-";
+}
+
+async function copyPanelTenantsIdNameCarEnvGray(panel: { key: string; title: string; items: TenantItem[] }) {
+  if (!panel.items || panel.items.length === 0) return;
+  const text = panel.items
+    .map(
+      (tenant) =>
+        `${tenant.tenantId} ${tenant.tenantName || "-"} ${formatYesterdayCarTotal(tenant.carTotal)} ${envTagDisplayText(tenant.env, panel.key)} ${grayStrategyText(tenant.tenantId)}`,
+    )
+    .join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`已复制${panel.title}（ID、名称、车辆数、环境、加灰策略）`);
+  } catch {
+    message.error("复制失败，请手动复制");
+  }
+}
+
 function handleCopyPanelMenuSelect(key: string, panel: { key: string; title: string; items: TenantItem[] }) {
   if (key === "copy-ids-comma") void copyPanelTenantIdsComma(panel);
   else if (key === "copy-ids-space") void copyPanelTenantIdsSpace(panel);
@@ -640,6 +697,7 @@ function handleCopyPanelMenuSelect(key: string, panel: { key: string; title: str
   else if (key === "copy-id-name") void copyPanelTenantsIdName(panel);
   else if (key === "copy-id-name-car") void copyPanelTenantsIdNameCar(panel);
   else if (key === "copy-id-name-car-env") void copyPanelTenantsIdNameCarEnv(panel);
+  else if (key === "copy-id-name-car-env-gray") void copyPanelTenantsIdNameCarEnvGray(panel);
 }
 
 async function copyText(text: string, label: string) {
@@ -939,7 +997,9 @@ onScopeDispose(() => {
 
 <style lang="less" scoped>
 .tenant-dashboard {
-  width: min(1650px, 100%);
+  width: 85%;
+  max-width: 92%;
+  flex: 1 1 100%;
   box-sizing: border-box;
   min-height: 800px;
   display: flex;
@@ -1071,6 +1131,23 @@ onScopeDispose(() => {
   gap: 8px;
   flex-wrap: nowrap;
   margin-left: auto;
+}
+
+.gray-type-filter-select {
+  width: 132px;
+  flex-shrink: 0;
+}
+
+.gray-type-filter-select :deep(.n-base-selection) {
+  --n-height: 34px;
+  --n-border-radius: 8px;
+  height: 34px;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.gray-type-filter-select :deep(.n-base-selection-label) {
+  height: 34px;
 }
 
 .poll-select {
@@ -1474,9 +1551,9 @@ onScopeDispose(() => {
 
 .tenant-line {
   display: grid;
-  /* ID、名称、等级+车辆合并 tag、环境 */
+  /* ID、名称、等级+车辆合并 tag、环境、灰度类型 */
   grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-car-level, 64px)
-    var(--tenant-col-env, 84px);
+    var(--tenant-col-env, 84px) var(--tenant-col-gray-type, 36px);
   align-items: center;
   column-gap: 3px;
   font-size: 11px;
@@ -1586,8 +1663,24 @@ onScopeDispose(() => {
   white-space: nowrap;
 }
 
-.tenant-line :deep(.tenant-env-tag) {
+.tenant-env-cell {
   grid-column: 4;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.tenant-gray-type-cell {
+  grid-column: 5;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.tenant-line :deep(.tenant-env-tag),
+.tenant-line :deep(.tenant-gray-type-tag) {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -1596,12 +1689,24 @@ onScopeDispose(() => {
   height: 17px;
   font-size: 11px;
   line-height: 15px;
-  padding: 0 5px;
+  padding: 0 4px;
 }
 
-.tenant-line :deep(.tenant-env-tag .n-tag__content) {
+.tenant-line :deep(.tenant-gray-type-tag) {
+  cursor: default;
+}
+
+.tenant-line :deep(.tenant-env-tag .n-tag__content),
+.tenant-line :deep(.tenant-gray-type-tag .n-tag__content) {
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
+}
+
+.tenant-gray-type-cell :deep(.n-tooltip) {
+  display: block;
+  width: 100%;
 }
 
 .copyable {

@@ -179,37 +179,20 @@
                         :key="`${step.step_name}-${idx}`"
                         class="ssb-scene"
                         :class="statusClass(step.step_status)"
+                        v-memo="[step.step_status, step.step_name, step.api_path, step.errormsg]"
                       >
-                        <n-tooltip
-                          trigger="hover"
-                          placement="top"
-                          :disabled="!step.api_path"
+                        <span
+                          class="ssb-scene-name"
+                          :title="step.api_path || undefined"
+                        >{{ step.step_name || '未命名步骤' }}</span>
+                        <span
+                          class="ssb-status-tag"
+                          :class="statusClass(step.step_status)"
+                          :title="isFailOrAbnormal(step) && step.errormsg ? String(step.errormsg) : undefined"
                         >
-                          <template #trigger>
-                            <span class="ssb-scene-name">{{ step.step_name || '未命名步骤' }}</span>
-                          </template>
-                          <div class="ssb-tip">{{ step.api_path }}</div>
-                        </n-tooltip>
-                        <n-tooltip
-                          trigger="hover"
-                          placement="top"
-                          :disabled="!(isFailOrAbnormal(step) && step.errormsg)"
-                        >
-                          <template #trigger>
-                            <n-tag
-                              size="tiny"
-                              round
-                              :bordered="false"
-                              :type="stepTagType(step.step_status)"
-                              class="ssb-status-tag"
-                              :class="statusClass(step.step_status)"
-                            >
-                              <i class="ssb-status-dot" aria-hidden="true" />
-                              {{ statusLabel(step.step_status) }}
-                            </n-tag>
-                          </template>
-                          <div class="ssb-tip tip-err">{{ step.errormsg }}</div>
-                        </n-tooltip>
+                          <i class="ssb-status-dot" aria-hidden="true" />
+                          {{ statusLabel(step.step_status) }}
+                        </span>
                       </div>
                     </template>
                   </div>
@@ -436,7 +419,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, markRaw, nextTick, onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { useThemeVars, useMessage } from 'naive-ui';
 import { Refresh, MoodEmpty, AlertCircle, ArrowsMaximize, CircleCheck, AlertTriangle, CircleDashed, Clock, Building, FileText, PlayerPlay, Search, X } from '@vicons/tabler';
 import {
@@ -534,14 +517,14 @@ const searchOpen = ref(false);
 const stepFilter = ref('');
 const stepSearchInputRef = ref<HTMLInputElement | null>(null);
 
-const panelMap = ref<Record<string, PanelState>>(
+const panelMap = shallowRef<Record<string, PanelState>>(
   Object.fromEntries(
     ENV_DEFS.map((item) => [
       item.env,
       {
         ...item,
         report: null,
-        clients: emptyClients(),
+        clients: markRaw(emptyClients()),
         error: '',
       } satisfies PanelState,
     ]),
@@ -913,6 +896,17 @@ async function runEnv(env: string) {
   }
 }
 
+function patchPanel(env: string, patch: Partial<Pick<PanelState, 'report' | 'clients' | 'error'>>) {
+  const prev = panelMap.value[env];
+  const next: PanelState = {
+    ...prev,
+    ...patch,
+    clients: markRaw(patch.clients ?? prev.clients),
+    report: patch.report === undefined ? prev.report : (patch.report ? markRaw(patch.report) : null),
+  };
+  panelMap.value = { ...panelMap.value, [env]: next };
+}
+
 async function fetchEnv(env: string) {
   try {
     const resp: any = await service_status_list_api({
@@ -921,28 +915,26 @@ async function fetchEnv(env: string) {
       latest: LATEST,
     });
     if (resp?.code !== 0 && resp?.code !== '0') {
-      panelMap.value[env] = {
-        ...panelMap.value[env],
+      patchPanel(env, {
         report: null,
         clients: emptyClients(),
         error: resp?.msg || '接口返回异常',
-      };
+      });
       return;
     }
     const report = (resp?.data || null) as ServiceStatusReport | null;
-    panelMap.value[env] = {
-      ...panelMap.value[env],
+    const list = report?.list || [];
+    patchPanel(env, {
       report,
-      clients: groupByClient(report?.list || []),
+      clients: report && !isEmptyInspection(report) ? groupByClient(list) : emptyClients(),
       error: '',
-    };
+    });
   } catch (e: any) {
-    panelMap.value[env] = {
-      ...panelMap.value[env],
+    patchPanel(env, {
       report: null,
       clients: emptyClients(),
       error: e?.message || '网络异常',
-    };
+    });
   }
 }
 
@@ -1573,6 +1565,8 @@ onUnmounted(() => {
   text-align: left;
   font: inherit;
   min-height: 0;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 22px;
 }
 
 .ssb-scene:last-child {
@@ -1606,6 +1600,36 @@ onUnmounted(() => {
     align-items: center;
     gap: 3px;
   }
+}
+
+.ssb-scene .ssb-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.ssb-scene .ssb-status-tag.is-ok {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.ssb-scene .ssb-status-tag.is-fail {
+  color: var(--fail);
+  background: var(--fail-bg);
+}
+
+.ssb-scene .ssb-status-tag.is-unk {
+  color: var(--unk);
+  background: var(--unk-bg);
+}
+
+.ssb-scene .ssb-status-tag.is-skip {
+  color: var(--muted);
+  background: var(--soft);
 }
 
 .ssb-status-dot {

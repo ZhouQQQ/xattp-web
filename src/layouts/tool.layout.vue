@@ -33,11 +33,12 @@ const toolNotice = computed<string | undefined>(() => {
   const notice = route.meta?.notice;
   return typeof notice === 'string' && notice.trim() ? notice.trim() : undefined;
 });
+const isWideTool = computed(() => route.path === '/tenant-dashboard');
 </script>
 
 <template>
   <BaseLayout>
-    <div class="tool-layout">
+    <div class="tool-layout" :class="{ 'is-wide': isWideTool }">
       <div class="tool-header">
         <div flex flex-nowrap items-center justify-between>
           <n-h1 flex items-center gap-10px>
@@ -86,6 +87,14 @@ const toolNotice = computed<string | undefined>(() => {
   max-width: 80%;
   margin: 0 auto;
   box-sizing: border-box;
+
+  &.is-wide {
+    max-width: 100%;
+
+    .tool-content ::v-deep(& > *) {
+      flex: 1 1 100%;
+    }
+  }
 
   .tool-header {
     padding: 18px 0;

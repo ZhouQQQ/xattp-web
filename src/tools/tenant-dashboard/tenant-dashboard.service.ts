@@ -26,6 +26,58 @@ export interface TenantGrayItem {
   tenantId: string;
   grayGroup?: number;
   canGray?: boolean;
+  /** 1 全量加厚 / 2 B端加灰 / 3 B端自主加灰 */
+  grayType?: 1 | 2 | 3;
+}
+
+function pickGrayType(raw: unknown): 1 | 2 | 3 | undefined {
+  const n = Number(raw);
+  if (n === 1 || n === 2 || n === 3) return n;
+  return undefined;
+}
+
+export interface TenantGrayTypeTagMeta {
+  type: 1 | 2 | 3;
+  text: string;
+  detail: string;
+  color: {
+    color: string;
+    textColor: string;
+    borderColor: string;
+  };
+}
+
+const GRAY_TYPE_TAG_COLOR = {
+  color: "#fafafa",
+  textColor: "#71717a",
+  borderColor: "#e4e4e7",
+} as const;
+
+const GRAY_TYPE_TAG: Record<1 | 2 | 3, TenantGrayTypeTagMeta> = {
+  1: {
+    type: 1,
+    text: "全量",
+    detail: "全量加灰",
+    color: GRAY_TYPE_TAG_COLOR,
+  },
+  2: {
+    type: 2,
+    text: "B端",
+    detail: "B端加灰",
+    color: GRAY_TYPE_TAG_COLOR,
+  },
+  3: {
+    type: 3,
+    text: "自主",
+    detail: "B端自主加灰",
+    color: GRAY_TYPE_TAG_COLOR,
+  },
+};
+
+export function resolveGrayTypeTag(grayType?: number | string | null): TenantGrayTypeTagMeta | null {
+  const n = Number(grayType);
+  if (n === 1 || n === 2 || n === 3) return GRAY_TYPE_TAG[n];
+  return null;
 }
 
 export interface TenantEnvTagMeta {
@@ -72,6 +124,7 @@ export function normalizeGrayList(raw: unknown): TenantGrayItem[] {
         beta: Boolean(row.beta),
         canGray: Boolean(row.canGray),
         grayGroup: Number(row.grayGroup),
+        grayType: pickGrayType(row.grayType ?? row.gray_type),
         tenantId,
       } as TenantGrayItem;
     })
