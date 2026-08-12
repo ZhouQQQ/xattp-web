@@ -67,6 +67,17 @@
                                   :title="envTagOf(t.env).cloud || undefined">
                                   {{ envLabel(t) }}
                                 </n-tag>
+                                <span class="tenant-gray-type-cell">
+                                  <n-tooltip v-if="grayTypeTagOf(t)" trigger="hover" placement="top">
+                                    <template #trigger>
+                                      <n-tag size="small" :bordered="true" class="tenant-gray-type-tag"
+                                        :color="grayTypeTagOf(t)?.color">
+                                        {{ grayTypeTagOf(t)?.text }}
+                                      </n-tag>
+                                    </template>
+                                    <div class="tenant-level-tooltip">{{ grayTypeTagOf(t)?.detail }}</div>
+                                  </n-tooltip>
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -203,6 +214,7 @@ import { tenant_all_api, tenant_gray_ai_api, tenant_gray_api } from "@/api/busin
 import {
   normalizeGrayList,
   normalizeTenantList,
+  resolveGrayTypeTag,
   resolveTenantEnvTag,
   type TenantGrayItem,
   type TenantItem,
@@ -417,6 +429,10 @@ function envLabel(t: TenantItem): string {
 
 function envTagOf(env?: string | number) {
   return resolveTenantEnvTag(env);
+}
+
+function grayTypeTagOf(t: TenantItem) {
+  return resolveGrayTypeTag(grayMap.value.get(t.tenantId)?.grayType);
 }
 
 function formatYesterdayCarTotal(value: TenantItem["carTotal"]): string {
@@ -1104,8 +1120,9 @@ async function runAiGrayPlan() {
 
 .td-mirror-panel .tenant-line {
   display: grid;
+  /* ID、名称、车辆数、环境、灰度策略 */
   grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-ebike, 58px)
-    var(--tenant-col-env, 84px);
+    var(--tenant-col-env, 84px) var(--tenant-col-gray-type, 36px);
   align-items: center;
   column-gap: 3px;
   font-size: 11px;
@@ -1207,6 +1224,44 @@ async function runAiGrayPlan() {
 .td-mirror-panel .tenant-line :deep(.tenant-env-tag .n-tag__content) {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.td-mirror-panel .tenant-gray-type-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.td-mirror-panel .tenant-gray-type-cell :deep(.n-tooltip) {
+  display: block;
+  width: 100%;
+}
+
+.td-mirror-panel .tenant-line :deep(.tenant-gray-type-tag) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  margin-left: 0;
+  height: 17px;
+  font-size: 11px;
+  line-height: 15px;
+  padding: 0;
+  cursor: default;
+}
+
+.td-mirror-panel .tenant-line :deep(.tenant-gray-type-tag .n-tag__content) {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.tenant-level-tooltip {
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: nowrap;
 }
 
 .plan-foot-hint {

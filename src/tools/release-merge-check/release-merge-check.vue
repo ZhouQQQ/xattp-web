@@ -291,6 +291,16 @@
                 >
                   {{ item.status }}
                 </n-tag>
+                <n-tag
+                  v-for="(part, labelIndex) in getItemLabelParts(item.label)"
+                  :key="labelIndex"
+                  size="tiny"
+                  bordered
+                  class="item-group-label-tag tag-fixed-center"
+                  :title="part"
+                >
+                  {{ part }}
+                </n-tag>
               </div>
               <span
                 class="item-group-meta"
@@ -382,6 +392,7 @@ const DEFAULT_MR_COLUMN_WIDTHS = {
   type: 46,
   title: 180,
   item_status: 88,
+  item_label: 180,
   mr_url: 250,
   target_branch: 140,
   author: 88,
@@ -612,6 +623,7 @@ const processedRows = computed(() => {
           title: item.title,
           url: item.url,
           itemStatus: item.status,
+          itemLabel: item.label,
           mr,
           noMr: false,
         });
@@ -622,6 +634,7 @@ const processedRows = computed(() => {
         title: item.title,
         url: item.url,
         itemStatus: item.status,
+        itemLabel: item.label,
         mr: null,
         noMr: true,
       });
@@ -970,6 +983,36 @@ const renderFixedCenterTag = (label, options = {}) => {
   );
 };
 
+const getItemLabelParts = (label) => {
+  if (!label) return [];
+  return String(label)
+    .split('|')
+    .map(part => part.trim())
+    .filter(Boolean);
+};
+
+const renderItemLabelCell = (row) => {
+  const parts = getItemLabelParts(row.itemLabel);
+  if (parts.length === 0) return '-';
+  return h(
+    'div',
+    { class: 'item-label-tags' },
+    parts.map((part, index) =>
+      h(
+        NTag,
+        {
+          key: index,
+          size: 'small',
+          bordered: true,
+          class: 'item-label-tag',
+          title: part,
+        },
+        { default: () => part }
+      )
+    )
+  );
+};
+
 const renderItemStatusTag = (status) => {
   return h(
     NTag,
@@ -1113,6 +1156,14 @@ const columns = computed(() => [
     },
     sorter: (a, b) => compareRowField(a, b, r => r.itemStatus),
     sortOrder: getColumnSortOrder('item_status'),
+  },
+  {
+    title: '标签',
+    key: 'item_label',
+    ...mrResizableColumn('item_label', 60),
+    render: renderItemLabelCell,
+    sorter: (a, b) => compareRowField(a, b, r => r.itemLabel),
+    sortOrder: getColumnSortOrder('item_label'),
   },
   {
     title: 'MR链接',
@@ -1805,6 +1856,24 @@ watch(
   font-weight: 400;
 }
 
+.item-label-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.item-label-tag,
+:deep(.n-tag.item-label-tag) {
+  max-width: 120px;
+  background-color: #fff !important;
+  color: #722ed1 !important;
+  border: 1px solid #d3adf7 !important;
+  font-weight: 400;
+  font-size: 11px !important;
+  height: 20px !important;
+  line-height: 18px !important;
+}
+
 .merge-status-tag,
 :deep(.n-tag.merge-status-tag) {
   padding-left: 8px !important;
@@ -1866,6 +1935,16 @@ watch(
   flex-shrink: 0;
   transform: scale(0.82);
   transform-origin: left center;
+}
+
+.item-group-label-tag {
+  flex-shrink: 0;
+  transform: scale(0.75);
+  transform-origin: left center;
+  background-color: #fff !important;
+  color: #722ed1 !important;
+  border: 1px solid #d3adf7 !important;
+  font-weight: 400;
 }
 
 .item-group-title {
