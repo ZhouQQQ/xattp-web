@@ -96,11 +96,13 @@ describe("tenant-gray-plan.service", () => {
         customerName: "X",
         carTotalDisplay: "10",
         currentEnv: "prod",
+        currentGrayStrategy: "-",
         plannedGrayAt: at,
+        grayStrategy: "全量加灰",
       },
     ]);
     expect(tsv.split("\n")[0]).not.toContain("租户ID");
-    expect(tsv).toBe(`1\tX\t10\tprod\t${at}`);
+    expect(tsv).toBe(`1\tX\t10\tprod\t-\t${at}\t全量加灰`);
   });
 
   it("planRowsToTsv includes header when includeHeader is true", () => {
@@ -112,13 +114,17 @@ describe("tenant-gray-plan.service", () => {
           customerName: "X",
           carTotalDisplay: "10",
           currentEnv: "prod",
+          currentGrayStrategy: "B端自主加灰",
           plannedGrayAt: at,
+          grayStrategy: "B端加灰",
         },
       ],
       { includeHeader: true },
     );
     expect(tsv.split("\n")[0]).toContain("租户ID");
-    expect(tsv).toContain(`1\tX\t10\tprod\t${at}`);
+    expect(tsv.split("\n")[0]).toContain("当前灰度策略");
+    expect(tsv.split("\n")[0]).toContain("本次灰度策略");
+    expect(tsv).toContain(`1\tX\t10\tprod\tB端自主加灰\t${at}\tB端加灰`);
   });
 
   it("parseImportedPlanTimeCell parses new and old suffix formats", () => {
@@ -132,14 +138,33 @@ describe("tenant-gray-plan.service", () => {
 
   it("parseImportedPlanTsvText parses sample lines and skips header", () => {
     const line =
-      "3161\t佛铁电单车+\t177\tprod2-gray1\t2026-05-01 10:38（周五上午）";
-    const header = "租户ID\t租户名称\t车辆数\t当前所在环境\t计划灰度时间";
+      "3161\t佛铁电单车+\t177\tprod2-gray1\t全量加灰\t2026-05-01 10:38（周五上午）\tB端加灰";
+    const header = "租户ID\t租户名称\t车辆数\t当前所在环境\t当前灰度策略\t计划灰度时间\t本次灰度策略";
     const { rows, lineErrors } = parseImportedPlanTsvText(`${header}\n${line}\n`);
     expect(lineErrors).toHaveLength(0);
     expect(rows).toHaveLength(1);
     expect(rows[0].tenantId).toBe("3161");
     expect(rows[0].customerName).toBe("佛铁电单车+");
+    expect(rows[0].currentGrayStrategyRaw).toBe("全量加灰");
     expect(rows[0].plannedAtMs).toBe(new Date(2026, 4, 1, 10, 38, 0, 0).getTime());
+    expect(rows[0].grayType).toBe(2);
+  });
+
+  it("parseImportedPlanTsvText supports legacy 6-column lines", () => {
+    const line = "3161\t佛铁电单车+\t177\tprod2-gray1\t2026-05-01 10:38（周五上午）\tB端";
+    const { rows, lineErrors } = parseImportedPlanTsvText(line);
+    expect(lineErrors).toHaveLength(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].currentGrayStrategyRaw).toBe("");
+    expect(rows[0].grayType).toBe(2);
+  });
+
+  it("parseImportedPlanTsvText supports legacy 5-column lines", () => {
+    const line = "3161\t佛铁电单车+\t177\tprod2-gray1\t2026-05-01 10:38（周五上午）";
+    const { rows, lineErrors } = parseImportedPlanTsvText(line);
+    expect(lineErrors).toHaveLength(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].grayType).toBeNull();
   });
 
   it("dedupeImportedPlanLinesLastWins keeps last row per tenant", () => {
@@ -148,16 +173,22 @@ describe("tenant-gray-plan.service", () => {
       customerName: "a",
       carTotalDisplay: "1",
       currentEnv: "prod",
+      currentGrayStrategyRaw: "",
       plannedGrayAtRaw: "2026-01-01 10:00（周四上午）",
       plannedAtMs: parseImportedPlanTimeCell("2026-01-01 10:00（周四上午）"),
+      grayStrategyRaw: "",
+      grayType: null,
     };
     const b = {
       tenantId: "1",
       customerName: "b",
       carTotalDisplay: "2",
       currentEnv: "prod",
+      currentGrayStrategyRaw: "",
       plannedGrayAtRaw: "2026-01-02 11:00（周五上午）",
       plannedAtMs: parseImportedPlanTimeCell("2026-01-02 11:00（周五上午）"),
+      grayStrategyRaw: "",
+      grayType: null,
     };
     const out = dedupeImportedPlanLinesLastWins([a, b]);
     expect(out).toHaveLength(1);

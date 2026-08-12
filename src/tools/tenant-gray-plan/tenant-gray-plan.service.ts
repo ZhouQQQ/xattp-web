@@ -1,5 +1,5 @@
 import type { TenantGrayItem, TenantItem } from "../tenant-dashboard/tenant-dashboard.service";
-import { resolveTenantEnvTag } from "../tenant-dashboard/tenant-dashboard.service";
+import { resolveGrayTypeTag, resolveTenantEnvTag } from "../tenant-dashboard/tenant-dashboard.service";
 
 export type GrayPanelKey = "gray-1" | "gray-2" | "formal";
 
@@ -38,7 +38,13 @@ export interface PlanRow {
   customerName: string;
   carTotalDisplay: string;
   currentEnv: string;
+  currentGrayStrategy: string;
   plannedGrayAt: string;
+  grayStrategy: string;
+}
+
+export function grayStrategyTextOf(grayType?: number | string | null): string {
+  return resolveGrayTypeTag(grayType)?.detail ?? "-";
 }
 
 export function compareCarTotalAsc(a: TenantItem, b: TenantItem): number {
@@ -88,13 +94,18 @@ export function formatPlanLocalDateTime(ms: number): string {
 export const DEFAULT_PLAN_STEP_MS = 30 * 60 * 1000;
 
 export function buildGrayPlanRows(
-  items: Array<{ tenant: TenantItem; panelKey: GrayPanelKey }>,
+  items: Array<{
+    tenant: TenantItem;
+    panelKey: GrayPanelKey;
+    grayType?: number | null;
+    currentGrayType?: number | null;
+  }>,
   firstPlanMs: number,
   stepMs: number = DEFAULT_PLAN_STEP_MS,
 ): PlanRow[] {
   const sorted = [...items].sort((x, y) => compareCarTotalAsc(x.tenant, y.tenant));
   let t = firstPlanMs;
-  return sorted.map(({ tenant, panelKey }) => {
+  return sorted.map(({ tenant, panelKey, grayType, currentGrayType }) => {
     const car =
       tenant.carTotal != null && Number.isFinite(Number(tenant.carTotal)) ? String(tenant.carTotal) : "-";
     const row: PlanRow = {
@@ -102,19 +113,37 @@ export function buildGrayPlanRows(
       customerName: tenant.tenantName?.trim() || "-",
       carTotalDisplay: car,
       currentEnv: envLabelForGrayPanel(tenant.env, panelKey),
+      currentGrayStrategy: grayStrategyTextOf(currentGrayType),
       plannedGrayAt: formatPlanLocalDateTime(t),
+      grayStrategy: grayStrategyTextOf(grayType),
     };
     t += stepMs;
     return row;
   });
 }
 
-const TSV_HEADER = ["租户ID", "租户名称", "车辆数", "当前所在环境", "计划灰度时间"].join("\t");
+const TSV_HEADER = [
+  "租户ID",
+  "租户名称",
+  "车辆数",
+  "当前所在环境",
+  "当前灰度策略",
+  "计划灰度时间",
+  "本次灰度策略",
+].join("\t");
 
 export function planRowsToTsv(rows: readonly PlanRow[], options?: { includeHeader?: boolean }): string {
   const includeHeader = options?.includeHeader === true;
   const dataLines = rows.map((r) =>
-    [r.tenantId, r.customerName, r.carTotalDisplay, r.currentEnv, r.plannedGrayAt].join("\t"),
+    [
+      r.tenantId,
+      r.customerName,
+      r.carTotalDisplay,
+      r.currentEnv,
+      r.currentGrayStrategy,
+      r.plannedGrayAt,
+      r.grayStrategy,
+    ].join("\t"),
   );
   const lines = includeHeader ? [TSV_HEADER, ...dataLines] : dataLines;
   return lines.join("\n");
@@ -126,10 +155,22 @@ export function csvEscapeCell(value: string): string {
 }
 
 export function planRowsToCsv(rows: readonly PlanRow[]): string {
-  const header = ["租户ID", "租户名称", "车辆数", "当前所在环境", "计划灰度时间"].map(csvEscapeCell).join(",");
+  const header = ["租户ID", "租户名称", "车辆数", "当前所在环境", "当前灰度策略", "计划灰度时间", "本次灰度策略"]
+    .map(csvEscapeCell)
+    .join(",");
   const body = rows
     .map((r) =>
-      [r.tenantId, r.customerName, r.carTotalDisplay, r.currentEnv, r.plannedGrayAt].map(csvEscapeCell).join(","),
+      [
+        r.tenantId,
+        r.customerName,
+        r.carTotalDisplay,
+        r.currentEnv,
+        r.currentGrayStrategy,
+        r.plannedGrayAt,
+        r.grayStrategy,
+      ]
+        .map(csvEscapeCell)
+        .join(","),
     )
     .join("\r\n");
   return `${header}\r\n${body}`;
@@ -174,9 +215,28 @@ export interface ImportedPlanLine {
   customerName: string;
   carTotalDisplay: string;
   currentEnv: string;
+  currentGrayStrategyRaw: string;
   plannedGrayAtRaw: string;
   /** 解析成功为毫秒时间戳；无法解析时间为 `null`（仍可按租户导入） */
   plannedAtMs: number | null;
+  grayStrategyRaw: string;
+  /** 全量=1 / B端=2 / 自主=3；无法识别为 `null` */
+  grayType: 1 | 2 | 3 | null;
+}
+
+const GRAY_STRATEGY_TEXTS = ["全量", "B端", "自主", "全量加灰", "B端加灰", "B端自主加灰"] as const;
+
+/** 复制时未加灰的租户当前灰度策略为 `-`，导入识别时同样视为合法策略列 */
+function isGrayStrategyCell(s: string): boolean {
+  return s === "" || s === "-" || (GRAY_STRATEGY_TEXTS as readonly string[]).includes(s);
+}
+
+export function parseGrayStrategyText(raw: string): 1 | 2 | 3 | null {
+  const s = raw.trim();
+  if (s === "全量" || s === "全量加灰") return 1;
+  if (s === "B端" || s === "B端加灰") return 2;
+  if (s === "自主" || s === "B端自主加灰") return 3;
+  return null;
 }
 
 export interface PlanImportLineError {
@@ -185,21 +245,49 @@ export interface PlanImportLineError {
   message: string;
 }
 
-/** 将一行按制表符拆成 5 列；名称列内若含 `\t` 则合并中间段为名称 */
+/**
+ * 将一行按制表符拆成 7 列（租户ID、租户名称、车辆数、当前所在环境、当前灰度策略、计划灰度时间、本次灰度策略）。
+ * 兼容旧 6 列（无当前灰度策略）与旧 5 列格式（缺失列补空串）；名称列内若含 `\t` 则合并中间段为名称。
+ */
 export function splitPlanImportColumns(line: string): string[] | null {
   const parts = line.split("\t");
   if (parts.length < 5) return null;
-  if (parts.length === 5) return parts.map((p) => p.trim());
+  if (parts.length === 5) return [...parts.map((p) => p.trim()), "", ""];
+  const last = parts[parts.length - 1].trim();
+  const secondLast = parts[parts.length - 2].trim();
+  const thirdLast = parts[parts.length - 3].trim();
+  const timeParsable = parseImportedPlanTimeCell(secondLast) != null;
+  const looksLikeSevenColumns = timeParsable && isGrayStrategyCell(last) && isGrayStrategyCell(thirdLast);
+  if (looksLikeSevenColumns) {
+    if (parts.length === 7) return parts.map((p) => p.trim());
+    const id = parts[0].trim();
+    const name = parts.slice(1, parts.length - 5).join("\t").trim();
+    const car = parts[parts.length - 5].trim();
+    const env = parts[parts.length - 4].trim();
+    return [id, name, car, env, thirdLast, secondLast, last];
+  }
+  const looksLikeSixColumns = timeParsable && isGrayStrategyCell(last);
+  if (looksLikeSixColumns) {
+    if (parts.length === 6) {
+      const [id, name, car, env, time, strategy] = parts.map((p) => p.trim());
+      return [id, name, car, env, "", time, strategy];
+    }
+    const id = parts[0].trim();
+    const name = parts.slice(1, parts.length - 4).join("\t").trim();
+    const car = parts[parts.length - 4].trim();
+    const env = parts[parts.length - 3].trim();
+    return [id, name, car, env, "", secondLast, last];
+  }
   const id = parts[0].trim();
   const time = parts[parts.length - 1].trim();
   const env = parts[parts.length - 2].trim();
   const car = parts[parts.length - 3].trim();
   const name = parts.slice(1, parts.length - 3).join("\t").trim();
-  return [id, name, car, env, time];
+  return [id, name, car, env, "", time, ""];
 }
 
 /**
- * 解析待灰度计划粘贴文本（与 `planRowsToTsv` 数据行一致：制表符分隔五列）。
+ * 解析待灰度计划粘贴文本（与 `planRowsToTsv` 数据行一致：制表符分隔七列，兼容旧六列、五列）。
  * 自动去 BOM；跳过空行；首列为 `租户ID` 的表头行会跳过。
  */
 export function parseImportedPlanTsvText(raw: string): {
@@ -220,12 +308,21 @@ export function parseImportedPlanTsvText(raw: string): {
       lineErrors.push({
         lineNo,
         line: trimmed,
-        message: "列数不足（需制表符分隔的 5 列：租户ID、租户名称、车辆数、当前所在环境、计划灰度时间）",
+        message:
+          "列数不足（需制表符分隔的 7 列：租户ID、租户名称、车辆数、当前所在环境、当前灰度策略、计划灰度时间、本次灰度策略）",
       });
       continue;
     }
     if (isPlanImportHeaderRow(cols)) continue;
-    const [tenantId, customerName, carTotalDisplay, currentEnv, plannedGrayAtRaw] = cols;
+    const [
+      tenantId,
+      customerName,
+      carTotalDisplay,
+      currentEnv,
+      currentGrayStrategyRaw,
+      plannedGrayAtRaw,
+      grayStrategyRaw,
+    ] = cols;
     if (!tenantId) {
       lineErrors.push({ lineNo, line: trimmed, message: "租户ID 为空" });
       continue;
@@ -236,8 +333,11 @@ export function parseImportedPlanTsvText(raw: string): {
       customerName,
       carTotalDisplay,
       currentEnv,
+      currentGrayStrategyRaw,
       plannedGrayAtRaw,
       plannedAtMs,
+      grayStrategyRaw,
+      grayType: parseGrayStrategyText(grayStrategyRaw),
     });
   }
   return { rows, lineErrors };

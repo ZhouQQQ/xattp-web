@@ -56,13 +56,29 @@
                                     {{ t.tenantName || "-" }}
                                   </span>
                                 </span>
-                                <n-tag size="small" :bordered="true" class="tenant-ebike-tag" title="昨日车辆数"
-                                  :color="ebikeCountTagColor">
-                                  <span class="tenant-ebike-tag-inner">
-                                    <n-icon :component="ScooterElectric" class="tenant-ebike-icon" />
-                                    <span class="tenant-ebike-num">{{ formatYesterdayCarTotal(t.carTotal) }}</span>
-                                  </span>
-                                </n-tag>
+                                <span class="tenant-car-level-cell">
+                                  <n-tooltip v-if="carLevelOf(t)" trigger="hover" placement="top">
+                                    <template #trigger>
+                                      <n-tag size="small" :bordered="true" class="tenant-car-level-tag"
+                                        :color="ebikeCountTagColor" title="昨日车辆数">
+                                        <span class="tenant-car-level-inner">
+                                          <span class="tenant-car-level-letter"
+                                            :style="{ color: carLevelOf(t)?.color.textColor }">{{ carLevelOf(t)?.level }}</span>
+                                          <span class="tenant-car-level-num">{{ formatYesterdayCarTotal(t.carTotal) }}</span>
+                                        </span>
+                                      </n-tag>
+                                    </template>
+                                    <div class="tenant-level-tooltip">
+                                      {{ carLevelOf(t)?.level }} 级：{{ carLevelOf(t)?.definition }}
+                                    </div>
+                                  </n-tooltip>
+                                  <n-tag v-else size="small" :bordered="true" class="tenant-car-level-tag"
+                                    :color="ebikeCountTagColor" title="昨日车辆数">
+                                    <span class="tenant-car-level-inner tenant-car-level-inner-only-num">
+                                      <span class="tenant-car-level-num">{{ formatYesterdayCarTotal(t.carTotal) }}</span>
+                                    </span>
+                                  </n-tag>
+                                </span>
                                 <n-tag size="small" :bordered="true" class="tenant-env-tag" :color="envTagOf(t.env).color"
                                   :title="envTagOf(t.env).cloud || undefined">
                                   {{ envLabel(t) }}
@@ -117,7 +133,7 @@
                       size="small"
                       secondary
                       :disabled="pendingTenantIds.length === 0"
-                      title="首行为列名：租户ID、租户名称、车辆数、当前所在环境、计划灰度时间"
+                      title="首行为列名：租户ID、租户名称、车辆数、当前所在环境、当前灰度策略、计划灰度时间、本次灰度策略"
                       @click="copyPlanTsv(true)">
                       复制
                     </n-button>
@@ -171,8 +187,10 @@
       @after-leave="onImportPlanModalAfterLeave">
       <div class="plan-import-modal-body">
         <p class="plan-import-hint">
-          粘贴与「复制」一致的数据：<strong>制表符</strong>分隔为 5 列（租户ID、租户名称、车辆数、当前所在环境、计划灰度时间）。时间支持
-          <code>2026-05-01 10:38（周五上午）</code> 或仅 <code>2026-05-01 10:38</code>；可含表头行。仅会加入当前已加载租户列表中存在的租户。
+          粘贴与「复制」一致的数据：<strong>制表符</strong>分隔为 7
+          列（租户ID、租户名称、车辆数、当前所在环境、当前灰度策略、计划灰度时间、本次灰度策略），兼容旧 6 列、5 列格式。时间支持
+          <code>2026-05-01 10:38（周五上午）</code> 或仅 <code>2026-05-01 10:38</code>；灰度策略支持
+          <code>全量加灰 / B端加灰 / B端自主加灰</code>。可含表头行。仅会加入当前已加载租户列表中存在的租户。
         </p>
         <n-input v-model:value="importPlanDraft" type="textarea" :rows="14" size="small" placeholder="在此粘贴…" />
         <div class="plan-import-actions">
@@ -206,15 +224,16 @@ import {
   NModal,
   NSelect,
   NTag,
+  NTooltip,
   type DataTableColumns,
   type DataTableSortState,
 } from "naive-ui";
-import { ScooterElectric } from "@vicons/tabler";
 import { tenant_all_api, tenant_gray_ai_api, tenant_gray_api } from "@/api/business";
 import {
   normalizeGrayList,
   normalizeTenantList,
   resolveGrayTypeTag,
+  resolveTenantCarLevel,
   resolveTenantEnvTag,
   type TenantGrayItem,
   type TenantItem,
@@ -226,6 +245,7 @@ import {
   filterTenantsFuzzy,
   formatPlanLocalDateTime,
   grayPanelKeyForTenant,
+  grayStrategyTextOf,
   envLabelForGrayPanel,
   isStandaloneTenant,
   parseImportedPlanTimeCell,
@@ -267,6 +287,13 @@ const leftListSortOptions: { label: string; value: LeftListSortSpec }[] = [
 const pendingTenantIds = ref<string[]>([]);
 /** 各租户计划灰度时间（毫秒时间戳），未选则为 null */
 const pendingTimeByTenant = reactive<Record<string, number | null>>({});
+/** 各租户灰度策略（1 全量 / 2 B端 / 3 自主），未选则为 null */
+const pendingGrayTypeByTenant = reactive<Record<string, 1 | 2 | 3 | null>>({});
+
+const grayStrategyOptions: Array<{ label: string; value: 1 | 2 | 3 }> = [1, 2, 3].map((n) => ({
+  label: resolveGrayTypeTag(n)?.detail ?? String(n),
+  value: n as 1 | 2 | 3,
+}));
 
 const importPlanModalShow = ref(false);
 const importPlanDraft = ref("");
@@ -435,6 +462,10 @@ function grayTypeTagOf(t: TenantItem) {
   return resolveGrayTypeTag(grayMap.value.get(t.tenantId)?.grayType);
 }
 
+function carLevelOf(t: TenantItem) {
+  return resolveTenantCarLevel(t.carTotal);
+}
+
 function formatYesterdayCarTotal(value: TenantItem["carTotal"]): string {
   if (value === null || value === undefined) return "-";
   return String(value);
@@ -492,8 +523,11 @@ function pendingRowClassName(row: { tenantId: string }) {
   return pendingRowTimeGroupClass.value.get(row.tenantId) ?? "";
 }
 
-const planRows = computed<PlanRow[]>(() =>
-  pendingTenantsSorted.value.map((tenant) => {
+const planRows = computed<PlanRow[]>(() => {
+  for (const id of pendingTenantIds.value) {
+    void pendingGrayTypeByTenant[id];
+  }
+  return pendingTenantsSorted.value.map((tenant) => {
     const ms = pendingTimeByTenant[tenant.tenantId];
     const car =
       tenant.carTotal != null && Number.isFinite(Number(tenant.carTotal)) ? String(tenant.carTotal) : "-";
@@ -502,17 +536,20 @@ const planRows = computed<PlanRow[]>(() =>
       customerName: tenant.tenantName?.trim() || "-",
       carTotalDisplay: car,
       currentEnv: envLabel(tenant),
+      currentGrayStrategy: grayStrategyTextOf(grayMap.value.get(tenant.tenantId)?.grayType),
       plannedGrayAt:
         ms != null && Number.isFinite(ms)
           ? formatPlanLocalDateTime(floorTimestampToLocalMinute(Number(ms)))
           : "-",
+      grayStrategy: grayStrategyTextOf(pendingGrayTypeByTenant[tenant.tenantId]),
     };
-  }),
-);
+  });
+});
 
 function removePending(id: string) {
   pendingTenantIds.value = pendingTenantIds.value.filter((x) => x !== id);
   delete pendingTimeByTenant[id];
+  delete pendingGrayTypeByTenant[id];
 }
 
 /** 本地日历下将秒、毫秒归零，与仅选择到「分钟」一致 */
@@ -551,7 +588,7 @@ const pendingColumns = computed<DataTableColumns<{
   {
     title: "车辆数",
     key: "carTotal",
-    width: 40,
+    width: 56,
     className: "plan-pending-car-total-col",
     titleClassName: "plan-pending-car-total-th",
     sorter: (r1, r2) => {
@@ -561,6 +598,38 @@ const pendingColumns = computed<DataTableColumns<{
       return compareCarTotalAsc(a, b);
     },
     sortOrder: pendingSortKey.value === "carTotal" ? pendingSortOrder.value : false,
+    render(row) {
+      const t = tenantById.value.get(row.tenantId);
+      const level = t ? resolveTenantCarLevel(t.carTotal) : null;
+      if (!level) {
+        return h("span", { class: "plan-pending-car-num" }, row.carTotal);
+      }
+      return h(NTooltip, { trigger: "hover", placement: "top" }, {
+        trigger: () =>
+          h(
+            NTag,
+            {
+              size: "small",
+              bordered: true,
+              class: "tenant-car-level-tag",
+              color: ebikeCountTagColor,
+              title: "昨日车辆数",
+            },
+            {
+              default: () =>
+                h("span", { class: "tenant-car-level-inner" }, [
+                  h(
+                    "span",
+                    { class: "tenant-car-level-letter", style: { color: level.color.textColor } },
+                    level.level,
+                  ),
+                  h("span", { class: "tenant-car-level-num" }, row.carTotal),
+                ]),
+            },
+          ),
+        default: () => `${level.level} 级：${level.definition}`,
+      });
+    },
   },
   {
     title: "当前所在环境",
@@ -583,6 +652,27 @@ const pendingColumns = computed<DataTableColumns<{
         },
         { default: () => envLabel(t) },
       );
+    },
+  },
+  {
+    title: "当前灰度策略",
+    key: "currentGrayStrategy",
+    width: 66,
+    render(row) {
+      const t = tenantById.value.get(row.tenantId);
+      const tag = t ? resolveGrayTypeTag(grayMap.value.get(t.tenantId)?.grayType) : null;
+      if (!tag) {
+        return h("span", { class: "plan-pending-env-fallback" }, "-");
+      }
+      return h(NTooltip, { trigger: "hover", placement: "top" }, {
+        trigger: () =>
+          h(
+            NTag,
+            { size: "small", bordered: true, class: "tenant-gray-type-tag", color: tag.color },
+            { default: () => tag.text },
+          ),
+        default: () => tag.detail,
+      });
     },
   },
   {
@@ -640,6 +730,26 @@ const pendingColumns = computed<DataTableColumns<{
     },
   },
   {
+    title: "本次灰度策略",
+    key: "grayStrategy",
+    width: 104,
+    className: "plan-pending-strategy-col",
+    render(row) {
+      return h(NSelect, {
+        size: "small",
+        class: "plan-pending-strategy-select",
+        value: pendingGrayTypeByTenant[row.tenantId] ?? null,
+        options: grayStrategyOptions,
+        clearable: true,
+        placeholder: "未选择",
+        onUpdateValue: (v: number | null) => {
+          pendingGrayTypeByTenant[row.tenantId] =
+            v === 1 || v === 2 || v === 3 ? v : null;
+        },
+      });
+    },
+  },
+  {
     title: "操作",
     key: "actions",
     width: 36,
@@ -664,6 +774,7 @@ function togglePending(t: TenantItem) {
   if (idx >= 0) {
     pendingTenantIds.value = pendingTenantIds.value.filter((x) => x !== id);
     delete pendingTimeByTenant[id];
+    delete pendingGrayTypeByTenant[id];
   } else {
     if (isStandaloneTenant(t)) {
       message.warning("独立部署租户不允许加入灰度计划");
@@ -671,6 +782,9 @@ function togglePending(t: TenantItem) {
     }
     pendingTenantIds.value = sortPendingIdsByCarTotalAsc([...pendingTenantIds.value, id]);
     pendingTimeByTenant[id] = null;
+    const currentGrayType = grayMap.value.get(id)?.grayType;
+    pendingGrayTypeByTenant[id] =
+      currentGrayType === 1 || currentGrayType === 2 || currentGrayType === 3 ? currentGrayType : null;
   }
 }
 
@@ -683,6 +797,7 @@ watch(tenants, (list) => {
   if (removeIds.length === 0) return;
   for (const id of removeIds) {
     delete pendingTimeByTenant[id];
+    delete pendingGrayTypeByTenant[id];
   }
   pendingTenantIds.value = pendingTenantIds.value.filter((id) => !removeIds.includes(id));
 });
@@ -798,7 +913,7 @@ function confirmImportPlan() {
   const unknown: string[] = [];
   const standalone: string[] = [];
   const timeUnparsed: string[] = [];
-  const toApply: Array<{ id: string; ms: number | null }> = [];
+  const toApply: Array<{ id: string; ms: number | null; grayType: 1 | 2 | 3 | null }> = [];
   for (const r of merged) {
     const t = tenantById.value.get(r.tenantId);
     if (!t) {
@@ -812,7 +927,7 @@ function confirmImportPlan() {
     if (r.plannedGrayAtRaw.trim() && r.plannedAtMs == null) {
       timeUnparsed.push(r.tenantId);
     }
-    toApply.push({ id: r.tenantId, ms: r.plannedAtMs });
+    toApply.push({ id: r.tenantId, ms: r.plannedAtMs, grayType: r.grayType });
   }
   if (toApply.length === 0) {
     message.warning("没有可导入的租户（需在已加载列表中且非独立部署）");
@@ -821,11 +936,16 @@ function confirmImportPlan() {
   const prevIds = new Set(pendingTenantIds.value);
   const newIdSet = new Set([...pendingTenantIds.value, ...toApply.map((x) => x.id)]);
   pendingTenantIds.value = sortPendingIdsByCarTotalAsc([...newIdSet]);
-  for (const { id, ms } of toApply) {
+  for (const { id, ms, grayType } of toApply) {
     if (ms != null) {
       pendingTimeByTenant[id] = floorTimestampToLocalMinute(ms);
     } else if (!prevIds.has(id)) {
       pendingTimeByTenant[id] = null;
+    }
+    if (grayType != null) {
+      pendingGrayTypeByTenant[id] = grayType;
+    } else if (!prevIds.has(id)) {
+      pendingGrayTypeByTenant[id] = null;
     }
   }
   importPlanModalShow.value = false;
@@ -917,7 +1037,9 @@ async function runAiGrayPlan() {
 
 <style lang="less" scoped>
 .tenant-gray-plan {
-  width: min(1200px, 100%);
+  width: 90% !important;
+  max-width: 90% !important;
+  flex: 0 1 90% !important;
   box-sizing: border-box;
 }
 
@@ -1120,8 +1242,8 @@ async function runAiGrayPlan() {
 
 .td-mirror-panel .tenant-line {
   display: grid;
-  /* ID、名称、车辆数、环境、灰度策略 */
-  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-ebike, 58px)
+  /* ID、名称、车辆数等级、环境、灰度策略 */
+  grid-template-columns: var(--tenant-col-id, 5ch) minmax(0, 1fr) var(--tenant-col-car-level, 64px)
     var(--tenant-col-env, 84px) var(--tenant-col-gray-type, 36px);
   align-items: center;
   column-gap: 3px;
@@ -1169,41 +1291,60 @@ async function runAiGrayPlan() {
   line-height: 1;
 }
 
-.td-mirror-panel .tenant-line :deep(.tenant-ebike-tag) {
+.td-mirror-panel .tenant-car-level-cell {
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.td-mirror-panel .tenant-car-level-cell :deep(.n-tooltip) {
+  display: block;
+  width: 100%;
+}
+
+.td-mirror-panel .tenant-line :deep(.tenant-car-level-tag) {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  justify-content: flex-start;
+  justify-content: center;
   margin-left: 0;
   height: 17px;
   font-size: 11px;
   line-height: 15px;
-  padding: 0 3px;
+  padding: 0 4px;
+  cursor: default;
 }
 
-.td-mirror-panel .tenant-line :deep(.tenant-ebike-tag .n-tag__content) {
+.td-mirror-panel .tenant-line :deep(.tenant-car-level-tag .n-tag__content) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
 }
 
-.td-mirror-panel .tenant-ebike-tag-inner {
+.td-mirror-panel .tenant-car-level-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
 }
 
-.td-mirror-panel .tenant-ebike-icon {
-  font-size: 12px;
-  flex-shrink: 0;
-  opacity: 0.92;
+.td-mirror-panel .tenant-car-level-inner-only-num {
+  justify-content: flex-end;
 }
 
-.td-mirror-panel .tenant-ebike-num {
+.td-mirror-panel .tenant-car-level-letter {
   flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.td-mirror-panel .tenant-car-level-num {
+  flex-shrink: 0;
+  margin-left: auto;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -1360,6 +1501,27 @@ async function runAiGrayPlan() {
   font-weight: 400;
 }
 
+.plan-pending-table :deep(td.plan-pending-strategy-col) {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.plan-pending-table :deep(.plan-pending-strategy-select) {
+  font-size: 11px;
+}
+
+.plan-pending-table :deep(.plan-pending-strategy-select .n-base-selection) {
+  --n-height: 22px;
+  min-height: 22px;
+  font-size: 11px;
+}
+
+.plan-pending-table :deep(.plan-pending-strategy-select .n-base-selection__placeholder),
+.plan-pending-table :deep(.plan-pending-strategy-select .n-base-selection-label) {
+  font-size: 11px;
+  line-height: 20px;
+}
+
 /* 车辆数列排序激活时表头不要底色 */
 .plan-pending-table :deep(th.plan-pending-car-total-th),
 .plan-pending-table :deep(th.plan-pending-car-total-th.n-data-table-th--sorting),
@@ -1388,6 +1550,78 @@ async function runAiGrayPlan() {
 .plan-pending-table :deep(.tenant-env-tag .n-tag__content) {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.plan-pending-table :deep(.tenant-car-level-tag) {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  margin-left: 0;
+  height: 17px;
+  font-size: 11px;
+  line-height: 15px;
+  padding: 0 4px;
+  cursor: default;
+}
+
+.plan-pending-table :deep(.tenant-car-level-tag .n-tag__content) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.plan-pending-table :deep(.tenant-car-level-inner) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-pending-table :deep(.tenant-car-level-inner-only-num) {
+  justify-content: flex-end;
+}
+
+.plan-pending-table :deep(.tenant-car-level-letter) {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.plan-pending-table :deep(.tenant-car-level-num) {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.plan-pending-table :deep(.plan-pending-car-num) {
+  font-size: 11px;
+  line-height: 1;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-pending-table :deep(.tenant-gray-type-tag) {
+  width: 80%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  margin-left: 0;
+  height: 17px;
+  font-size: 11px;
+  line-height: 15px;
+  padding: 0 3px;
+  cursor: default;
+}
+
+.plan-pending-table :deep(.tenant-gray-type-tag .n-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 
 .plan-pending-env-fallback {
