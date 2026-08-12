@@ -47,30 +47,36 @@ export interface TenantGrayTypeTagMeta {
   };
 }
 
-const GRAY_TYPE_TAG_COLOR = {
-  color: "#fafafa",
-  textColor: "#71717a",
-  borderColor: "#e4e4e7",
-} as const;
-
 const GRAY_TYPE_TAG: Record<1 | 2 | 3, TenantGrayTypeTagMeta> = {
   1: {
     type: 1,
     text: "全量",
     detail: "全量加灰",
-    color: GRAY_TYPE_TAG_COLOR,
+    color: {
+      color: "#fafafa",
+      textColor: "#71717a",
+      borderColor: "#e4e4e7",
+    },
   },
   2: {
     type: 2,
     text: "B端",
     detail: "B端加灰",
-    color: GRAY_TYPE_TAG_COLOR,
+    color: {
+      color: "#eff6ff",
+      textColor: "#1d4ed8",
+      borderColor: "#bfdbfe",
+    },
   },
   3: {
     type: 3,
     text: "自主",
     detail: "B端自主加灰",
-    color: GRAY_TYPE_TAG_COLOR,
+    color: {
+      color: "#f0fdf4",
+      textColor: "#15803d",
+      borderColor: "#bbf7d0",
+    },
   },
 };
 
