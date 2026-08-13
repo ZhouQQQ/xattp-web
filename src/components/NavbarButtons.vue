@@ -6,6 +6,7 @@ import { getUserInfo } from '@/api/auth';
 import { useRouter } from 'vue-router';
 import { useCopy } from '@/composable/copy';
 import { useMessage } from 'naive-ui';
+import { handleNameClick } from '@/composable/watermark';
 
 const styleStore = useStyleStore();
 const userStore = useUserStore();
@@ -147,7 +148,7 @@ function handleXathClick() {
     </c-tooltip>
 
     <n-dropdown :options="userOptions" @select="handleSelect">
-        <c-button variant="text"> <span>😄{{ userStore.userInfo.nick }}</span></c-button>
+        <c-button variant="text" @click="handleNameClick"> <span>😄{{ userStore.userInfo.nick }}</span></c-button>
     </n-dropdown>
 </template>
 

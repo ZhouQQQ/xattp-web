@@ -13,10 +13,13 @@ import {
 import { darkThemeOverrides, lightThemeOverrides } from './themes';
 import { layouts } from './layouts';
 import { useStyleStore } from './stores/style.store';
+import { useWatermark } from './composable/watermark';
 
 const route = useRoute();
 const layout = computed(() => route?.meta?.layout ?? layouts.base);
 const styleStore = useStyleStore();
+
+useWatermark();
 
 const theme = computed(() => (styleStore.isDarkTheme ? darkTheme : null));
 const themeOverrides = computed(() => (styleStore.isDarkTheme ? darkThemeOverrides : lightThemeOverrides));
