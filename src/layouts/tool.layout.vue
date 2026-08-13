@@ -90,6 +90,7 @@ const isWideTool = computed(() => route.path === '/tenant-dashboard');
 
   &.is-wide {
     max-width: 100%;
+    padding: 0 24px;
 
     .tool-content ::v-deep(& > *) {
       flex: 1 1 100%;

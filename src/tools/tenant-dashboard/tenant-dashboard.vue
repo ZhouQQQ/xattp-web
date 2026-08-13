@@ -119,7 +119,7 @@
                   <n-empty v-if="panel.items.length === 0" size="small" description="该组暂无租户" />
                   <div v-for="row in panelPageRows(panel.items, panel.key)" :key="`${panel.key}-${row.tenant.tenantId}`"
                     class="tenant-row" @click="openTenantLink(row.tenant)">
-                    <n-avatar :src="row.tenant.logo || undefined" :size="18" round />
+                    <n-avatar :src="row.tenant.logo || undefined" :size="18" round class="tenant-logo" @click.stop="openLogoPreview(row.tenant.logo)" />
                     <div class="tenant-main">
                       <div class="tenant-line">
                         <span class="tenant-id">
@@ -213,6 +213,22 @@
           {{ d }}
         </n-button>
       </n-space>
+    </n-modal>
+
+    <n-modal
+      v-model:show="logoPreviewShow"
+      preset="card"
+      :title="logoPreviewHint"
+      :style="{ width: 'min(360px, 92vw)' }"
+      :header-style="domainPickModalHeaderStyle"
+      :content-style="domainPickModalContentStyle"
+      :mask-closable="true"
+      :closable="true"
+      class="tenant-logo-preview-modal"
+      @after-leave="closeLogoPreview">
+      <div class="logo-preview-body">
+        <img :src="logoPreviewUrl" class="logo-preview-img" alt="租户logo" />
+      </div>
     </n-modal>
   </div>
 </template>
@@ -768,6 +784,23 @@ const domainPickShow = ref(false);
 const domainPickDomains = ref<string[]>([]);
 const domainPickTenantHint = ref("");
 
+const logoPreviewShow = ref(false);
+const logoPreviewUrl = ref("");
+const logoPreviewHint = ref("");
+
+function openLogoPreview(logo: string | null | undefined) {
+  if (!logo) return;
+  logoPreviewUrl.value = logo;
+  logoPreviewHint.value = "";
+  logoPreviewShow.value = true;
+}
+
+function closeLogoPreview() {
+  logoPreviewShow.value = false;
+  logoPreviewUrl.value = "";
+  logoPreviewHint.value = "";
+}
+
 function resetDomainPick() {
   domainPickDomains.value = [];
   domainPickTenantHint.value = "";
@@ -997,8 +1030,7 @@ onScopeDispose(() => {
 
 <style lang="less" scoped>
 .tenant-dashboard {
-  width: 85%;
-  max-width: 92%;
+  width: 100%;
   flex: 1 1 100%;
   box-sizing: border-box;
   min-height: 800px;
@@ -1753,5 +1785,47 @@ onScopeDispose(() => {
 
 .domain-pick-actions {
   width: 100%;
+}
+
+.tenant-logo {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.tenant-logo-preview-modal {
+  --n-color-modal: #ffffff;
+}
+
+.tenant-logo-preview-modal :deep(.n-modal-mask) {
+  background-color: rgb(15 23 42 / 55%) !important;
+}
+
+.tenant-logo-preview-modal :deep(.n-card) {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgb(226 232 240 / 95%) !important;
+  box-shadow:
+    0 25px 50px -12px rgb(15 23 42 / 28%),
+    0 0 0 1px rgb(15 23 42 / 5%) !important;
+}
+
+.tenant-logo-preview-modal :deep(.n-card-header),
+.tenant-logo-preview-modal :deep(.n-card__content),
+.tenant-logo-preview-modal :deep(.n-card-header__main) {
+  color: #0f172a !important;
+}
+
+.logo-preview-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.logo-preview-img {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 8px;
 }
 </style>
