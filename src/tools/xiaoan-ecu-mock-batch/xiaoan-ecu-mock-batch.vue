@@ -1849,7 +1849,22 @@ function getCreatedCount(): number {
 /** get_batch_record 回显到表单（按 batch_add 的 data 结构） */
 function applyBatchRecordDataToForm(res: unknown) {
   const data = (res as { data?: unknown } | null)?.data;
-  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  if (!data || typeof data !== "object") return;
+  if (Array.isArray(data)) {
+    const first = (data[0] ?? null) as Record<string, unknown> | null;
+    const server =
+      first && typeof first.server === "string" ? first.server.trim() : "";
+    if (server) formData.server = server;
+    const env = first && typeof first.env === "string" ? first.env.trim() : "";
+    if (env) formData.env = env;
+    const businessType = Number(first?.business_type);
+    if (businessType === 1 || businessType === 2 || businessType === 3) {
+      formData.business_type = businessType;
+    } else if (currentCreateEnvSource.value) {
+      formData.business_type = BUSINESS_TYPE_BY_SOURCE[currentCreateEnvSource.value];
+    }
+    return;
+  }
   const record = data as Record<string, unknown>;
 
   const env = typeof record.env === "string" ? record.env.trim() : "";
