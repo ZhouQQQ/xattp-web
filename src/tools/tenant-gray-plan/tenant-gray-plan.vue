@@ -782,9 +782,7 @@ function togglePending(t: TenantItem) {
     }
     pendingTenantIds.value = sortPendingIdsByCarTotalAsc([...pendingTenantIds.value, id]);
     pendingTimeByTenant[id] = null;
-    const currentGrayType = grayMap.value.get(id)?.grayType;
-    pendingGrayTypeByTenant[id] =
-      currentGrayType === 1 || currentGrayType === 2 || currentGrayType === 3 ? currentGrayType : null;
+    pendingGrayTypeByTenant[id] = null;
   }
 }
 
