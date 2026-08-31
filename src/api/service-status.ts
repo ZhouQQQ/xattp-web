@@ -48,6 +48,6 @@ export function service_status_list_api(params: ServiceStatusListParams) {
 }
 
 /** POST /service_status/run — 触发指定环境 Jenkins 巡检 */
-export function service_status_run_api(data: { env: string }) {
+export function service_status_run_api(data: { env: string; tenant_id?: string }) {
   return AlovaInstance.Post(`${BASE_PATH}/service_status/run`, data);
 }

@@ -111,7 +111,7 @@
                         class="ssb-card-refresh"
                         :disabled="isEnvRunning(panel.env)"
                         :class="{ 'is-loading': isEnvRunning(panel.env) }"
-                        @click.stop="runEnv(panel.env)"
+                        @click.stop="openRunDialog(panel.env)"
                       >
                         <n-icon :component="PlayerPlay" :size="12" />
                       </button>
@@ -203,6 +203,30 @@
         </section>
       </div>
     </n-spin>
+
+    <n-modal
+      v-model:show="runDialogVisible"
+      preset="card"
+      title="触发巡检"
+      :bordered="false"
+      :closable="true"
+      :mask-closable="true"
+      style="width: 420px"
+    >
+      <div class="ssb-config">
+        <div class="ssb-config-row">
+          <label class="ssb-config-label">环境</label>
+          <n-select v-model:value="runEnvVal" :options="runEnvOptions" filterable />
+        </div>
+        <div class="ssb-config-row">
+          <label class="ssb-config-label">租户 ID</label>
+          <n-input v-model:value="runTenantId" placeholder="请输入租户 ID" />
+        </div>
+        <div class="ssb-config-actions">
+          <n-button type="primary" :loading="runLoading" :disabled="runLoading" @click="confirmRun">确认触发</n-button>
+        </div>
+      </div>
+    </n-modal>
 
     <n-modal
       v-model:show="expandVisible"
@@ -470,6 +494,47 @@ const ENV_DEFS: EnvDef[] = [
   { env: 'prod-gray2', label: '华为云灰度组2', shortLabel: '灰度组2', cloud: 'huawei' },
   { env: 'prod', label: '华为云正式', shortLabel: '正式', cloud: 'huawei' },
 ];
+
+const TENANT_MAP: Record<string, string> = {
+  'prod': '863',
+  'prod-gray': '2',
+  'prod-gray2': '2',
+  'prod2': '546',
+  'prod2-gray': '1',
+  'prod2-gray2': '1',
+};
+
+const runDialogVisible = ref(false);
+const runEnvVal = ref('');
+const runTenantId = ref('');
+const runLoading = ref(false);
+
+const runEnvOptions = computed(() =>
+  ENV_DEFS.map((e) => ({
+    label: `${e.label} (${e.env})`,
+    value: e.env,
+  })),
+);
+
+function openRunDialog(env: string) {
+  runEnvVal.value = env;
+  runTenantId.value = TENANT_MAP[env] || '';
+  runDialogVisible.value = true;
+}
+
+async function confirmRun() {
+  if (!runTenantId.value.trim()) {
+    message.warning('请输入租户 ID');
+    return;
+  }
+  runLoading.value = true;
+  try {
+    await runEnv(runEnvVal.value, runTenantId.value);
+    runDialogVisible.value = false;
+  } finally {
+    runLoading.value = false;
+  }
+}
 
 const CLIENT_ORDER = [
   { key: 'c_mp', label: '用户端', aliases: ['c_mp', '用户端'] },
@@ -879,11 +944,11 @@ function openExpand(env: string) {
   expandVisible.value = true;
 }
 
-async function runEnv(env: string) {
+async function runEnv(env: string, tenantId: string) {
   if (runningEnvs.value[env]) return;
   runningEnvs.value = { ...runningEnvs.value, [env]: true };
   try {
-    const resp: any = await service_status_run_api({ env });
+    const resp: any = await service_status_run_api({ env, tenant_id: tenantId });
     if (resp?.code !== 0 && resp?.code !== '0') {
       message.error(resp?.msg || `触发 ${env} 巡检失败`);
       return;
@@ -2237,6 +2302,31 @@ onUnmounted(() => {
   color: var(--muted);
   opacity: 0.8;
   white-space: nowrap;
+}
+
+.ssb-config {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.ssb-config-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ssb-config-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: v-bind(ssbText);
+}
+
+.ssb-config-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 :deep(.n-spin-content) {
