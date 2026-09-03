@@ -1,5 +1,53 @@
 <template>
   <div class="xiaoan-ecu-mock-batch">
+    <div v-if="batchSessions.length > 0" class="existing-tabs-wrap">
+      <div class="existing-tabs-row">
+        <button
+          v-for="session in batchSessions"
+          :key="session.id"
+          type="button"
+          class="mock-tab"
+          :class="{ 'mock-tab-active': session.id === activeSessionId }"
+          @click="handleSessionTabChange(session.id)"
+        >
+          <span class="mock-tab-text">
+            <span class="mock-tab-top">
+              <span class="mock-status-tag mock-status-tenant">{{ formatBusinessType(session.business_type) }}</span>
+              <span class="mock-status-tag mock-status-env">{{ session.env || "-" }}</span>
+              <span class="mock-tab-time" :title="session.createDatetime">{{ formatRelativeCreateAt(session.createDatetime) }}</span>
+            </span>
+            <span class="mock-tab-imei-row">
+              <span class="mock-status-tag mock-status-tenant">{{ formatBatchMode(session.formDataSnapshot.mode) }}</span>
+              <span class="mock-tab-imei">{{ session.rows.length }}台</span>
+            </span>
+          </span>
+          <n-button
+            quaternary
+            circle
+            size="tiny"
+            class="mock-tab-close-btn"
+            title="删除批次"
+            @click.stop="handleRemoveSession(session.id)"
+          >
+            <template #icon>
+              <n-icon :component="Trash" :size="12" />
+            </template>
+          </n-button>
+        </button>
+        <n-button
+          type="primary"
+          size="small"
+          secondary
+          class="add-mock-button"
+          @click="handleAddBatchTab"
+        >
+          <template #icon>
+            <n-icon :component="Plus" :size="16" />
+          </template>
+          新增批次
+        </n-button>
+      </div>
+    </div>
     <n-card>
       <n-spin :show="batchRecordLoading">
         <div class="form-section">
@@ -474,7 +522,8 @@
 defineOptions({ name: "XiaoanEcuMockBatch" });
 
 import { computed, h, onMounted, reactive, ref, watch } from "vue";
-import { createDiscreteApi, NButton, NInputNumber, NTag, NTooltip, type DataTableColumns, type DataTableRowKey } from "naive-ui";
+import { createDiscreteApi, NButton, NIcon, NInputNumber, NTag, NTooltip, type DataTableColumns, type DataTableRowKey } from "naive-ui";
+import { Trash, Plus } from "@vicons/tabler";
 import {
   getEbikeEnvListAPI,
   getOverseaEnvListAPI,
@@ -487,6 +536,7 @@ import {
   xiaoanEcuServiceAreaAllAPI,
   xiaoanEcuMockBatchCreateAPI,
   xiaoanEcuMockBatchDeleteAPI,
+  xiaoanEcuMockBatchGroupsAPI,
   xiaoanEcuMockBatchRecordAPI,
   xiaoanEcuMockUpdateAPI,
 } from "@/api/device";
@@ -826,6 +876,297 @@ const rentalFranchiseeShopMap = ref<Record<string, Array<{ label: string; value:
 const currentCreateEnvSource = ref<EnvSource | null>(null);
 const showSharedBindCol = ref(false);
 const showRentalBatchAddCol = ref(false);
+
+/* ========== 多批次 Session 管理 ========== */
+const SESSIONS_STORAGE_KEY = "XATTP_ECU_MOCK_BATCH_SESSIONS_NEW";
+
+interface BatchSessionMeta {
+  id: string;
+  batch_group: string;
+  createDatetime: string;
+  env: string;
+  business_type: 1 | 2 | 3 | null;
+  rows: BatchMockListRow[];
+  /** 保存快照 */
+  formDataSnapshot: BatchFormData;
+  successSummary: string;
+  requestError: string;
+  showSharedBindCol: boolean;
+  showRentalBatchAddCol: boolean;
+  checkedRowKeys: string[];
+  currentCreateEnvSource: EnvSource | null;
+  numInputStr: string;
+  voltageSlider: [number, number];
+}
+
+const batchSessions = ref<BatchSessionMeta[]>([]);
+const activeSessionId = ref("");
+
+function generateSessionId(): string {
+  return `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatBusinessType(bt: 1 | 2 | 3 | null): string {
+  if (bt === 1) return "共享";
+  if (bt === 2) return "短租";
+  if (bt === 3) return "海外";
+  return "-";
+}
+
+function formatBatchMode(mode: number | null | undefined): string {
+  if (mode === 1) return "随机";
+  if (mode === 2) return "顺序";
+  if (mode === 3) return "指定";
+  return "-";
+}
+
+function formatRelativeCreateAt(createAt?: string): string {
+  if (!createAt || typeof createAt !== "string") return "-";
+  const createMs = Date.parse(createAt.replace(/-/g, "/"));
+  if (Number.isNaN(createMs)) return "-";
+  const diffSec = Math.max(0, Math.floor((Date.now() - createMs) / 1000));
+  if (diffSec < 60) return "刚刚";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} 小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} 天前`;
+}
+
+function saveCurrentSessionToActive() {
+  const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+  if (!session) return;
+  session.formDataSnapshot = { ...formData };
+  session.rows = [...batchMockListRows.value];
+  session.successSummary = successSummary.value;
+  session.requestError = requestError.value;
+  session.showSharedBindCol = showSharedBindCol.value;
+  session.showRentalBatchAddCol = showRentalBatchAddCol.value;
+  session.checkedRowKeys = [...checkedRowKeys.value];
+  session.currentCreateEnvSource = currentCreateEnvSource.value;
+  session.numInputStr = numInputStr.value;
+  session.voltageSlider = [...voltageSlider.value];
+  saveSessionsToStorage();
+}
+
+function loadSessionIntoUI(session: BatchSessionMeta) {
+  Object.assign(formData, session.formDataSnapshot);
+  batchMockListRows.value = session.rows;
+  successSummary.value = session.successSummary;
+  requestError.value = session.requestError;
+  showSharedBindCol.value = session.showSharedBindCol;
+  showRentalBatchAddCol.value = session.showRentalBatchAddCol;
+  checkedRowKeys.value = session.checkedRowKeys;
+  currentCreateEnvSource.value = session.currentCreateEnvSource;
+  numInputStr.value = session.numInputStr;
+  voltageSlider.value = [...session.voltageSlider];
+  activeSessionId.value = session.id;
+}
+
+function switchToSession(targetId: string) {
+  if (targetId === activeSessionId.value) return;
+  saveCurrentSessionToActive();
+  const target = batchSessions.value.find((s) => s.id === targetId);
+  if (target) {
+    loadSessionIntoUI(target);
+  }
+}
+
+function handleSessionTabChange(targetId: string) {
+  switchToSession(targetId);
+}
+
+function handleAddBatchTab() {
+  if (batchMockListRows.value.length > 0 || formData.server?.trim() || formData.env?.trim()) {
+    saveCurrentSessionToActive();
+  }
+  const prevForm = { ...formData };
+  numInputStr.value = prevForm.num != null && Number.isFinite(Number(prevForm.num)) ? String(Math.trunc(Number(prevForm.num))) : "";
+  batchMockListRows.value = [];
+  checkedRowKeys.value = [];
+  requestError.value = "";
+  successSummary.value = "";
+  showSharedBindCol.value = false;
+  showRentalBatchAddCol.value = false;
+  const newId = generateSessionId();
+  const newSession: BatchSessionMeta = {
+    id: newId,
+    batch_group: "",
+    createDatetime: new Date().toISOString().replace("T", " ").slice(0, 19),
+    env: prevForm.env || "",
+    business_type: prevForm.business_type,
+    rows: [],
+    formDataSnapshot: { ...prevForm },
+    successSummary: "",
+    requestError: "",
+    showSharedBindCol: false,
+    showRentalBatchAddCol: false,
+    checkedRowKeys: [],
+    currentCreateEnvSource: currentCreateEnvSource.value,
+    numInputStr: numInputStr.value,
+    voltageSlider: [prevForm.voltage_min ?? 0, prevForm.voltage_max ?? 0],
+  };
+  batchSessions.value.push(newSession);
+  activeSessionId.value = newId;
+  saveSessionsToStorage();
+}
+
+/** 从 API 返回的批次分组数据创建 session */
+function createSessionFromApiGroup(group: any): BatchSessionMeta {
+  const newId = generateSessionId();
+  const rows = parseBatchMockListFromResponse({ data: { list: group.list } });
+  const mergedRows = rows.length > 0 ? rows : parseBatchMockListFromLegacyRecordResponse({ data: group.list });
+  const firstRecord = mergedRows[0] || null;
+  const firstRaw = group.list?.[0] || {};
+  const formSnapshot: BatchFormData = {
+    env: group.env || "",
+    server: String(firstRaw.server || firstRecord?.server || ""),
+    tenant_id: firstRecord?.tenant_id || "",
+    business_type: group.business_type,
+    voltage_min: 50,
+    voltage_max: 54,
+    lat: firstRecord?.lat || DEFAULT_COORD_LAT,
+    lng: firstRecord?.lng || DEFAULT_COORD_LNG,
+    coord_combined_text: `${firstRecord?.lng || DEFAULT_COORD_LNG},${firstRecord?.lat || DEFAULT_COORD_LAT}`,
+    radius_m: 10000,
+    random_move_m: 0,
+    coord_mode: "scatter",
+    mode: Number(firstRaw.mode) === 1 || Number(firstRaw.mode) === 2 || Number(firstRaw.mode) === 3 ? Number(firstRaw.mode) as 1 | 2 | 3 : 1,
+    create_mode: 1,
+    serial_interval_ms: 10,
+    reply_delay_sec: 0,
+    enable_scheduled_report: true,
+    num: mergedRows.length,
+    start_imei: "",
+    imeis_text: "",
+    coordinates_text: "",
+  };
+  return {
+    id: newId,
+    batch_group: group.batch_group || "",
+    createDatetime: group.create_datetime || new Date().toISOString().replace("T", " ").slice(0, 19),
+    env: group.env || "",
+    business_type: group.business_type,
+    rows: mergedRows,
+    formDataSnapshot: formSnapshot,
+    successSummary: "",
+    requestError: "",
+    showSharedBindCol: false,
+    showRentalBatchAddCol: false,
+    checkedRowKeys: mergedRows.map((r) => r.row_key),
+    currentCreateEnvSource: null,
+    numInputStr: "",
+    voltageSlider: [0, 0],
+  };
+}
+
+async function handleRemoveSession(sessionId: string) {
+  const idx = batchSessions.value.findIndex((s) => s.id === sessionId);
+  if (idx === -1) return;
+  const session = batchSessions.value[idx];
+  const wasActive = sessionId === activeSessionId.value;
+
+  // 停止该批次所有模拟中控
+  const imeis = Array.from(
+    new Set(
+      session.rows
+        .filter((r) => r.is_mock_success && r.connect_id)
+        .map((r) => r.imei)
+        .filter((im) => /^\d{15}$/.test(im)),
+    ),
+  );
+  const server = session.formDataSnapshot.server?.trim();
+  if (imeis.length > 0 && server) {
+    try {
+      await xiaoanEcuMockBatchDeleteAPI({
+        mode: 3,
+        server,
+        imeis,
+      });
+    } catch {
+      // 停止失败不影响删除
+    }
+  }
+
+  batchSessions.value.splice(idx, 1);
+  if (batchSessions.value.length === 0) {
+    Object.assign(formData, { ...defaultFormData });
+    numInputStr.value = formData.num != null && Number.isFinite(Number(formData.num)) ? String(Math.trunc(Number(formData.num))) : "";
+    syncVoltageSliderFromForm();
+    batchMockListRows.value = [];
+    checkedRowKeys.value = [];
+    requestError.value = "";
+    successSummary.value = "";
+    showSharedBindCol.value = false;
+    showRentalBatchAddCol.value = false;
+    currentCreateEnvSource.value = null;
+    activeSessionId.value = "";
+  } else if (wasActive) {
+    const next = batchSessions.value[Math.min(idx, batchSessions.value.length - 1)];
+    loadSessionIntoUI(next);
+  }
+  saveSessionsToStorage();
+}
+
+function saveSessionsToStorage() {
+  try {
+    const data = batchSessions.value.map((s) => ({
+      ...s,
+      rows: s.rows,
+      formDataSnapshot: s.formDataSnapshot,
+      checkedRowKeys: s.checkedRowKeys,
+      voltageSlider: s.voltageSlider,
+    }));
+    localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // 忽略存储失败
+  }
+}
+
+function loadSessionsFromStorage() {
+  try {
+    const raw = localStorage.getItem(SESSIONS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as BatchSessionMeta[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    batchSessions.value = parsed.map((s) => ({
+      ...s,
+      batch_group: (s as any).batch_group || "",
+      rows: Array.isArray(s.rows) ? s.rows : [],
+      checkedRowKeys: Array.isArray(s.checkedRowKeys) ? s.checkedRowKeys : [],
+      voltageSlider: Array.isArray(s.voltageSlider) && s.voltageSlider.length === 2 ? s.voltageSlider : [0, 0],
+    }));
+    const first = batchSessions.value[0];
+    if (first) {
+      loadSessionIntoUI(first);
+    }
+  } catch {
+    // 忽略加载失败
+  }
+}
+
+/** 从后端 API 加载批次分组 */
+async function loadBatchGroupsFromApi() {
+  try {
+    const res: any = await xiaoanEcuMockBatchGroupsAPI();
+    if (res != null && Number(res.code) !== 0) return;
+    const groups = Array.isArray(res?.data) ? res.data : [];
+    if (groups.length === 0) return;
+    const sessions = groups.map((g: any) => createSessionFromApiGroup(g)).reverse();
+    // 合并：已有 localStorage session 优先保留，不覆盖
+    const existingIds = new Set(batchSessions.value.map((s) => s.id));
+    const newSessions = sessions.filter((s) => !existingIds.has(s.id));
+    if (newSessions.length === 0) return;
+    batchSessions.value = [...batchSessions.value, ...newSessions];
+    if (!activeSessionId.value && newSessions.length > 0) {
+      loadSessionIntoUI(newSessions[0]);
+    }
+    saveSessionsToStorage();
+  } catch {
+    // 忽略
+  }
+}
 
 async function loadBindAndOnlineEnvOptions() {
   bindAndOnlineEnvLoading.value = true;
@@ -1487,7 +1828,7 @@ const modeTipText = computed(() => {
 });
 const createModeTipText = computed(() => {
   if (formData.create_mode === 2) {
-    return `串行创建：每隔 ${formData.serial_interval_ms}ms 启动一个中控模拟，按顺序逐个创建。`;
+    return `串行创建：每隔 ${formData.serial_interval_ms}ms 启动一个中控模拟，按顺序逐个创建。停止也是`;
   }
   return "并行创建：尽可能并发创建中控模拟，整体创建速度更快。";
 });
@@ -1822,6 +2163,7 @@ function resetDefaultCoords() {
 }
 
 function handleReset() {
+  saveCurrentSessionToActive();
   Object.assign(formData, { ...defaultFormData });
   numInputStr.value =
     formData.num != null && Number.isFinite(Number(formData.num))
@@ -1839,6 +2181,27 @@ function handleReset() {
   showRentalBatchAddCol.value = false;
   currentCreateEnvSource.value = null;
   saveFormToStorage();
+  const newId = generateSessionId();
+  const newSession: BatchSessionMeta = {
+    id: newId,
+    batch_group: "",
+    createDatetime: new Date().toISOString().replace("T", " ").slice(0, 19),
+    env: "",
+    business_type: null,
+    rows: [],
+    formDataSnapshot: { ...formData },
+    successSummary: "",
+    requestError: "",
+    showSharedBindCol: false,
+    showRentalBatchAddCol: false,
+    checkedRowKeys: [],
+    currentCreateEnvSource: null,
+    numInputStr: "",
+    voltageSlider: [0, 0],
+  };
+  batchSessions.value.push(newSession);
+  activeSessionId.value = newId;
+  saveSessionsToStorage();
 }
 
 function getCreatedCount(): number {
@@ -2145,6 +2508,7 @@ async function handleRentalBatchAddSubmit() {
     showSharedBindCol.value = false;
     showRentalBatchAddCol.value = true;
     rentalBatchAddShow.value = false;
+    saveCurrentSessionToActive();
     const sc = Number(res?.data?.success_count);
     const fc = Number(res?.data?.fail_count);
     if (Number.isFinite(sc) || Number.isFinite(fc)) {
@@ -2228,6 +2592,7 @@ async function handleBindAndOnlineSubmit() {
     showSharedBindCol.value = true;
     showRentalBatchAddCol.value = false;
     bindAndOnlineShow.value = false;
+    saveCurrentSessionToActive();
     const sc = Number(res?.data?.success_count);
     const fc = Number(res?.data?.fail_count);
     if (Number.isFinite(sc) || Number.isFinite(fc)) {
@@ -2315,6 +2680,30 @@ async function loadBatchMockRecords() {
     showRentalBatchAddCol.value = false;
     checkedRowKeys.value = mergedRows.map((row) => row.row_key);
     saveFormToStorage();
+    // 创建 session
+    if (mergedRows.length > 0 && !activeSessionId.value) {
+      const newId = generateSessionId();
+      const newSession: BatchSessionMeta = {
+        id: newId,
+        batch_group: "",
+        createDatetime: new Date().toISOString().replace("T", " ").slice(0, 19),
+        env: formData.env || "",
+        business_type: formData.business_type,
+        rows: [...mergedRows],
+        formDataSnapshot: { ...formData },
+        successSummary: successSummary.value,
+        requestError: requestError.value,
+        showSharedBindCol: false,
+        showRentalBatchAddCol: false,
+        checkedRowKeys: [...checkedRowKeys.value],
+        currentCreateEnvSource: currentCreateEnvSource.value,
+        numInputStr: numInputStr.value,
+        voltageSlider: [...voltageSlider.value],
+      };
+      batchSessions.value.push(newSession);
+      activeSessionId.value = newId;
+      saveSessionsToStorage();
+    }
   } catch {
     // 历史记录加载失败不阻塞页面主流程
   } finally {
@@ -2323,11 +2712,26 @@ async function loadBatchMockRecords() {
 }
 
 onMounted(() => {
-  loadBatchMockRecords();
+  loadSessionsFromStorage();
+  // 从后端 API 加载批次分组（兼容 localStorage 被清除的情况）
+  if (batchSessions.value.length === 0) {
+    void loadBatchGroupsFromApi().then(() => {
+      // 如果 API 也没有数据，尝试加载历史记录
+      if (batchSessions.value.length === 0) {
+        void loadBatchMockRecords();
+      }
+    });
+  }
 });
 
-// setup 阶段也触发一次，确保页面初始渲染链路就发请求（便于在 Network 观察）
-void loadBatchMockRecords();
+// setup 阶段也触发一次
+if (batchSessions.value.length === 0) {
+  void loadBatchGroupsFromApi().then(() => {
+    if (batchSessions.value.length === 0) {
+      void loadBatchMockRecords();
+    }
+  });
+}
 
 async function handleStopMock() {
   const keys = checkedRowKeys.value.map((k) => String(k)).filter(Boolean);
@@ -2355,33 +2759,40 @@ async function handleStopMock() {
   stopMockLoading.value = true;
   requestError.value = "";
   successSummary.value = "";
+  const intervalMs = Math.max(0, Math.trunc(Number(formData.serial_interval_ms) || 0));
+  const total = imeis.length;
+  let successCount = 0;
+  let failCount = 0;
   try {
-    const res: any = await xiaoanEcuMockBatchDeleteAPI({
-      mode: 3,
-      server,
-      imeis,
-    });
-    if (res != null && Number(res.code) !== 0) {
-      const msg = res?.msg || "批量停止失败";
-      requestError.value = msg;
-      message.error(msg);
-      return;
+    for (let i = 0; i < total; i++) {
+      const imei = imeis[i];
+      if (i > 0 && intervalMs > 0) {
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+      const res: any = await xiaoanEcuMockBatchDeleteAPI({
+        mode: 3,
+        server,
+        imeis: [imei],
+      });
+      if (res != null && Number(res.code) !== 0) {
+        failCount++;
+        continue;
+      }
+      const data = res?.data;
+      const list = Array.isArray(data?.list) ? data.list : [];
+      const failed = list.some((item: any) => item && item.success === false && String(item.imei) === imei);
+      if (failed) {
+        failCount++;
+      } else {
+        successCount++;
+        batchMockListRows.value = batchMockListRows.value.filter((r) => r.imei !== imei);
+      }
     }
-    const data = res?.data;
-    const list = Array.isArray(data?.list) ? data.list : [];
-    const failedImeis = new Set(
-      list.filter((item: any) => item && item.success === false && item.imei).map((item: any) => String(item.imei)),
-    );
-    // 后端 skipped 不在 list 中，仅有 skipped_count；因此这里保留失败项，其余（成功 + 跳过）都从列表清除
-    const removedImeis = new Set(imeis.filter((imei) => !failedImeis.has(imei)));
-    batchMockListRows.value = batchMockListRows.value.filter((r) => !removedImeis.has(r.imei));
     checkedRowKeys.value = [];
-    const sc = typeof data?.success_count === "number" ? data.success_count : removedImeis.size;
-    const fc = typeof data?.fail_count === "number" ? data.fail_count : 0;
-    const sk = typeof data?.skipped_count === "number" ? data.skipped_count : 0;
-    const tail = [fc > 0 ? `失败 ${fc}` : "", sk > 0 ? `跳过 ${sk}` : ""].filter(Boolean).join("，");
-    message.success(tail ? `批量停止完成：成功 ${sc} 台，${tail}` : `批量停止完成：成功 ${sc} 台`);
+    const tail = [failCount > 0 ? `失败 ${failCount}` : ""].filter(Boolean).join("，");
+    message.success(tail ? `批量停止完成：成功 ${successCount} 台，${tail}` : `批量停止完成：成功 ${successCount} 台`);
     saveFormToStorage();
+    saveCurrentSessionToActive();
   } catch (e: any) {
     const msg = e?.message || String(e) || "批量停止失败";
     requestError.value = msg;
@@ -2448,6 +2859,38 @@ async function handleCreate() {
       message.success(successSummary.value);
     }
     saveFormToStorage();
+    // 保存当前批次到 session
+    const resBatchGroup = res?.data?.batch_group ? String(res.data.batch_group) : "";
+    if (!activeSessionId.value) {
+      const newId = generateSessionId();
+      const newSession: BatchSessionMeta = {
+        id: newId,
+        batch_group: resBatchGroup,
+        createDatetime: new Date().toISOString().replace("T", " ").slice(0, 19),
+        env: formData.env || "",
+        business_type: formData.business_type,
+        rows: [...batchMockListRows.value],
+        formDataSnapshot: { ...formData },
+        successSummary: successSummary.value,
+        requestError: requestError.value,
+        showSharedBindCol: false,
+        showRentalBatchAddCol: false,
+        checkedRowKeys: [...checkedRowKeys.value],
+        currentCreateEnvSource: currentCreateEnvSource.value,
+        numInputStr: numInputStr.value,
+        voltageSlider: [...voltageSlider.value],
+      };
+      batchSessions.value.push(newSession);
+      activeSessionId.value = newId;
+    } else {
+      saveCurrentSessionToActive();
+      // 更新 batch_group
+      const cur = batchSessions.value.find((s) => s.id === activeSessionId.value);
+      if (cur && resBatchGroup && !cur.batch_group) {
+        cur.batch_group = resBatchGroup;
+      }
+    }
+    saveSessionsToStorage();
   } catch (error: any) {
     const msg = error?.message || String(error) || "批量创建失败";
     requestError.value = msg;
@@ -2887,5 +3330,118 @@ async function handleCreate() {
   font-size: 11px;
   color: #6b7280;
   cursor: help;
+}
+
+/* ========== 多批次 Tab 样式 ========== */
+.existing-tabs-wrap {
+  margin-bottom: 8px;
+}
+
+.existing-tabs-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.add-mock-button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.mock-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 200px;
+  max-width: 100%;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.mock-tab:hover {
+  border-color: #d1d5db;
+}
+
+.mock-tab-active {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.mock-tab-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.mock-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.mock-status-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.mock-status-env,
+.mock-status-tenant {
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.mock-tab-imei-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mock-tab-imei {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mock-tab-time {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.mock-tab-close-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  color: #9ca3af;
+}
+
+.mock-tab-close-btn:hover {
+  color: #d03050;
 }
 </style>

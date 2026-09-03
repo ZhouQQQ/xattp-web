@@ -151,6 +151,13 @@ export function xiaoanEcuMockBatchRecordAPI(params?: { source?: string }) {
   });
 }
 
+/** 小安中控批量模拟：获取当前用户所有批次分组 */
+export function xiaoanEcuMockBatchGroupsAPI() {
+  return AlovaInstance.Get(`${BASE_PATH}/ecu/mock/batch/groups`, {
+    params: { _ts: Date.now() },
+  });
+}
+
 /** 小安中控批量工具：批量绑定并上架 */
 export function xiaoanEcuBatchBindAndOnlineAPI(data: {
   env: string;

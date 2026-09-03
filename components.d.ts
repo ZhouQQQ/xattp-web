@@ -193,6 +193,7 @@ declare module 'vue' {
     NText: typeof import('naive-ui')['NText']
     NTooltip: typeof import('naive-ui')['NTooltip']
     NumeronymGenerator: typeof import('./src/tools/numeronym-generator/numeronym-generator.vue')['default']
+    NUpload: typeof import('naive-ui')['NUpload']
     OauthCallback: typeof import('./src/views/OauthCallback.vue')['default']
     OtpCodeGeneratorAndValidator: typeof import('./src/tools/otp-code-generator-and-validator/otp-code-generator-and-validator.vue')['default']
     OverseaEcuMock: typeof import('./src/tools/oversea-ecu-mock/oversea-ecu-mock.vue')['default']

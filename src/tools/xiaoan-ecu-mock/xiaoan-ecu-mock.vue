@@ -1280,7 +1280,7 @@ async function fetchExistingMockList(preferredConnectId = "") {
         return { connectId: itemConnectId, imei, raw: record };
       })
       .filter((item: ExistingMockItem | null): item is ExistingMockItem => item != null);
-    existingMockList.value = list;
+    existingMockList.value = list.reverse();
 
     let targetConnectId = preferredConnectId;
     if (!list.some((item) => item.connectId === targetConnectId)) {
