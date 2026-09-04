@@ -2148,6 +2148,13 @@ function applyEnvSelection(source: EnvSource, envKey: string, record: EnvRecord)
     formData.server = gateway;
   }
   saveFormToStorage();
+  const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+  if (session) {
+    session.business_type = BUSINESS_TYPE_BY_SOURCE[source];
+    session.env = envKey;
+    session.formDataSnapshot = { ...formData };
+    saveSessionsToStorage();
+  }
 }
 
 function resetDefaultCoords() {
@@ -2819,7 +2826,7 @@ async function handleCreate() {
 
   try {
     const payload = buildBatchPayload(formData);
-    payload.business_type = 1;
+    payload.business_type = formData.business_type || 1;
     const res: any = await xiaoanEcuMockBatchCreateAPI(payload);
     const resBusinessType = Number(res?.data?.business_type);
     if (resBusinessType === 1 || resBusinessType === 2 || resBusinessType === 3) {
