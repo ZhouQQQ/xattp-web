@@ -149,7 +149,7 @@ export interface TenantCarLevelMeta {
   };
 }
 
-/** 租户车辆数分级（昨日车辆数） */
+/** 租户车辆数分级（昨日上架车辆数） */
 export const TENANT_CAR_LEVEL_RULES: ReadonlyArray<{
   level: TenantCarLevel;
   definition: string;
@@ -178,7 +178,7 @@ function tenantCarLevelMeta(level: TenantCarLevel): TenantCarLevelMeta {
   };
 }
 
-/** 根据昨日车辆数返回租户级别；无有效数据时返回 null */
+/** 根据昨日上架车辆数返回租户级别；无有效数据时返回 null */
 export function resolveTenantCarLevel(carTotal?: number | null): TenantCarLevelMeta | null {
   if (carTotal == null || !Number.isFinite(Number(carTotal))) return null;
   const n = Number(carTotal);

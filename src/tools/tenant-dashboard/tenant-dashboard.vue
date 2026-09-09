@@ -5,7 +5,7 @@
         <div class="search-row">
           <n-input v-model:value="searchKeyword" clearable size="large" class="search-input search-input-mac"
             placeholder="搜索：租户ID / 租户名称" />
-          <div class="car-filter-wrap" title="按昨日车辆数筛选（与搜索同时生效）">
+          <div class="car-filter-wrap" title="按昨日上架车辆数筛选（与搜索同时生效）">
             <span class="car-filter-label">车辆</span>
             <n-select v-model:value="carFilterOp" size="small" :options="carFilterOpOptions"
               class="car-filter-op-select" :consistent-menu-width="false" />
@@ -49,7 +49,7 @@
             <template #trigger>
               <span class="meta-total meta-car-total" title="昨日车辆合计">
                 <n-icon :component="ScooterElectric" class="meta-total-icon" />
-                <span>车辆总数 {{ formatPanelCarShortLabel(metaCarTotal) }}</span>
+                <span>上架车辆总数约 {{ formatPanelCarShortLabel(metaCarTotal) }}</span>
               </span>
             </template>
             <div class="panel-stats-tooltip">车辆数：{{ formatPanelCarExact(metaCarTotal) }}</div>
@@ -138,7 +138,7 @@
                           <n-tooltip v-if="row.carLevel" trigger="hover" placement="top">
                             <template #trigger>
                               <n-tag size="small" :bordered="true" class="tenant-car-level-tag"
-                                :color="ebikeCountTagColor" title="昨日车辆数">
+                                :color="ebikeCountTagColor" title="昨日上架车辆数">
                                 <span class="tenant-car-level-inner">
                                   <span class="tenant-car-level-letter"
                                     :style="{ color: row.carLevel.color.textColor }">{{ row.carLevel.level }}</span>
@@ -151,7 +151,7 @@
                             </div>
                           </n-tooltip>
                           <n-tag v-else size="small" :bordered="true" class="tenant-car-level-tag"
-                            :color="ebikeCountTagColor" title="昨日车辆数">
+                            :color="ebikeCountTagColor" title="昨日上架车辆数">
                             <span class="tenant-car-level-inner tenant-car-level-inner-only-num">
                               <span class="tenant-car-level-num">{{ formatYesterdayCarTotal(row.tenant.carTotal) }}</span>
                             </span>
