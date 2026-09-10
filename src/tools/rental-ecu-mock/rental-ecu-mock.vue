@@ -384,6 +384,9 @@
           移动
         </n-button>
       </template>
+      <n-alert type="warning" :bordered="false" style="margin-bottom: 12px; font-size: 12px;">
+        尽量不要用移动功能模拟骑行轨迹或里程，后端可能过滤不合理的移动上报
+      </n-alert>
       <n-form :model="moveForm" label-width="100px" label-placement="top">
         <n-form-item label="方位角">
           <div class="move-compass">
