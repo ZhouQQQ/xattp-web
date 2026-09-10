@@ -824,6 +824,8 @@ const checkedImeis = computed(() =>
     .filter((imei) => /^\d{15}$/.test(imei)),
 );
 const tableSuccessFilter = ref<"all" | "success" | "fail">("all");
+/** 顺序模式下，下一次批量新增的起始 IMEI（自动 = 之前的 start_imei + num） */
+const nextSequentialStartImei = ref("");
 const tableSuccessFilterOptions = [
   { label: "全部", value: "all" },
   { label: "仅成功", value: "success" },
@@ -1009,6 +1011,20 @@ function handleAddBatchTab() {
     saveCurrentSessionToActive();
   }
   const prevForm = { ...formData };
+  // 顺序模式自动递进起始 IMEI
+  if (prevForm.mode === 2 && nextSequentialStartImei.value) {
+    formData.start_imei = nextSequentialStartImei.value;
+    prevForm.start_imei = nextSequentialStartImei.value;
+    nextSequentialStartImei.value = "";
+  }
+  // 新增 tab 清空模式专属输入字段，不沿用旧数据
+  prevForm.imeis_text = "";
+  prevForm.coordinates_text = "";
+  if (prevForm.mode !== 2) prevForm.start_imei = "";
+  // UI 也同步清空
+  formData.imeis_text = "";
+  formData.coordinates_text = "";
+  if (formData.mode !== 2) formData.start_imei = "";
   numInputStr.value = prevForm.num != null && Number.isFinite(Number(prevForm.num)) ? String(Math.trunc(Number(prevForm.num))) : "";
   batchMockListRows.value = [];
   checkedRowKeys.value = [];
@@ -1046,36 +1062,85 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
   const mergedRows = rows.length > 0 ? rows : parseBatchMockListFromLegacyRecordResponse({ data: group.list });
   const firstRecord = mergedRows[0] || null;
   const firstRaw = group.list?.[0] || {};
-  const formSnapshot: BatchFormData = {
-    env: group.env || "",
-    server: String(firstRaw.server || firstRecord?.server || ""),
-    tenant_id: firstRecord?.tenant_id || "",
-    business_type: group.business_type,
-    voltage_min: 50,
-    voltage_max: 54,
-    lat: firstRecord?.lat || DEFAULT_COORD_LAT,
-    lng: firstRecord?.lng || DEFAULT_COORD_LNG,
-    coord_combined_text: `${firstRecord?.lng || DEFAULT_COORD_LNG},${firstRecord?.lat || DEFAULT_COORD_LAT}`,
-    radius_m: 10000,
-    random_move_m: 0,
-    coord_mode: "scatter",
-    mode: Number(firstRaw.mode) === 1 || Number(firstRaw.mode) === 2 || Number(firstRaw.mode) === 3 ? Number(firstRaw.mode) as 1 | 2 | 3 : 1,
-    create_mode: 1,
-    serial_interval_ms: 10,
-    reply_delay_sec: 0,
-    enable_scheduled_report: true,
-    immediate_start_riding: false,
-    num: mergedRows.length,
-    start_imei: "",
-    imeis_text: "",
-    coordinates_text: "",
-  };
+
+  // 优先使用后端保存的表单快照（完整还原）
+  let formSnapshot: BatchFormData;
+  if (group.form_snapshot) {
+    let snap: any;
+    try {
+      snap = typeof group.form_snapshot === "string" ? JSON.parse(group.form_snapshot) : group.form_snapshot;
+    } catch {
+      snap = null;
+    }
+    if (snap) {
+      const snapCoords = Array.isArray(snap.coordinates) ? snap.coordinates : [];
+      formSnapshot = {
+        env: snap.env ?? group.env ?? "",
+        server: snap.server ?? String(firstRaw.server || firstRecord?.server || "") ?? "",
+        tenant_id: snap.tenant_id ?? firstRecord?.tenant_id ?? "",
+        business_type: snap.business_type ?? group.business_type,
+        voltage_min: snap.voltage_min ?? 50,
+        voltage_max: snap.voltage_max ?? 54,
+        lat: snap.lat ?? firstRecord?.lat ?? DEFAULT_COORD_LAT,
+        lng: snap.lng ?? firstRecord?.lng ?? DEFAULT_COORD_LNG,
+        coord_combined_text: snap.coord_mode === "scatter"
+          ? `${snap.lng ?? firstRecord?.lng ?? DEFAULT_COORD_LNG},${snap.lat ?? firstRecord?.lat ?? DEFAULT_COORD_LAT}`
+          : `${DEFAULT_COORD_LNG},${DEFAULT_COORD_LAT}`,
+        radius_m: snap.radius_m ?? 10000,
+        random_move_m: snap.random_move_m ?? 0,
+        coord_mode: snap.coord_mode === "fixed" ? "fixed" : "scatter",
+        mode: snap.mode === 1 || snap.mode === 2 || snap.mode === 3 ? snap.mode as 1 | 2 | 3 : 1,
+        create_mode: snap.create_mode === 2 ? 2 : 1,
+        serial_interval_ms: snap.serial_interval_ms ?? 10,
+        reply_delay_sec: snap.reply_delay_sec ?? 0,
+        enable_scheduled_report: snap.enable_scheduled_report !== false,
+        immediate_start_riding: snap.immediate_start_riding === true,
+        num: snap.num ?? mergedRows.length,
+        start_imei: snap.start_imei ?? group.start_imei ?? firstRaw.start_imei ?? "",
+        imeis_text: Array.isArray(snap.imeis) ? snap.imeis.join("\n") : "",
+        coordinates_text: snapCoords.length > 0 ? snapCoords.map((c: any) => `${c.lng},${c.lat}`).join("\n") : "",
+      };
+    } else {
+      formSnapshot = buildCompatSnapshot();
+    }
+  } else {
+    formSnapshot = buildCompatSnapshot();
+  }
+
+  /** 从 group/list 部分字段重建快照（兼容 form_snapshot 不存在的旧数据） */
+  function buildCompatSnapshot(): BatchFormData {
+    const groupMode = group.mode !== undefined ? Number(group.mode) : Number(firstRaw.mode);
+    return {
+      env: group.env || "",
+      server: String(firstRaw.server || firstRecord?.server || ""),
+      tenant_id: firstRecord?.tenant_id || "",
+      business_type: group.business_type,
+      voltage_min: 50,
+      voltage_max: 54,
+      lat: firstRecord?.lat || DEFAULT_COORD_LAT,
+      lng: firstRecord?.lng || DEFAULT_COORD_LNG,
+      coord_combined_text: `${firstRecord?.lng || DEFAULT_COORD_LNG},${firstRecord?.lat || DEFAULT_COORD_LAT}`,
+      radius_m: 10000,
+      random_move_m: 0,
+      coord_mode: "scatter",
+      mode: groupMode === 1 || groupMode === 2 || groupMode === 3 ? groupMode as 1 | 2 | 3 : 1,
+      create_mode: 1,
+      serial_interval_ms: 10,
+      reply_delay_sec: 0,
+      enable_scheduled_report: true,
+      immediate_start_riding: false,
+      num: mergedRows.length,
+      start_imei: group.start_imei || firstRaw.start_imei || "",
+      imeis_text: "",
+      coordinates_text: "",
+    };
+  }
   return {
     id: newId,
     batch_group: group.batch_group || "",
     createDatetime: group.create_datetime || new Date().toISOString().replace("T", " ").slice(0, 19),
-    env: group.env || "",
-    business_type: group.business_type,
+    env: formSnapshot.env || "",
+    business_type: formSnapshot.business_type,
     rows: mergedRows,
     formDataSnapshot: formSnapshot,
     successSummary: "",
@@ -2227,6 +2292,7 @@ function handleReset() {
   showSharedBindCol.value = false;
   showRentalBatchAddCol.value = false;
   currentCreateEnvSource.value = null;
+  nextSequentialStartImei.value = "";
   saveFormToStorage();
   const newId = generateSessionId();
   const newSession: BatchSessionMeta = {
@@ -2810,38 +2876,27 @@ async function handleStopMock() {
   stopMockLoading.value = true;
   requestError.value = "";
   successSummary.value = "";
-  const intervalMs = Math.max(0, Math.trunc(Number(formData.serial_interval_ms) || 0));
-  const total = imeis.length;
-  let successCount = 0;
-  let failCount = 0;
   try {
-    for (let i = 0; i < total; i++) {
-      const imei = imeis[i];
-      if (i > 0 && intervalMs > 0) {
-        await new Promise((r) => setTimeout(r, intervalMs));
-      }
-      const res: any = await xiaoanEcuMockBatchDeleteAPI({
-        mode: 3,
-        server,
-        imeis: [imei],
-      });
-      if (res != null && Number(res.code) !== 0) {
-        failCount++;
-        continue;
-      }
-      const data = res?.data;
-      const list = Array.isArray(data?.list) ? data.list : [];
-      const failed = list.some((item: any) => item && item.success === false && String(item.imei) === imei);
-      if (failed) {
-        failCount++;
-      } else {
-        successCount++;
-        batchMockListRows.value = batchMockListRows.value.filter((r) => r.imei !== imei);
-      }
+    const res: any = await xiaoanEcuMockBatchDeleteAPI({
+      mode: 3,
+      server,
+      imeis,
+    });
+    if (res != null && Number(res.code) !== 0) {
+      message.error(res?.msg || "批量停止失败");
+      requestError.value = res?.msg || "批量停止失败";
+      return;
     }
+    const data = res?.data;
+    const list = Array.isArray(data?.list) ? data.list : [];
+    const failedImeis = new Set(
+      list.filter((item: any) => item && item.success === false).map((item: any) => String(item.imei)),
+    );
+    const successImeis = imeis.filter((im) => !failedImeis.has(im));
     checkedRowKeys.value = [];
-    const tail = [failCount > 0 ? `失败 ${failCount}` : ""].filter(Boolean).join("，");
-    message.success(tail ? `批量停止完成：成功 ${successCount} 台，${tail}` : `批量停止完成：成功 ${successCount} 台`);
+    batchMockListRows.value = batchMockListRows.value.filter((r) => !successImeis.includes(r.imei));
+    const tail = [failedImeis.size > 0 ? `失败 ${failedImeis.size}` : ""].filter(Boolean).join("，");
+    message.success(tail ? `批量停止完成：成功 ${successImeis.length} 台，${tail}` : `批量停止完成：成功 ${successImeis.length} 台`);
     saveFormToStorage();
     saveCurrentSessionToActive();
   } catch (e: any) {
@@ -2942,6 +2997,15 @@ async function handleCreate() {
       }
     }
     saveSessionsToStorage();
+    // 顺序模式下自动递进起始 IMEI
+    if (formData.mode === 2 && /^\d{15}$/.test(formData.start_imei) && Number(formData.num) > 0) {
+      const nextImei = String(Number(formData.start_imei) + Number(formData.num)).padStart(15, "0");
+      if (/^\d{15}$/.test(nextImei)) {
+        nextSequentialStartImei.value = nextImei;
+      }
+    } else {
+      nextSequentialStartImei.value = "";
+    }
   } catch (error: any) {
     const msg = error?.message || String(error) || "批量创建失败";
     requestError.value = msg;
