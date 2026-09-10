@@ -27,6 +27,8 @@ export interface BatchFormData {
   reply_delay_sec: number;
   /** 是否开启周期上报（心跳 + GPS），默认开启；关闭时仍会初始化上报一次 */
   enable_scheduled_report: boolean;
+  /** 是否立即开始骑行：acc=1, defend=0, GPS 每5秒上报 */
+  immediate_start_riding: boolean;
   num: number | null;
   start_imei: string;
   imeis_text: string;
@@ -51,6 +53,7 @@ export interface BatchPayload {
   serial_interval_ms?: number;
   reply_delay_sec?: number;
   enable_scheduled_report?: boolean;
+  immediate_start_riding?: boolean;
   num?: number;
   start_imei?: string;
   imeis?: string[];
@@ -246,7 +249,8 @@ export function buildBatchPayload(form: BatchFormData): BatchPayload {
       REPLY_DELAY_MAX_SEC,
       Math.max(0, Math.trunc(Number(form.reply_delay_sec))),
     ),
-    enable_scheduled_report: form.enable_scheduled_report !== false,
+    immediate_start_riding: form.immediate_start_riding === true,
+    enable_scheduled_report: form.immediate_start_riding ? true : form.enable_scheduled_report !== false,
   };
 
   const server = form.server.trim();

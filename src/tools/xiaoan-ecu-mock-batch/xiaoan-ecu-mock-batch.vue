@@ -255,6 +255,22 @@
                 </n-form-item>
               </n-gi>
 
+              <n-gi :span="3">
+                <n-form-item label="立即开始骑行">
+                  <template #label>
+                    <span>立即开始骑行</span>
+                    <n-tooltip trigger="hover" style="margin-left: 8px;">
+                      <template #trigger>
+                        <span class="tip-text">?</span>
+                      </template>
+                      开启后电门开启（acc=1），设防关闭（defend=0），GPS 每 5 秒快速上报
+                    </n-tooltip>
+                  </template>
+                  <n-switch :value="formData.immediate_start_riding"
+                    @update:value="onImmediateStartRidingUpdate" />
+                </n-form-item>
+              </n-gi>
+
               <n-gi :span="4">
                 <n-form-item label="随机移动(m)">
                   <template #label>
@@ -317,7 +333,14 @@
                       @update:value="onReplyDelaySecUpdate" />
                     <div class="scheduled-report-inline">
                       <span class="scheduled-report-label">周期上报</span>
+                      <n-tooltip trigger="hover" style="margin-left: 2px;">
+                        <template #trigger>
+                          <span class="tip-text">?</span>
+                        </template>
+                        关闭：只上报一次数据；开启：周期上报数据
+                      </n-tooltip>
                       <n-switch :value="formData.enable_scheduled_report"
+                        :disabled="formData.immediate_start_riding"
                         @update:value="onEnableScheduledReportUpdate" />
                     </div>
                   </div>
@@ -690,6 +713,7 @@ const defaultFormData: BatchFormData = {
   serial_interval_ms: 10,
   reply_delay_sec: 0,
   enable_scheduled_report: true,
+  immediate_start_riding: false,
   num: 10,
   start_imei: "",
   imeis_text: "",
@@ -769,6 +793,9 @@ function getInitialFormData(): BatchFormData {
     }
     if (typeof merged.enable_scheduled_report !== "boolean") {
       merged.enable_scheduled_report = defaultFormData.enable_scheduled_report;
+    }
+    if (typeof merged.immediate_start_riding !== "boolean") {
+      merged.immediate_start_riding = defaultFormData.immediate_start_riding;
     }
     return merged;
   } catch {
@@ -1037,6 +1064,7 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
     serial_interval_ms: 10,
     reply_delay_sec: 0,
     enable_scheduled_report: true,
+    immediate_start_riding: false,
     num: mergedRows.length,
     start_imei: "",
     imeis_text: "",
@@ -1860,10 +1888,22 @@ function onReplyDelaySecUpdate(value: number | null) {
   saveFormToStorage();
 }
 
+function onImmediateStartRidingUpdate(value: boolean) {
+  formData.immediate_start_riding = value;
+  if (value && (formData.random_move_m == null || formData.random_move_m === 0)) {
+    formData.random_move_m = 30;
+  }
+  saveFormToStorage();
+}
+
 function onEnableScheduledReportUpdate(value: boolean) {
   if (value) {
     formData.enable_scheduled_report = true;
     saveFormToStorage();
+    return;
+  }
+  if (formData.immediate_start_riding) {
+    message.warning("立即开始骑行开启时，周期上报不可关闭");
     return;
   }
   dialog.warning({
@@ -2337,6 +2377,10 @@ function applyBatchRecordDataToForm(res: unknown) {
 
   if (typeof record.enable_scheduled_report === "boolean") {
     formData.enable_scheduled_report = record.enable_scheduled_report;
+  }
+
+  if (typeof record.immediate_start_riding === "boolean") {
+    formData.immediate_start_riding = record.immediate_start_riding;
   }
 
   const recordCoordinates = Array.isArray(record.coordinates) ? record.coordinates : [];
