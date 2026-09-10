@@ -158,6 +158,11 @@ export function xiaoanEcuMockBatchGroupsAPI() {
   });
 }
 
+/** 小安中控批量模拟：按 batch_group 整批停止 */
+export function xiaoanEcuMockBatchDeleteByGroupAPI(data: { batch_group: string }) {
+  return AlovaInstance.Post(`${BASE_PATH}/ecu/mock/batch_delete_by_group`, data);
+}
+
 /** 小安中控批量工具：批量绑定并上架 */
 export function xiaoanEcuBatchBindAndOnlineAPI(data: {
   env: string;

@@ -1,13 +1,17 @@
 <template>
   <div class="xiaoan-ecu-mock-batch">
-    <div v-if="batchSessions.length > 0" class="existing-tabs-wrap">
+    <div v-if="batchSessions.length > 0 || batchGroupsLoading" class="existing-tabs-wrap">
       <div class="existing-tabs-row">
         <button
           v-for="session in batchSessions"
           :key="session.id"
           type="button"
           class="mock-tab"
-          :class="{ 'mock-tab-active': session.id === activeSessionId }"
+          :class="{
+            'mock-tab-active': session.id === activeSessionId,
+            'mock-tab-removing': removingSessionId === session.id,
+          }"
+          :disabled="removingSessionId === session.id"
           @click="handleSessionTabChange(session.id)"
         >
           <span class="mock-tab-text">
@@ -18,7 +22,7 @@
             </span>
             <span class="mock-tab-imei-row">
               <span class="mock-status-tag mock-status-tenant">{{ formatBatchMode(session.formDataSnapshot.mode) }}</span>
-              <span class="mock-tab-imei">{{ session.rows.length }}台</span>
+              <span class="mock-tab-imei">{{ session.batchCount ?? session.rows.length }}台</span>
             </span>
           </span>
           <n-button
@@ -27,6 +31,8 @@
             size="tiny"
             class="mock-tab-close-btn"
             title="删除批次"
+            :loading="removingSessionId === session.id"
+            :disabled="removingSessionId === session.id"
             @click.stop="handleRemoveSession(session.id)"
           >
             <template #icon>
@@ -46,6 +52,14 @@
           </template>
           新增批次
         </n-button>
+      </div>
+      <div v-if="batchGroupsLoading" class="tabs-loading-bar">
+        <n-spin size="small" />
+      </div>
+      <div class="tabs-summary">
+        <span class="tabs-summary-text">
+          共 {{ batchSessions.length }} 批，{{ totalDeviceCount }} 台
+        </span>
       </div>
     </div>
     <n-card>
@@ -99,7 +113,7 @@
                   <div class="mode-section">
                     <n-radio-group v-model:value="formData.mode" name="batch-mode">
                       <n-space>
-                        <n-radio :value="1">随机模式</n-radio>
+                        <!-- <n-radio :value="1">随机模式</n-radio> -->
                         <n-radio :value="2">顺序模式</n-radio>
                         <n-radio :value="3">指定模式</n-radio>
                       </n-space>
@@ -111,7 +125,7 @@
                 </n-form-item>
               </n-gi>
 
-              <n-gi :span="12" v-if="formData.mode === 1">
+              <!-- <n-gi :span="12" v-if="formData.mode === 1">
                 <n-form-item label="创建数量" required>
                   <div class="num-field">
                     <n-input :value="numInputStr" type="number" inputmode="numeric" min="1" placeholder="请输入随机创建数量"
@@ -119,7 +133,7 @@
                       @wheel.prevent="onNumInputWheel" />
                   </div>
                 </n-form-item>
-              </n-gi>
+              </n-gi> -->
 
               <template v-if="formData.mode === 2">
                 <n-gi :span="6">
@@ -356,13 +370,13 @@
                         批量创建
                       </n-button>
                       <n-button v-else type="warning" :loading="stopMockLoading"
-                        :disabled="batchRecordLoading || checkedRowKeys.length === 0" @click="handleStopMock">
-                        停止模拟（{{ checkedRowKeys.length }}）
-                      </n-button>
-                      <n-button v-if="batchMockSessionActive" type="default"
+  :disabled="batchRecordLoading || (checkedRowKeys.length === 0 && !hasBatchGroup)" @click="handleStopMock">
+  停止模拟（{{ stopCount }}）
+</n-button>
+                      <!-- <n-button v-if="batchMockSessionActive" type="default"
                         :disabled="batchRecordLoading || checkedImeis.length === 0" @click="handleCopyCheckedImeis">
                         复制IMEI{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
-                      </n-button>
+                      </n-button> -->
                       <n-button type="default" :disabled="batchRecordLoading || batchMockSessionActive"
                         @click="handleReset">
                         重置
@@ -388,7 +402,7 @@
 
           <n-alert v-if="successSummary" class="result-block" type="success" :title="successSummary" />
 
-          <div v-if="batchMockListRows.length > 0" class="result-block batch-mock-result-table">
+          <div v-if="batchMockListRows.length > 0 && showDetailTable" class="result-block batch-mock-result-table">
             <div class="table-actions">
               <n-space :size="8" align="center" class="table-actions-left">
                 <n-button size="small" quaternary type="primary" :disabled="batchRecordLoading"
@@ -558,7 +572,7 @@ import {
   xiaoanEcuBatchBindAndOnlineAPI,
   xiaoanEcuServiceAreaAllAPI,
   xiaoanEcuMockBatchCreateAPI,
-  xiaoanEcuMockBatchDeleteAPI,
+  xiaoanEcuMockBatchDeleteByGroupAPI,
   xiaoanEcuMockBatchGroupsAPI,
   xiaoanEcuMockBatchRecordAPI,
   xiaoanEcuMockUpdateAPI,
@@ -813,9 +827,11 @@ const voltageSlider = ref<[number, number]>([
 ]);
 const createLoading = ref(false);
 const stopMockLoading = ref(false);
+const removingSessionId = ref("");
 const requestError = ref("");
 const successSummary = ref("");
 const batchMockListRows = ref<BatchMockListRow[]>([]);
+const showDetailTable = ref(true);
 const checkedRowKeys = ref<DataTableRowKey[]>([]);
 const checkedImeis = computed(() =>
   batchMockListRows.value
@@ -916,12 +932,15 @@ interface BatchSessionMeta {
   env: string;
   business_type: 1 | 2 | 3 | null;
   rows: BatchMockListRow[];
+  /** 批次总数量，无明细列表时替代 rows.length */
+  batchCount: number;
   /** 保存快照 */
   formDataSnapshot: BatchFormData;
   successSummary: string;
   requestError: string;
   showSharedBindCol: boolean;
   showRentalBatchAddCol: boolean;
+  showDetailTable: boolean;
   checkedRowKeys: string[];
   currentCreateEnvSource: EnvSource | null;
   numInputStr: string;
@@ -972,6 +991,7 @@ function saveCurrentSessionToActive() {
   session.requestError = requestError.value;
   session.showSharedBindCol = showSharedBindCol.value;
   session.showRentalBatchAddCol = showRentalBatchAddCol.value;
+  session.showDetailTable = showDetailTable.value;
   session.checkedRowKeys = [...checkedRowKeys.value];
   session.currentCreateEnvSource = currentCreateEnvSource.value;
   session.numInputStr = numInputStr.value;
@@ -986,6 +1006,7 @@ function loadSessionIntoUI(session: BatchSessionMeta) {
   requestError.value = session.requestError;
   showSharedBindCol.value = session.showSharedBindCol;
   showRentalBatchAddCol.value = session.showRentalBatchAddCol;
+  showDetailTable.value = session.showDetailTable;
   checkedRowKeys.value = session.checkedRowKeys;
   currentCreateEnvSource.value = session.currentCreateEnvSource;
   numInputStr.value = session.numInputStr;
@@ -1040,12 +1061,14 @@ function handleAddBatchTab() {
     env: prevForm.env || "",
     business_type: prevForm.business_type,
     rows: [],
+    batchCount: Number(prevForm.num) || 0,
     formDataSnapshot: { ...prevForm },
     successSummary: "",
     requestError: "",
     showSharedBindCol: false,
     showRentalBatchAddCol: false,
-    checkedRowKeys: [],
+    showDetailTable: true,
+      checkedRowKeys: [],
     currentCreateEnvSource: currentCreateEnvSource.value,
     numInputStr: numInputStr.value,
     voltageSlider: [prevForm.voltage_min ?? 0, prevForm.voltage_max ?? 0],
@@ -1107,13 +1130,13 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
     formSnapshot = buildCompatSnapshot();
   }
 
-  /** 从 group/list 部分字段重建快照（兼容 form_snapshot 不存在的旧数据） */
+  /** 从 group 部分字段重建快照（兼容 form_snapshot 不存在的旧数据） */
   function buildCompatSnapshot(): BatchFormData {
-    const groupMode = group.mode !== undefined ? Number(group.mode) : Number(firstRaw.mode);
+    const groupMode = group.mode != null ? Number(group.mode) : 1;
     return {
       env: group.env || "",
-      server: String(firstRaw.server || firstRecord?.server || ""),
-      tenant_id: firstRecord?.tenant_id || "",
+      server: group.server || "",
+      tenant_id: group.tenant_id || "",
       business_type: group.business_type,
       voltage_min: 50,
       voltage_max: 54,
@@ -1142,12 +1165,14 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
     env: formSnapshot.env || "",
     business_type: formSnapshot.business_type,
     rows: mergedRows,
+    batchCount: group.count ?? mergedRows.length,
     formDataSnapshot: formSnapshot,
     successSummary: "",
     requestError: "",
     showSharedBindCol: false,
     showRentalBatchAddCol: false,
-    checkedRowKeys: mergedRows.map((r) => r.row_key),
+    showDetailTable: true,
+      checkedRowKeys: mergedRows.map((r) => r.row_key),
     currentCreateEnvSource: null,
     numInputStr: "",
     voltageSlider: [0, 0],
@@ -1157,25 +1182,16 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
 async function handleRemoveSession(sessionId: string) {
   const idx = batchSessions.value.findIndex((s) => s.id === sessionId);
   if (idx === -1) return;
+  removingSessionId.value = sessionId;
   const session = batchSessions.value[idx];
   const wasActive = sessionId === activeSessionId.value;
 
   // 停止该批次所有模拟中控
-  const imeis = Array.from(
-    new Set(
-      session.rows
-        .filter((r) => r.is_mock_success && r.connect_id)
-        .map((r) => r.imei)
-        .filter((im) => /^\d{15}$/.test(im)),
-    ),
-  );
-  const server = session.formDataSnapshot.server?.trim();
-  if (imeis.length > 0 && server) {
+  const batchGroup = session.batch_group?.trim();
+  if (batchGroup) {
     try {
-      await xiaoanEcuMockBatchDeleteAPI({
-        mode: 3,
-        server,
-        imeis,
+      await xiaoanEcuMockBatchDeleteByGroupAPI({
+        batch_group: batchGroup,
       });
     } catch {
       // 停止失败不影响删除
@@ -1200,6 +1216,7 @@ async function handleRemoveSession(sessionId: string) {
     loadSessionIntoUI(next);
   }
   saveSessionsToStorage();
+  removingSessionId.value = "";
 }
 
 function saveSessionsToStorage() {
@@ -1241,6 +1258,7 @@ function loadSessionsFromStorage() {
 
 /** 从后端 API 加载批次分组 */
 async function loadBatchGroupsFromApi() {
+  batchGroupsLoading.value = true;
   try {
     const res: any = await xiaoanEcuMockBatchGroupsAPI();
     if (res != null && Number(res.code) !== 0) return;
@@ -1258,6 +1276,8 @@ async function loadBatchGroupsFromApi() {
     saveSessionsToStorage();
   } catch {
     // 忽略
+  } finally {
+    batchGroupsLoading.value = false;
   }
 }
 
@@ -1548,7 +1568,24 @@ async function loadRentalBatchAddVehicleModelOptions() {
 }
 
 // 只要结果表存在数据（无论成功/失败），都视为处于“开始模拟”状态，需先停止后才能再次创建
-const batchMockSessionActive = computed(() => batchMockListRows.value.length > 0);
+const batchMockSessionActive = computed(() => {
+  if (batchMockListRows.value.length > 0) return true;
+  // 无明细列表时，有 batch_group 也视为有活跃批次（可停止）
+  const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+  return !!session?.batch_group;
+});
+const hasBatchGroup = computed(() => {
+  const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+  return !!session?.batch_group;
+});
+const stopCount = computed(() => {
+  if (checkedRowKeys.value.length > 0) return checkedRowKeys.value.length;
+  const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+  return session?.batchCount ?? 0;
+});
+const totalDeviceCount = computed(() =>
+  batchSessions.value.reduce((sum, s) => sum + (s.batchCount ?? s.rows.length), 0)
+);
 const sharedBindDisabledByEnv = computed(() => formData.business_type !== 1);
 const rentalBatchAddDisabledByEnv = computed(() => formData.business_type !== 2);
 
@@ -1847,6 +1884,7 @@ const envPickerPage = ref(1);
 const ENV_PICKER_PAGE_SIZE = 5;
 let envPickerRequestId = 0;
 const batchRecordLoading = ref(false);
+const batchGroupsLoading = ref(false);
 let batchRecordLoaded = false;
 
 const envPickerTitle = computed(() => {
@@ -2302,12 +2340,14 @@ function handleReset() {
     env: "",
     business_type: null,
     rows: [],
+    batchCount: 0,
     formDataSnapshot: { ...formData },
     successSummary: "",
     requestError: "",
     showSharedBindCol: false,
     showRentalBatchAddCol: false,
-    checkedRowKeys: [],
+    showDetailTable: true,
+      checkedRowKeys: [],
     currentCreateEnvSource: null,
     numInputStr: "",
     voltageSlider: [0, 0],
@@ -2807,11 +2847,13 @@ async function loadBatchMockRecords() {
         env: formData.env || "",
         business_type: formData.business_type,
         rows: [...mergedRows],
+        batchCount: mergedRows.length,
         formDataSnapshot: { ...formData },
         successSummary: successSummary.value,
         requestError: requestError.value,
         showSharedBindCol: false,
         showRentalBatchAddCol: false,
+        showDetailTable: true,
         checkedRowKeys: [...checkedRowKeys.value],
         currentCreateEnvSource: currentCreateEnvSource.value,
         numInputStr: numInputStr.value,
@@ -2851,61 +2893,40 @@ if (batchSessions.value.length === 0) {
 }
 
 async function handleStopMock() {
-  const keys = checkedRowKeys.value.map((k) => String(k)).filter(Boolean);
-  if (keys.length === 0) {
-    message.warning("请先勾选要停止模拟的连接");
-    return;
-  }
-  const server = formData.server?.trim();
-  if (!server) {
-    message.error("设备网关为空，无法批量停止。请填写与创建时一致的网关（server）。");
-    return;
-  }
-  const imeis = Array.from(
-    new Set(
-      batchMockListRows.value
-        .filter((r) => keys.includes(r.row_key))
-        .map((r) => String(r.imei ?? "").trim())
-        .filter((im) => /^\d{15}$/.test(im)),
-    ),
-  );
-  if (imeis.length === 0) {
-    message.warning("无法从勾选行解析有效 IMEI，请重新勾选");
-    return;
-  }
-  stopMockLoading.value = true;
-  requestError.value = "";
-  successSummary.value = "";
-  try {
-    const res: any = await xiaoanEcuMockBatchDeleteAPI({
-      mode: 3,
-      server,
-      imeis,
-    });
-    if (res != null && Number(res.code) !== 0) {
-      message.error(res?.msg || "批量停止失败");
-      requestError.value = res?.msg || "批量停止失败";
-      return;
+  const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+  const batchGroup = session?.batch_group?.trim() || "";
+  if (batchGroup) {
+    // 有 batch_group，按批次 ID 一次停止整批
+    stopMockLoading.value = true;
+    requestError.value = "";
+    successSummary.value = "";
+    try {
+      const res: any = await xiaoanEcuMockBatchDeleteByGroupAPI({
+        batch_group: batchGroup,
+      });
+      if (res != null && Number(res.code) !== 0) {
+        message.error(res?.msg || "批量停止失败");
+        requestError.value = res?.msg || "批量停止失败";
+        return;
+      }
+      checkedRowKeys.value = [];
+      batchMockListRows.value = [];
+      showDetailTable.value = false;
+      message.success("批量停止完成");
+      saveFormToStorage();
+      saveCurrentSessionToActive();
+    } catch (e: any) {
+      const msg = e?.message || String(e) || "批量停止失败";
+      requestError.value = msg;
+      message.error(msg);
+    } finally {
+      stopMockLoading.value = false;
     }
-    const data = res?.data;
-    const list = Array.isArray(data?.list) ? data.list : [];
-    const failedImeis = new Set(
-      list.filter((item: any) => item && item.success === false).map((item: any) => String(item.imei)),
-    );
-    const successImeis = imeis.filter((im) => !failedImeis.has(im));
-    checkedRowKeys.value = [];
-    batchMockListRows.value = batchMockListRows.value.filter((r) => !successImeis.includes(r.imei));
-    const tail = [failedImeis.size > 0 ? `失败 ${failedImeis.size}` : ""].filter(Boolean).join("，");
-    message.success(tail ? `批量停止完成：成功 ${successImeis.length} 台，${tail}` : `批量停止完成：成功 ${successImeis.length} 台`);
-    saveFormToStorage();
-    saveCurrentSessionToActive();
-  } catch (e: any) {
-    const msg = e?.message || String(e) || "批量停止失败";
-    requestError.value = msg;
-    message.error(msg);
-  } finally {
-    stopMockLoading.value = false;
+    return;
   }
+
+  // 没有 batch_group，无法停止
+  message.warning("该批次没有 batch_group，无法停止");
 }
 
 async function handleCreate() {
@@ -2942,27 +2963,56 @@ async function handleCreate() {
     }
 
     const list = parseBatchMockListFromResponse(res);
-    batchMockListRows.value = list;
-    const resRandomMoveM = Number(res?.data?.random_move_m);
+    const resData = res?.data;
+    const hasList = list.length > 0;
+    if (hasList) {
+      batchMockListRows.value = list;
+      checkedRowKeys.value = list.map((row) => row.row_key);
+    } else {
+      // 无明细列表，不保留任何行数据
+      batchMockListRows.value = [];
+      checkedRowKeys.value = [];
+    }
+    showDetailTable.value = hasList;
+    const resRandomMoveM = Number(resData?.random_move_m);
     if (Number.isFinite(resRandomMoveM) && resRandomMoveM >= 0) {
       formData.random_move_m = resRandomMoveM;
     }
-    const successRows = list.filter((row) => row.is_mock_success && !!row.connect_id);
-    const failRows = list.filter((row) => !row.is_mock_success);
-    checkedRowKeys.value = list.map((row) => row.row_key);
-    if (successRows.length > 0) {
-      const tail = failRows.length > 0 ? `，失败 ${failRows.length} 台` : "";
-      successSummary.value = `批量创建完成：成功 ${successRows.length} 台${tail}（耗时 ${elapsedSec} 秒）`;
-      message.success(successSummary.value);
-    } else if (failRows.length > 0) {
-      const firstError = failRows.find((row) => !!row.error)?.error || "请查看下方失败原因";
-      requestError.value = `批量创建失败：共 ${failRows.length} 台失败，原因示例：${firstError}`;
-      message.error("批量创建失败，请查看下方失败原因");
+    const resSuccessCount = Number(resData?.success_count) || 0;
+    const resFailCount = Number(resData?.fail_count) || 0;
+    if (hasList) {
+      // 有明细列表，逐条处理
+      const successRows = list.filter((row) => row.is_mock_success && !!row.connect_id);
+      const failRows = list.filter((row) => !row.is_mock_success);
+      checkedRowKeys.value = list.map((row) => row.row_key);
+      if (successRows.length > 0) {
+        const tail = failRows.length > 0 ? `，失败 ${failRows.length} 台` : "";
+        successSummary.value = `批量创建完成：成功 ${successRows.length} 台${tail}（耗时 ${elapsedSec} 秒）`;
+        message.success(successSummary.value);
+      } else if (failRows.length > 0) {
+        const firstError = failRows.find((row) => !!row.error)?.error || "请查看下方失败原因";
+        requestError.value = `批量创建失败：共 ${failRows.length} 台失败，原因示例：${firstError}`;
+        message.error("批量创建失败，请查看下方失败原因");
+      } else {
+        checkedRowKeys.value = [];
+        const count = getCreatedCount();
+        successSummary.value = `批量创建请求成功，已提交 ${count} 台设备（耗时 ${elapsedSec} 秒）`;
+        message.success(successSummary.value);
+      }
     } else {
-      checkedRowKeys.value = [];
-      const count = getCreatedCount();
-      successSummary.value = `批量创建请求成功，已提交 ${count} 台设备（耗时 ${elapsedSec} 秒）`;
-      message.success(successSummary.value);
+      // 无明细列表，直接用计数（checkedRowKeys 已全选，不清空以便停止）
+      if (resSuccessCount > 0) {
+        const tail = resFailCount > 0 ? `，失败 ${resFailCount} 台` : "";
+        successSummary.value = `批量创建完成：成功 ${resSuccessCount} 台${tail}（耗时 ${elapsedSec} 秒）`;
+        message.success(successSummary.value);
+      } else if (resFailCount > 0) {
+        requestError.value = `批量创建失败：共 ${resFailCount} 台失败`;
+        message.error("批量创建失败");
+      } else {
+        const count = getCreatedCount();
+        successSummary.value = `批量创建请求成功，已提交 ${count} 台设备（耗时 ${elapsedSec} 秒）`;
+        message.success(successSummary.value);
+      }
     }
     saveFormToStorage();
     // 保存当前批次到 session
@@ -2976,11 +3026,13 @@ async function handleCreate() {
         env: formData.env || "",
         business_type: formData.business_type,
         rows: [...batchMockListRows.value],
+        batchCount: resSuccessCount || getCreatedCount(),
         formDataSnapshot: { ...formData },
         successSummary: successSummary.value,
         requestError: requestError.value,
         showSharedBindCol: false,
         showRentalBatchAddCol: false,
+        showDetailTable: true,
         checkedRowKeys: [...checkedRowKeys.value],
         currentCreateEnvSource: currentCreateEnvSource.value,
         numInputStr: numInputStr.value,
@@ -3460,9 +3512,37 @@ async function handleCreate() {
   min-width: 0;
 }
 
+.tabs-loading-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: #888;
+  font-size: 13px;
+}
+
+.tabs-loading-text {
+  white-space: nowrap;
+}
+
+.tabs-summary {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px 8px;
+}
+
+.tabs-summary-text {
+  font-size: 12px;
+  color: #999;
+}
+
 .add-mock-button {
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.tabs-loading-spin {
+  margin-left: 8px;
 }
 
 .mock-tab {
