@@ -18,11 +18,19 @@
             <span class="mock-tab-top">
               <span class="mock-status-tag mock-status-tenant">{{ formatBusinessType(session.business_type) }}</span>
               <span class="mock-status-tag mock-status-env">{{ session.env || "-" }}</span>
-              <span class="mock-tab-time" :title="session.createDatetime">{{ formatRelativeCreateAt(session.createDatetime) }}</span>
-            </span>
-            <span class="mock-tab-imei-row">
               <span class="mock-status-tag mock-status-tenant">{{ formatBatchMode(session.formDataSnapshot.mode) }}</span>
               <span class="mock-tab-imei">{{ session.batchCount ?? session.rows.length }}台</span>
+              <span class="mock-tab-time" :title="session.createDatetime">{{ formatRelativeCreateAt(session.createDatetime) }}</span>
+            </span>
+            <span v-if="session.formDataSnapshot.mode === 2" class="mock-tab-imei-row">
+              <span v-if="session.formDataSnapshot.start_imei" class="mock-tab-imei-range" title="点击复制IMEI范围" @click.stop="copyImeiRange(session)">
+                {{ session.formDataSnapshot.start_imei }}-{{ getEndImei(session) }}
+              </span>
+            </span>
+            <span v-if="session.formDataSnapshot.mode === 3" class="mock-tab-imei-row">
+              <span class="mock-tab-imei-range">
+                {{ getFirstSpecifiedImei(session) }}等
+              </span>
             </span>
           </span>
           <n-button
@@ -52,14 +60,14 @@
           </template>
           新增批次
         </n-button>
+        <div class="tabs-summary">
+          <span class="tabs-summary-text">
+            共 {{ batchSessions.length }} 批，{{ totalDeviceCount }} 台
+          </span>
+        </div>
       </div>
       <div v-if="batchGroupsLoading" class="tabs-loading-bar">
         <n-spin size="small" />
-      </div>
-      <div class="tabs-summary">
-        <span class="tabs-summary-text">
-          共 {{ batchSessions.length }} 批，{{ totalDeviceCount }} 台
-        </span>
       </div>
     </div>
     <n-card>
@@ -722,7 +730,7 @@ const defaultFormData: BatchFormData = {
   radius_m: 10000,
   random_move_m: 0,
   coord_mode: "scatter",
-  mode: 1,
+  mode: 2,
   create_mode: 1,
   serial_interval_ms: 10,
   reply_delay_sec: 0,
@@ -968,6 +976,24 @@ function formatBatchMode(mode: number | null | undefined): string {
   return "-";
 }
 
+function getEndImei(session: BatchSessionMeta): string {
+  const start = session.formDataSnapshot.start_imei;
+  const count = session.batchCount ?? session.rows.length;
+  if (!start || count <= 0) return "";
+  return String(Number(start) + count - 1).padStart(15, "0");
+}
+
+function copyImeiRange(session: BatchSessionMeta) {
+  const start = session.formDataSnapshot.start_imei;
+  const end = getEndImei(session);
+  const text = start && end ? `${start}-${end}` : "";
+  if (!text || !navigator?.clipboard) return;
+  navigator.clipboard.writeText(text).then(
+    () => message.success("已复制 IMEI 范围"),
+    () => {},
+  );
+}
+
 function formatRelativeCreateAt(createAt?: string): string {
   if (!createAt || typeof createAt !== "string") return "-";
   const createMs = Date.parse(createAt.replace(/-/g, "/"));
@@ -980,6 +1006,13 @@ function formatRelativeCreateAt(createAt?: string): string {
   if (diffHour < 24) return `${diffHour} 小时前`;
   const diffDay = Math.floor(diffHour / 24);
   return `${diffDay} 天前`;
+}
+
+function getFirstSpecifiedImei(session: BatchSessionMeta): string {
+  const text = session.formDataSnapshot.imeis_text || "";
+  if (!text) return "";
+  const imeis = text.split(/[\s,，;；]+/).map((s) => s.trim()).filter(Boolean);
+  return imeis[0] || "";
 }
 
 function saveCurrentSessionToActive() {
@@ -1032,12 +1065,15 @@ function handleAddBatchTab() {
     saveCurrentSessionToActive();
   }
   const prevForm = { ...formData };
-  // 顺序模式自动递进起始 IMEI
-  if (prevForm.mode === 2 && nextSequentialStartImei.value) {
-    formData.start_imei = nextSequentialStartImei.value;
-    prevForm.start_imei = nextSequentialStartImei.value;
-    nextSequentialStartImei.value = "";
+  // 顺序模式自动递进起始 IMEI：新的 tab 从 start_imei + num 开始
+  if (prevForm.mode === 2 && /^\d{15}$/.test(prevForm.start_imei) && Number(prevForm.num) > 0) {
+    const nextImei = String(Number(prevForm.start_imei) + Number(prevForm.num)).padStart(15, "0");
+    if (/^\d{15}$/.test(nextImei)) {
+      formData.start_imei = nextImei;
+      prevForm.start_imei = nextImei;
+    }
   }
+  nextSequentialStartImei.value = "";
   // 新增 tab 清空模式专属输入字段，不沿用旧数据
   prevForm.imeis_text = "";
   prevForm.coordinates_text = "";
@@ -1174,7 +1210,10 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
     showDetailTable: true,
       checkedRowKeys: mergedRows.map((r) => r.row_key),
     currentCreateEnvSource: null,
-    numInputStr: "",
+    numInputStr:
+      formSnapshot.num != null && Number.isFinite(Number(formSnapshot.num))
+        ? String(Math.trunc(Number(formSnapshot.num)))
+        : "",
     voltageSlider: [0, 0],
   };
 }
@@ -1200,8 +1239,13 @@ async function handleRemoveSession(sessionId: string) {
 
   batchSessions.value.splice(idx, 1);
   if (batchSessions.value.length === 0) {
-    Object.assign(formData, { ...defaultFormData });
-    numInputStr.value = formData.num != null && Number.isFinite(Number(formData.num)) ? String(Math.trunc(Number(formData.num))) : "";
+    // 恢复最近一次表单缓存，而不是清空
+    const cached = getInitialFormData();
+    Object.assign(formData, cached);
+    numInputStr.value =
+      formData.num != null && Number.isFinite(Number(formData.num))
+        ? String(Math.trunc(Number(formData.num)))
+        : "";
     syncVoltageSliderFromForm();
     batchMockListRows.value = [];
     checkedRowKeys.value = [];
@@ -1209,6 +1253,7 @@ async function handleRemoveSession(sessionId: string) {
     successSummary.value = "";
     showSharedBindCol.value = false;
     showRentalBatchAddCol.value = false;
+    showDetailTable.value = true;
     currentCreateEnvSource.value = null;
     activeSessionId.value = "";
   } else if (wasActive) {
@@ -2086,6 +2131,22 @@ watch(
   },
 );
 
+// 表单变化实时同步到当前 tab 的快照
+watch(
+  () => ({ ...formData }),
+  (snap) => {
+    const session = batchSessions.value.find((s) => s.id === activeSessionId.value);
+    if (session) {
+      Object.assign(session.formDataSnapshot, snap);
+      session.env = snap.env || "";
+      session.business_type = snap.business_type;
+      session.batchCount = snap.mode === 3 ? (Array.isArray(snap.imeis_text) ? snap.imeis_text.length : 0) : Number(snap.num) || 0;
+      saveSessionsToStorage();
+    }
+  },
+  { deep: true },
+);
+
 function onNumInputWheel() {
   // 避免 number 输入框聚焦时滚轮改变值
 }
@@ -2912,6 +2973,11 @@ async function handleStopMock() {
       checkedRowKeys.value = [];
       batchMockListRows.value = [];
       showDetailTable.value = false;
+      // 清除 batch_group 使表单可交互、按钮切回「批量创建」
+      if (session) {
+        session.batch_group = "";
+        session.batchCount = 0;
+      }
       message.success("批量停止完成");
       saveFormToStorage();
       saveCurrentSessionToActive();
@@ -3549,7 +3615,7 @@ async function handleCreate() {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-width: 200px;
+  min-width: 260px;
   max-width: 100%;
   padding: 4px 6px 4px 8px;
   border: 1px solid #e5e7eb;
@@ -3619,6 +3685,15 @@ async function handleCreate() {
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.mock-tab-imei-range {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 .mock-tab-time {
