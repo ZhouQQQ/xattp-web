@@ -384,8 +384,9 @@
           移动
         </n-button>
       </template>
-      <n-alert type="warning" :bordered="false" style="margin-bottom: 12px; font-size: 12px;">
-        尽量不要用移动功能模拟骑行轨迹或里程，后端可能过滤不合理的移动上报
+      <n-alert type="warning" :bordered="false" style="margin-bottom: 12px; font-size: 12px; line-height: 1.6;">
+        <div>移动功能仅用于调整设备坐标位置，请勿用于模拟骑行<span style="color: #d03050; font-weight: 600;">轨迹</span>或<span style="color: #d03050; font-weight: 600;">里程</span>。</div>
+        <div>后端会校验数据合理性，不合理的数据将被过滤，导致骑行数据异常。</div>
       </n-alert>
       <n-form :model="moveForm" label-width="100px" label-placement="top">
         <n-form-item label="方位角">
