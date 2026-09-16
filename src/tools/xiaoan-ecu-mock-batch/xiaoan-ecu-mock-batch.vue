@@ -2140,7 +2140,7 @@ watch(
       Object.assign(session.formDataSnapshot, snap);
       session.env = snap.env || "";
       session.business_type = snap.business_type;
-      session.batchCount = snap.mode === 3 ? (Array.isArray(snap.imeis_text) ? snap.imeis_text.length : 0) : Number(snap.num) || 0;
+      session.batchCount = snap.mode === 3 ? validImeis.value.length : Number(snap.num) || 0;
       saveSessionsToStorage();
     }
   },
