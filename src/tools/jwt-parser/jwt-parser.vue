@@ -4,9 +4,10 @@ import { useValidation } from '@/composable/validation';
 import { isNotThrowing } from '@/utils/boolean';
 import { withDefaultOnError } from '@/utils/defaults';
 
-const rawJwt = ref(
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
-);
+const DEMO_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+
+// 默认填入当前登录用户的 JWT，未登录时退回示例 token
+const rawJwt = ref(localStorage.getItem('token') || DEMO_JWT);
 
 const decodedJWT = computed(() =>
   withDefaultOnError(() => decodeJwt({ jwt: rawJwt.value }), { header: [], payload: [] }),
@@ -30,7 +31,7 @@ const validation = useValidation({
 
 <template>
   <c-card>
-    <c-input-text v-model:value="rawJwt" label="JWT to decode" :validation="validation" placeholder="Put your token here..." rows="5" multiline raw-text autofocus mb-3 />
+    <c-input-text v-model:value="rawJwt" label="JWT to decode" :validation="validation" placeholder="Put your token here... (Bearer prefix is supported)" rows="5" multiline raw-text autofocus mb-3 />
 
     <n-table v-if="validation.isValid">
       <tbody>

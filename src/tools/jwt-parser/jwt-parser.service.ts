@@ -5,8 +5,10 @@ import { ALGORITHM_DESCRIPTIONS, CLAIM_DESCRIPTIONS } from './jwt-parser.constan
 export { decodeJwt };
 
 function decodeJwt({ jwt }: { jwt: string }) {
-  const rawHeader = jwtDecode<JwtHeader>(jwt, { header: true });
-  const rawPayload = jwtDecode<JwtPayload>(jwt);
+  const token = stripBearerPrefix(jwt);
+
+  const rawHeader = jwtDecode<JwtHeader>(token, { header: true });
+  const rawPayload = jwtDecode<JwtPayload>(token);
 
   const header = _.map(rawHeader, (value, claim) => parseClaims({ claim, value }));
   const payload = _.map(rawPayload, (value, claim) => parseClaims({ claim, value }));
@@ -15,6 +17,11 @@ function decodeJwt({ jwt }: { jwt: string }) {
     header,
     payload,
   };
+}
+
+// 从 Authorization header 里复制出来的值通常带 `Bearer ` 前缀和多余空白，解析前先剥离
+function stripBearerPrefix(jwt: string) {
+  return jwt.trim().replace(/^bearer\s+/i, '');
 }
 
 function parseClaims({ claim, value }: { claim: string; value: unknown }) {
