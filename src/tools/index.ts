@@ -129,11 +129,11 @@ export const toolsByCategory: ToolCategory[] = [
     },
     {
         name: 'Rental-Business',
-        components: [rentalSwitch, rentalEcuMock, rentalCabinetMock,rentalGetMeituanShopToken],
+        components: [rentalSwitch, rentalEcuMock, rentalCabinetMock, rentalGetMeituanShopToken],
     },
     {
         name: 'Oversea-Business',
-        components: [overseaSwitch, overseaEcuMock],
+        components: [overseaSwitch],
     },
     // {
     //     name: 'Business',
