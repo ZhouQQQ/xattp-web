@@ -202,6 +202,10 @@ const envs = [
     label: 'PROD2',
     value: 'prod2',
   },
+  {
+    label: 'prod-sg(新加坡)',
+    value: 'prod-sg',
+  },
   // {
   //   label: 'DIDI',
   //   value: 'didi',
@@ -265,6 +269,7 @@ watch(targetEnv, (val) => {
   if (val === 'uat') tenantID.value = 5;
   else if (val === 'prod') tenantID.value = 2;
   else if (val === 'prod2') tenantID.value = 1;
+  else if (val === 'prod-sg') tenantID.value = 4164;
   else if (val === 'dev') tenantID.value = 1;
   else if (val === 'test2') tenantID.value = 1;
   else if (val === 'yunjiang') tenantID.value = 1955;
@@ -274,6 +279,7 @@ watch(targetEnv, (val) => {
   else if (val === 'bdqx') tenantID.value = 2719;
   else if (val === 'qiyiqi') tenantID.value = 250;
   else if (val === 'feifan') tenantID.value = 2001;
+  else if (val === 'shengchan') tenantID.value = undefined;
   else tenantID.value = undefined;
 });
 
