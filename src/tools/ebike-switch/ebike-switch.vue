@@ -191,15 +191,15 @@ const server = ref();
 
 const envs = [
   {
-    label: 'UAT',
+    label: 'uat',
     value: 'uat',
   },
   {
-    label: 'PROD',
+    label: 'prod',
     value: 'prod',
   },
   {
-    label: 'PROD2',
+    label: 'prod2',
     value: 'prod2',
   },
   {
@@ -211,11 +211,11 @@ const envs = [
   //   value: 'didi',
   // },
   {
-    label: 'DEV',
+    label: 'dev',
     value: 'dev',
   },
   {
-    label: 'TEST2',
+    label: 'test2',
     value: 'test2',
   },
   {
