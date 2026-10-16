@@ -79,14 +79,8 @@
           size="small"
           secondary
           class="add-mock-button"
-          :disabled="isCreateMode || existingMockList.length >= MAX_ACTIVE_MOCKS"
-          :title="
-            isCreateMode
-              ? '请先完成当前新建'
-              : existingMockList.length >= MAX_ACTIVE_MOCKS
-                ? '每人暂时最多 3 个在线模拟中控'
-                : ''
-          "
+          :disabled="isCreateMode"
+          :title="isCreateMode ? '请先完成当前新建' : ''"
           @click="handleAddMockTab"
         >
           <template #icon>
@@ -1098,7 +1092,6 @@ interface ExistingMockItem {
   imei: string;
   raw: XiaoanEcuMockActiveItem;
 }
-const MAX_ACTIVE_MOCKS = 3;
 const existingMockList = ref<ExistingMockItem[]>([]);
 const activeExistingMockConnectId = ref("");
 /** 点击「新增模拟」后的占位 Tab，与真实连接 Tab 互斥选中 */
@@ -1343,10 +1336,6 @@ async function activateExistingMock(selectedConnectId: string) {
 
 /** 进入新增模拟状态，已运行的连接保持不变。 */
 function handleAddMockTab() {
-  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
-    message.warning("每人暂时最多 3 个在线模拟中控");
-    return;
-  }
   if (hasPendingSessionOperation()) {
     message.warning("当前操作完成后再新增中控");
     return;
@@ -1682,10 +1671,6 @@ function validateBeforeCreate(): boolean {
 
 /** 创建 mock 连接：点击按钮时二次确认 */
 function handleCreate() {
-  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
-    message.warning("每人暂时最多 3 个在线模拟中控");
-    return;
-  }
   if (!validateBeforeCreate()) return;
   dialog.warning({
     title: "确认开始模拟",
@@ -1699,10 +1684,6 @@ function handleCreate() {
 }
 
 async function doCreate() {
-  if (existingMockList.value.length >= MAX_ACTIVE_MOCKS) {
-    message.warning("每人暂时最多 3 个在线模拟中控");
-    return;
-  }
   if (!validateBeforeCreate()) return;
   const imei = formData.imei.trim();
   const refImei = formData.ref_imei?.trim();
