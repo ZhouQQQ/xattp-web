@@ -722,7 +722,7 @@ const defaultFormData: BatchFormData = {
   server: "",
   tenant_id: "",
   business_type: null,
-  voltage_min: 50,
+  voltage_min: 54,
   voltage_max: 54,
   lat: DEFAULT_COORD_LAT,
   lng: DEFAULT_COORD_LNG,
@@ -759,7 +759,7 @@ function getInitialFormData(): BatchFormData {
       merged.voltage_min = Math.trunc(parsed.voltage);
       merged.voltage_max = Math.trunc(parsed.voltage);
     }
-    // 缓存里缺省或非法电压时，使用表单初始默认 50–54（避免 null 被规范成 0–0）
+    // 缓存里缺省或非法电压时，使用表单初始默认 54–54（避免 null 被规范成 0–0）
     if (
       merged.voltage_min == null ||
       merged.voltage_max == null ||
@@ -1164,7 +1164,7 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
         server: snap.server ?? String(firstRaw.server || firstRecord?.server || "") ?? "",
         tenant_id: snap.tenant_id ?? firstRecord?.tenant_id ?? "",
         business_type: snap.business_type ?? group.business_type,
-        voltage_min: snap.voltage_min ?? 50,
+        voltage_min: snap.voltage_min ?? 54,
         voltage_max: snap.voltage_max ?? 54,
         lat: snap.lat ?? firstRecord?.lat ?? DEFAULT_COORD_LAT,
         lng: snap.lng ?? firstRecord?.lng ?? DEFAULT_COORD_LNG,
@@ -1200,7 +1200,7 @@ function createSessionFromApiGroup(group: any): BatchSessionMeta {
       server: group.server || "",
       tenant_id: group.tenant_id || "",
       business_type: group.business_type,
-      voltage_min: 50,
+      voltage_min: 54,
       voltage_max: 54,
       lat: firstRecord?.lat || DEFAULT_COORD_LAT,
       lng: firstRecord?.lng || DEFAULT_COORD_LNG,
