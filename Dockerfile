@@ -1,5 +1,5 @@
 # build stage（Node 18 无法运行新版 pnpm：dist 内正则用了 /v 等语法，需 Node 20+）
-FROM docker.m.daocloud.io/node:20-alpine AS build-stage
+FROM node:20-alpine AS build-stage
 ENV NODE_OPTIONS="--max_old_space_size=8098"
 
 WORKDIR /app
@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/app/node_modules/.vite \
   pnpm run build:docker
 
 # production stage
-FROM docker.m.daocloud.io/nginx:stable-alpine AS production-stage
+FROM nginx:stable-alpine AS production-stage
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
