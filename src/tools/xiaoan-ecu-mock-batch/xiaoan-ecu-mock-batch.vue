@@ -391,14 +391,14 @@
                       </n-button>
                     </n-space>
                     <n-button v-if="batchMockSessionActive" type="default"
-                      :disabled="batchRecordLoading || checkedImeis.length === 0 || sharedBindDisabledByEnv"
+                      :disabled="batchRecordLoading || sharedBindDisabledByEnv"
                       @click="openBindAndOnlineModal" class="bind-online-right-btn">
-                      共享-绑定并上架{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                      共享-绑定并上架{{ resolvedBatchImeis.length > 0 ? `（${resolvedBatchImeis.length}）` : "" }}
                     </n-button>
                     <n-button v-if="batchMockSessionActive" type="default"
-                      :disabled="batchRecordLoading || checkedImeis.length === 0 || rentalBatchAddDisabledByEnv"
+                      :disabled="batchRecordLoading || rentalBatchAddDisabledByEnv"
                       @click="openRentalBatchAddModal" class="rental-batch-add-right-btn">
-                      短租-批量入库{{ checkedImeis.length > 0 ? `（${checkedImeis.length}）` : "" }}
+                      短租-批量入库{{ resolvedBatchImeis.length > 0 ? `（${resolvedBatchImeis.length}）` : "" }}
                     </n-button>
                   </div>
                 </n-form-item>
@@ -847,6 +847,32 @@ const checkedImeis = computed(() =>
     .map((row) => row.imei)
     .filter((imei) => /^\d{15}$/.test(imei)),
 );
+
+/**
+ * 解析本次要操作的 IMEI 列表：
+ * 1. 优先取表格勾选行；
+ * 2. 无勾选（如表格为空）时按当前批次的 IMEI 规则推导：
+ *    - 顺序模式：起始 IMEI 起递增「创建数量」个
+ *    - 指定模式：IMEI 列表文本
+ *    - 随机模式：由后端生成，无法在前端推导，返回空
+ */
+const resolvedBatchImeis = computed<string[]>(() => {
+  const checked = Array.from(new Set(checkedImeis.value));
+  if (checked.length > 0) return checked;
+  // 表格有数据却未勾选，视为用户主动取消，不回填
+  if (batchMockListRows.value.length > 0) return [];
+  if (formData.mode === 2 && isFifteenDigitImei(formData.start_imei)) {
+    const count = Math.trunc(Number(formData.num));
+    const start = Number(formData.start_imei);
+    if (Number.isFinite(start) && count > 0) {
+      return Array.from({ length: count }, (_, i) => String(start + i).padStart(15, "0"));
+    }
+  }
+  if (formData.mode === 3) {
+    return Array.from(new Set(parseImeisText(formData.imeis_text))).filter((imei) => isFifteenDigitImei(imei));
+  }
+  return [];
+});
 const tableSuccessFilter = ref<"all" | "success" | "fail">("all");
 /** 顺序模式下，下一次批量新增的起始 IMEI（自动 = 之前的 start_imei + num） */
 const nextSequentialStartImei = ref("");
@@ -2613,11 +2639,7 @@ async function handleCopyCheckedImeis() {
 }
 
 function openBindAndOnlineModal() {
-  const imeis = Array.from(new Set(checkedImeis.value));
-  if (imeis.length === 0) {
-    message.warning("请先勾选要绑定并上架的 IMEI");
-    return;
-  }
+  const imeis = resolvedBatchImeis.value;
   bindAndOnlineForm.env = formData.env?.trim() || defaultFormData.env;
   bindAndOnlineForm.tenant_id = formData.tenant_id || "";
   bindAndOnlineForm.service_area_id = "";
@@ -2628,11 +2650,7 @@ function openBindAndOnlineModal() {
 }
 
 function openRentalBatchAddModal() {
-  const imeis = Array.from(new Set(checkedImeis.value));
-  if (imeis.length === 0) {
-    message.warning("请先勾选要批量入库的 IMEI");
-    return;
-  }
+  const imeis = resolvedBatchImeis.value;
   rentalBatchAddForm.env = formData.env?.trim() || defaultFormData.env;
   rentalBatchAddForm.tenant_id = formData.tenant_id?.trim() || "";
   rentalBatchAddForm.tenant_name = "";

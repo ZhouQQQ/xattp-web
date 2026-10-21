@@ -13,6 +13,7 @@ import { tool as rentalCabinetMock } from './rental-cabinet-mock';
 import { tool as ecuVoiceIdx } from './ecu-voice-idx';
 import { tool as rentalEcuMock } from './rental-ecu-mock';
 import { tool as xiaoanEcuMock } from './xiaoan-ecu-mock';
+import { tool as ecuTool } from './ecu-tool';
 import { tool as ecuMock } from './ecu-mock';
 import { tool as mergeRequestCheck } from './merge-request-check';
 import { tool as clearRealname } from './clear-realname';
@@ -173,6 +174,7 @@ export const toolsByCategory: ToolCategory[] = [
             // sqlPrettify,
             // emojiPicker,
             // asciiTextDrawer,
+            ecuTool,
         ],
     },
     // {

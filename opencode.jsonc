@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "references": {
+    "xattp-server": {
+      "path": "../xattp-server",
+      "description": "xattp 后端服务源码。涉及接口契约、数据模型、后端业务逻辑、报错溯源时查阅。"
+    },
+    "ecu-tools": {
+      "path": "D:/ECU-TOOLS",
+      "description": "ECU 相关工具集。涉及 ECU 工具、协议、脚本与测试辅助程序时查阅。"
+    }
+  }
+}
